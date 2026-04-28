@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DentalPro — Tu Sonrisa, Transformada</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Cabinet+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy:'#08111C',panel:'#0F1E2E',ivory:'#F2EDE3',gold:'#C8A44A',
+            'gold-light':'#E4C97A',mint:'#34C9AB',muted:'#6B7E95','red-urgent':'#E84545',
+          },
+          fontFamily: {
+            display:['Cormorant Garamond','Georgia','serif'],
+            body:['Cabinet Grotesk','system-ui','sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    .hero-bg { position:relative; }
+    .hero-bg::before {
+      content:''; position:absolute; inset:0;
+      background-image:url('assets/img/hero-dental.jpg');
+      background-size:cover; background-position:center top;
+      opacity:0.08; z-index:0;
+    }
+    .hero-bg > * { position:relative; z-index:1; }
+
+    .before-after-wrap {
+      position:relative; border-radius:20px; overflow:hidden;
+      aspect-ratio:16/9; max-width:680px; margin:0 auto;
+      box-shadow:0 24px 60px rgba(0,0,0,0.5);
+      border:1px solid rgba(255,255,255,0.07);
+    }
+    .ba-img { width:50%; height:100%; object-fit:cover; display:block; float:left; }
+    .ba-divider {
+      position:absolute; top:0; bottom:0; left:50%;
+      transform:translateX(-50%); width:3px; background:var(--gold); z-index:2;
+    }
+    .ba-divider-dot {
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      width:36px; height:36px; border-radius:50%;
+      background:var(--gold); display:flex; align-items:center;
+      justify-content:center; font-size:14px; color:var(--navy);
+      font-weight:800; z-index:3; box-shadow:0 0 0 4px rgba(200,164,74,0.25);
+    }
+    .ba-label {
+      position:absolute; bottom:14px; font-size:10px; font-weight:800;
+      text-transform:uppercase; letter-spacing:0.1em;
+      padding:4px 12px; border-radius:99px; z-index:3;
+    }
+    .ba-label-before { left:14px; background:rgba(232,69,69,0.85); color:white; }
+    .ba-label-after  { right:14px; background:rgba(52,201,171,0.9); color:var(--navy); }
+
+    .doctor-img-wrap {
+      width:120px; height:120px; border-radius:50%; overflow:hidden;
+      border:3px solid rgba(200,164,74,0.4); flex-shrink:0;
+    }
+    .doctor-img-wrap img { width:100%; height:100%; object-fit:cover; object-position:center top; }
+
+    .testimonial-avatar {
+      width:44px; height:44px; border-radius:50%; overflow:hidden;
+      border:2px solid rgba(255,255,255,0.12); flex-shrink:0;
+    }
+    .testimonial-avatar img { width:100%; height:100%; object-fit:cover; }
+
+    .avatar-ring {
+      width:44px; height:44px; border-radius:50%;
+      border:2px solid rgba(255,255,255,0.12); overflow:hidden;
+      flex-shrink:0; display:flex; align-items:center;
+      justify-content:center; font-weight:700; font-size:0.85rem;
+    }
+  </style>
+</head>
+<body class="bg-mesh">
+
+  <!-- NAVBAR -->
+  <nav class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-5 py-4"
+       style="background:rgba(8,17,28,0.88);backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,0.055);">
+    <a href="#" class="font-display text-xl font-bold text-ivory tracking-tight">
+      Dental<span class="text-gradient">Pro</span>
+    </a>
+    <div class="hidden md:flex items-center gap-8 text-xs font-medium uppercase tracking-wider" style="color:var(--muted);">
+      <a href="#para-quien" class="hover:text-ivory transition-colors">¿Para mí?</a>
+      <a href="#doctor" class="hover:text-ivory transition-colors">El Doctor</a>
+      <a href="#testimonios" class="hover:text-ivory transition-colors">Resultados</a>
+      <a href="#faq" class="hover:text-ivory transition-colors">Preguntas</a>
+    </div>
+    <a href="https://wa.me/595XXXXXXXXX"
+       class="text-xs font-bold px-5 py-2.5 rounded-full transition-all duration-200 hover:opacity-90"
+       style="background:var(--mint);color:var(--navy);">
+      Agendar ahora →
+    </a>
+  </nav>
+
+  <!-- HERO -->
+  <section id="hero" class="hero-bg min-h-screen flex flex-col justify-center pt-28 pb-20 px-6 text-center">
+    <div class="flex justify-center mb-7 reveal">
+      <div class="urgency-chip">
+        <span class="ping-dot"></span>
+        Solo quedan <strong>8 turnos</strong> disponibles esta semana
+      </div>
+    </div>
+    <h1 class="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-ivory reveal" style="transition-delay:0.1s;line-height:1.08;">
+      ¿Cuántos años llevas<br />
+      <em class="text-gradient">tapando tu sonrisa</em><br />
+      en las fotos?
+    </h1>
+    <p class="mt-6 max-w-xl mx-auto text-base md:text-lg leading-relaxed reveal" style="transition-delay:0.2s;color:var(--muted);">
+      En <strong class="text-ivory">una sola consulta gratuita</strong> sabés exactamente qué tiene tu boca,
+      cuánto cuesta arreglarlo y cómo empezar hoy. Sin letra chica. Sin presión.
+    </p>
+    <div class="mt-8 mx-auto max-w-md p-6 highlight-box reveal" style="transition-delay:0.3s;">
+      <p class="text-xs uppercase tracking-widest font-bold mb-4" style="color:var(--mint);">Lo que incluye tu consulta gratuita:</p>
+      <ul class="space-y-2.5 text-left text-sm">
+        <li class="flex items-start gap-3"><span class="mt-0.5" style="color:var(--mint);">✓</span><span class="text-ivory">Diagnóstico completo con el Dr. especialista</span></li>
+        <li class="flex items-start gap-3"><span class="mt-0.5" style="color:var(--mint);">✓</span><span><span class="text-ivory">Radiografía panorámica digital</span> <span class="line-through text-xs" style="color:var(--muted);">valor $40.000</span></span></li>
+        <li class="flex items-start gap-3"><span class="mt-0.5" style="color:var(--mint);">✓</span><span class="text-ivory">Plan de tratamiento personalizado + presupuesto exacto</span></li>
+        <li class="flex items-start gap-3"><span class="mt-0.5" style="color:var(--mint);">✓</span><span class="text-ivory">Opciones de financiación en cuotas desde la 1ª visita</span></li>
+      </ul>
+      <div class="mt-4 pt-4 flex items-center justify-between" style="border-top:1px solid rgba(255,255,255,0.07);">
+        <span class="text-xs" style="color:var(--muted);">Valor real: <span class="line-through">$80.000 Gs</span></span>
+        <span class="text-sm font-bold" style="color:var(--mint);">Hoy: 100% GRATIS</span>
+      </div>
+    </div>
+    <div class="mt-8 reveal" style="transition-delay:0.4s;">
+      <a href="https://wa.me/595XXXXXXXXX"
+         class="cta-pulse inline-flex items-center gap-3 font-bold text-base md:text-lg px-8 py-4 rounded-full transition-all duration-200 hover:opacity-90 hover:scale-105"
+         style="background:var(--mint);color:var(--navy);">
+        <svg class="w-5 h-5 wa-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.525 5.85L.057 23.032a.5.5 0 0 0 .611.61l5.26-1.45A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.799 9.799 0 0 1-5.031-1.39l-.36-.214-3.732 1.03 1.005-3.643-.235-.375A9.818 9.818 0 0 1 2.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>
+        Quiero mi consulta GRATIS →
+      </a>
+      <p class="mt-3 text-xs" style="color:var(--muted);">Respondemos en menos de 5 min · Sin spam · 100% sin compromiso</p>
+    </div>
+    <div class="mt-10 flex items-center justify-center gap-4 reveal" style="transition-delay:0.5s;">
+      <div class="flex -space-x-2.5">
+        <div class="testimonial-avatar" style="border:2px solid rgba(200,164,74,0.4);"><img src="assets/img/patient-1.jpg" alt="Paciente" /></div>
+        <div class="testimonial-avatar" style="border:2px solid rgba(52,201,171,0.4);"><img src="assets/img/patient-2.jpg" alt="Paciente" /></div>
+        <div class="avatar-ring" style="background:#7c3aed;color:white;font-size:11px;">+</div>
+      </div>
+      <p class="text-sm" style="color:var(--muted);"><strong class="text-ivory">+320 pacientes</strong> transformaron su sonrisa este año</p>
+    </div>
+  </section>
+
+  <!-- ANTES / DESPUÉS -->
+  <section class="py-20 px-6" style="background:rgba(255,255,255,0.02);">
+    <div class="max-w-3xl mx-auto">
+      <div class="text-center mb-10 reveal">
+        <p class="text-xs uppercase tracking-widest font-bold mb-2" style="color:var(--gold);">Resultados reales</p>
+        <h2 class="font-display text-3xl md:text-4xl font-bold text-ivory gold-line">Ver para creer</h2>
+        <p class="mt-4 text-sm max-w-md mx-auto" style="color:var(--muted);">No usamos filtros ni edición. Esto es lo que pasa cuando un especialista trabaja con la tecnología correcta.</p>
+      </div>
+      <div class="before-after-wrap reveal" style="transition-delay:0.1s;">
+        <img src="assets/img/antes.jpg" alt="Antes del tratamiento" class="ba-img" />
+        <img src="assets/img/despues.jpg" alt="Después del tratamiento" class="ba-img" />
+        <div class="ba-divider"><div class="ba-divider-dot">↔</div></div>
+        <span class="ba-label ba-label-before">Antes</span>
+        <span class="ba-label ba-label-after">Después</span>
+      </div>
+      <p class="mt-6 text-center text-xs" style="color:var(--muted);">Resultado real de paciente · Tratamiento de carillas en 2 sesiones · Sin filtros</p>
+      <div class="mt-8 text-center reveal" style="transition-delay:0.2s;">
+        <a href="https://wa.me/595XXXXXXXXX"
+           class="inline-flex items-center gap-2 font-bold text-sm px-7 py-3.5 rounded-full transition-all hover:opacity-90"
+           style="background:var(--mint);color:var(--navy);">
+          Quiero este resultado →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- PARA QUIÉN -->
+  <section id="para-quien" class="py-20 px-6">
+    <div class="max-w-2xl mx-auto">
+      <div class="text-center mb-12 reveal">
+        <p class="text-xs uppercase tracking-widest font-bold mb-2" style="color:var(--gold);">¿Esto es para vos?</p>
+        <h2 class="font-display text-3xl md:text-4xl font-bold text-ivory gold-line">Si alguna de estas frases<br />te suena familiar…</h2>
+      </div>
+      <div class="space-y-3 reveal" style="transition-delay:0.1s;">
+        <div class="empathy-item"><span class="text-xl mt-0.5">😬</span><div><p class="text-ivory text-sm font-medium">"Llevo años sin ir al dentista y me da vergüenza que me vean la boca."</p><p class="text-xs mt-1" style="color:var(--muted);">No te juzgamos. Nuestro trabajo es ayudarte, no hacerte sentir mal.</p></div></div>
+        <div class="empathy-item"><span class="text-xl mt-0.5">📸</span><div><p class="text-ivory text-sm font-medium">"En las fotos siempre cierro la boca. Ya ni recuerdo cómo es sonreír de verdad."</p><p class="text-xs mt-1" style="color:var(--muted);">Eso termina. Muchos tratamientos muestran resultados desde la primera sesión.</p></div></div>
+        <div class="empathy-item"><span class="text-xl mt-0.5">💸</span><div><p class="text-ivory text-sm font-medium">"Quiero arreglar mis dientes pero creo que no puedo pagarlo."</p><p class="text-xs mt-1" style="color:var(--muted);">Financiamos en hasta 18 cuotas. En la consulta te armamos un plan a tu medida.</p></div></div>
+        <div class="empathy-item"><span class="text-xl mt-0.5">😨</span><div><p class="text-ivory text-sm font-medium">"Le tengo terror al dentista. La última vez fue horrible."</p><p class="text-xs mt-1" style="color:var(--muted);">Entendemos ese miedo. Trabajamos con sedación consciente y nunca te apuramos.</p></div></div>
+        <div class="empathy-item"><span class="text-xl mt-0.5">⏳</span><div><p class="text-ivory text-sm font-medium">"Ya lo vengo postergando hace dos años. 'La semana que viene' y nunca."</p><p class="text-xs mt-1" style="color:var(--muted);">Cada mes que pasa, los problemas pequeños se vuelven costosos. Hoy es el día.</p></div></div>
+      </div>
+      <div class="mt-10 text-center reveal" style="transition-delay:0.3s;">
+        <p class="text-sm mb-5 font-medium text-ivory">Si te identificaste, esta consulta es exactamente para vos.</p>
+        <a href="https://wa.me/595XXXXXXXXX" class="inline-flex items-center gap-2 font-bold text-sm px-7 py-3.5 rounded-full transition-all hover:opacity-90" style="background:var(--mint);color:var(--navy);">Quiero empezar hoy →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOCTOR -->
+  <section id="doctor" class="py-20 px-6" style="background:rgba(255,255,255,0.018);">
+    <div class="max-w-3xl mx-auto">
+      <div class="text-center mb-12 reveal">
+        <p class="text-xs uppercase tracking-widest font-bold mb-2" style="color:var(--gold);">Quién te atiende</p>
+        <h2 class="font-display text-3xl md:text-4xl font-bold text-ivory gold-line">Un especialista real.<br />No un recepcionista.</h2>
+      </div>
+      <div class="card p-7 md:p-10 reveal" style="transition-delay:0.1s;">
+        <div class="flex flex-col md:flex-row items-center md:items-start gap-8">
+          <div class="flex flex-col items-center gap-3 flex-shrink-0">
+            <div class="doctor-img-wrap"><img src="assets/img/avatar-doctor.jpg" alt="Dr. Especialista" /></div>
+            <div class="text-center">
+              <p class="font-bold text-ivory text-sm">Dr. [Nombre Apellido]</p>
+              <p class="text-xs mt-0.5" style="color:var(--gold);">Especialista en Estética Dental</p>
+            </div>
+          </div>
+          <div class="flex-1 text-center md:text-left">
+            <p class="text-sm leading-relaxed mb-6" style="color:var(--muted);">Con más de <strong class="text-ivory">15 años de experiencia</strong> y formación internacional, el Dr. [Nombre] se especializa en transformaciones de sonrisa que cambian la vida de sus pacientes. No solo arregla dientes — devuelve confianza.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="flex items-center gap-3 p-3 rounded-xl" style="background:rgba(200,164,74,0.07);border:1px solid rgba(200,164,74,0.15);"><span class="text-lg">🎓</span><div><p class="text-xs font-bold text-ivory">Postgrado Internacional</p><p class="text-xs" style="color:var(--muted);">[Universidad o País]</p></div></div>
+              <div class="flex items-center gap-3 p-3 rounded-xl" style="background:rgba(52,201,171,0.07);border:1px solid rgba(52,201,171,0.15);"><span class="text-lg">🏆</span><div><p class="text-xs font-bold text-ivory">+1.200 pacientes</p><p class="text-xs" style="color:var(--muted);">transformaciones realizadas</p></div></div>
+              <div class="flex items-center gap-3 p-3 rounded-xl" style="background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.15);"><span class="text-lg">⭐</span><div><p class="text-xs font-bold text-ivory">4.9 estrellas</p><p class="text-xs" style="color:var(--muted);">en Google Reviews</p></div></div>
+              <div class="flex items-center gap-3 p-3 rounded-xl" style="background:rgba(232,69,69,0.07);border:1px solid rgba(232,69,69,0.12);"><span class="text-lg">🛡️</span><div><p class="text-xs font-bold text-ivory">Garantía escrita</p><p class="text-xs" style="color:var(--muted);">en todos los tratamientos</p></div></div>
+            </div>
+            <p class="mt-6 text-sm italic" style="color:var(--muted);">"Mi trabajo no es solo arreglar dientes. Es devolverte las ganas de sonreír." <span class="not-italic font-bold text-ivory">— Dr. [Nombre]</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HVCO -->
+  <section id="hvco" class="py-16 px-6">
+    <div class="max-w-2xl mx-auto">
+      <div class="hvco-banner p-7 md:p-9 reveal">
+        <div class="flex flex-col md:flex-row items-start md:items-center gap-6">
+          <div class="text-5xl flex-shrink-0">📋</div>
+          <div class="flex-1">
+            <p class="text-xs uppercase tracking-widest font-bold mb-2" style="color:var(--mint);">Guía gratuita — descarga instantánea</p>
+            <h3 class="font-display text-2xl md:text-3xl font-bold text-ivory leading-snug mb-3">"Los 5 Síntomas que tu Boca ya te Está Dando (y que cuestan 10x más ignorar)"</h3>
+            <p class="text-sm mb-5" style="color:var(--muted);">Descubrí qué señales advierten sobre caries profundas, pérdida ósea y problemas de encías <em>antes</em> de que se vuelvan emergencias de $500.000+.</p>
+            <div class="flex flex-col sm:flex-row gap-3">
+              <input type="email" placeholder="Tu email para recibir la guía" class="flex-1 px-4 py-3 rounded-xl text-sm outline-none" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:var(--ivory);" />
+              <button class="px-6 py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90 whitespace-nowrap" style="background:var(--mint);color:var(--navy);">Enviar guía gratis</button>
+            </div>
+            <p class="mt-2 text-xs" style="color:var(--muted);">Sin spam. Podés darte de baja cuando quieras.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CÓMO FUNCIONA -->
+  <section id="como-funciona" class="py-20 px-6" style="background:rgba(255,255,255,0.018);">
+    <div class="max-w-2xl mx-auto">
+      <div class="text-center mb-14 reveal">
+        <p class="text-xs uppercase tracking-widest font-bold mb-2" style="color:var(--gold);">Proceso simple</p>
+        <h2 class="font-display text-3xl md:text-4xl font-bold text-ivory gold-line">3 pasos. Sin complicaciones.</h2>
+      </div>
+      <div class="space-y-0">
+        <div class="flex gap-6 items-start reveal" style="transition-delay:0.1s;"><div><div class="step-badge" style="background:var(--gold);color:var(--navy);">1</div></div><div class="pt-1.5 pb-8"><h3 class="font-bold text-ivory text-lg mb-1.5">Completás el formulario en 60 segundos</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">Respondés 3 preguntas rápidas. Nuestro sistema identifica tu caso y lo prepara para el especialista antes de que llegues.</p></div></div>
+        <div class="step-line mb-0 reveal" style="background:linear-gradient(to bottom,var(--gold),var(--mint));transition-delay:0.15s;"></div>
+        <div class="flex gap-6 items-start reveal" style="transition-delay:0.2s;"><div><div class="step-badge" style="background:var(--mint);color:var(--navy);">2</div></div><div class="pt-1.5 pb-8"><h3 class="font-bold text-ivory text-lg mb-1.5">Consulta diagnóstica 100% gratuita</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">El Dr. especialista te examina, hace la radiografía y te presenta un plan con precios reales. Sin letra chica.</p></div></div>
+        <div class="step-line mb-0 reveal" style="background:linear-gradient(to bottom,var(--mint),#7c3aed);transition-delay:0.25s;"></div>
+        <div class="flex gap-6 items-start reveal" style="transition-delay:0.3s;"><div><div class="step-badge" style="background:#7c3aed;color:white;">3</div></div><div class="pt-1.5"><h3 class="font-bold text-ivory text-lg mb-1.5">Empezás ese mismo día si querés</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">Si te convence el plan, podés arrancar el tratamiento en esa misma visita. Sin presión. Sin burocracia.</p></div></div>
+      </div>
+      <div class="mt-12 text-center reveal" style="transition-delay:0.4s;">
+        <a href="https://wa.me/595XXXXXXXXX" class="inline-flex items-center gap-2 font-bold px-7 py-3.5 rounded-full border-2 transition-all hover:opacity-80" style="border-color:var(--mint);color:var(--mint);">Empezar ahora →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- BENEFICIOS -->
+  <section id="beneficios" class="py-20 px-6 max-w-5xl mx-auto">
+    <div class="text-center mb-14 reveal">
+      <p class="text-xs uppercase tracking-widest font-bold mb-2" style="color:var(--gold);">Por qué elegirnos</p>
+      <h2 class="font-display text-3xl md:text-4xl font-bold text-ivory gold-line">Lo que nos hace diferentes</h2>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div class="card p-6 reveal" style="transition-delay:0.1s;"><div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 text-xl" style="background:rgba(200,164,74,0.14);">🦷</div><h3 class="font-bold text-ivory mb-2">Sin Dolor, Garantizado</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">Anestesia tópica antes de la inyección. El 90% de nuestros pacientes con fobia terminan tranquilos en la primera sesión.</p></div>
+      <div class="card p-6 reveal" style="transition-delay:0.2s;"><div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 text-xl" style="background:rgba(52,201,171,0.14);">⚡</div><h3 class="font-bold text-ivory mb-2">Resultados en Días</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">Blanqueamiento desde la sesión 1. Carillas en 2-3 sesiones. Salís de la clínica con una sonrisa diferente.</p></div>
+      <div class="card p-6 reveal" style="transition-delay:0.3s;"><div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 text-xl" style="background:rgba(124,58,237,0.14);">💳</div><h3 class="font-bold text-ivory mb-2">Cuotas sin Interés</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">Financiamos en hasta 18 cuotas. Que el dinero no sea el obstáculo entre vos y tu sonrisa.</p></div>
+      <div class="card p-6 reveal" style="transition-delay:0.1s;"><div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 text-xl" style="background:rgba(52,201,171,0.14);">🏥</div><h3 class="font-bold text-ivory mb-2">Tecnología de Punta</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">Escáner intraoral 3D, rayos X digitales de baja radiación y láser dental. Diagnósticos más precisos.</p></div>
+      <div class="card p-6 reveal" style="transition-delay:0.2s;"><div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 text-xl" style="background:rgba(200,164,74,0.14);">🎓</div><h3 class="font-bold text-ivory mb-2">Especialistas con Postgrado</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">Más de 15 años de experiencia combinada. Certificados internacionalmente. No experimentamos — ejecutamos.</p></div>
+      <div class="card p-6 reveal" style="transition-delay:0.3s;"><div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 text-xl" style="background:rgba(232,69,69,0.12);">🛡️</div><h3 class="font-bold text-ivory mb-2">Garantía por Escrito</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">Carillas y coronas: hasta 5 años. Ortodoncia: 12 meses post-retención. Si algo falla, lo solucionamos sin costo.</p></div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIOS -->
+  <section id="testimonios" class="py-20 px-6 max-w-5xl mx-auto">
+    <div class="text-center mb-14 reveal">
+      <p class="text-xs uppercase tracking-widest font-bold mb-2" style="color:var(--gold);">Resultados reales</p>
+      <h2 class="font-display text-3xl md:text-4xl font-bold text-ivory gold-line">Pacientes que ya Sonríen</h2>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-12">
+      <div class="card p-6 flex flex-col gap-4 reveal" style="transition-delay:0.1s;">
+        <div class="quote-mark leading-none">"</div>
+        <p class="text-sm leading-relaxed -mt-4" style="color:var(--muted);">Toda la vida le tuve terror al dentista. Acá entré temblando y salí riéndome. El procedimiento no dolió <strong class="text-ivory">absolutamente nada</strong>.</p>
+        <div class="flex items-center gap-3 mt-auto">
+          <div class="testimonial-avatar"><img src="assets/img/patient-1.jpg" alt="María R." /></div>
+          <div><p class="font-bold text-ivory text-sm">María Rodríguez</p><p class="text-xs" style="color:var(--muted);">Blanqueamiento · ⭐⭐⭐⭐⭐</p></div>
+        </div>
+      </div>
+      <div class="card p-6 flex flex-col gap-4 reveal" style="transition-delay:0.2s;border-color:rgba(200,164,74,0.38);background:rgba(200,164,74,0.05);">
+        <div class="quote-mark leading-none">"</div>
+        <p class="text-sm leading-relaxed -mt-4" style="color:var(--muted);">Me pusieron carillas en dos sesiones. Mis amigos pensaron que había gastado una fortuna. Pagué en cuotas y el resultado superó <strong class="text-ivory">todas mis expectativas</strong>.</p>
+        <div class="flex items-center gap-3 mt-auto">
+          <div class="testimonial-avatar"><img src="assets/img/patient-2.jpg" alt="Santiago G." /></div>
+          <div><p class="font-bold text-ivory text-sm">Santiago González</p><p class="text-xs" style="color:var(--muted);">Carillas de porcelana · ⭐⭐⭐⭐⭐</p></div>
+        </div>
+      </div>
+      <div class="card p-6 flex flex-col gap-4 reveal" style="transition-delay:0.3s;">
+        <div class="quote-mark leading-none">"</div>
+        <p class="text-sm leading-relaxed -mt-4" style="color:var(--muted);">Fui por la consulta gratis y no había trampa. Me explicaron todo con tiempo y terminé <strong class="text-ivory">arrancando el tratamiento ese mismo día</strong>.</p>
+        <div class="flex items-center gap-3 mt-auto">
+          <div class="avatar-ring" style="background:#7c3aed;color:white;">LP</div>
+          <div><p class="font-bold text-ivory text-sm">Laura Paredes</p><p class="text-xs" style="color:var(--muted);">Ortodoncia invisible · ⭐⭐⭐⭐⭐</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="flex flex-wrap justify-center gap-10 reveal" style="transition-delay:0.4s;">
+      <div class="text-center"><p class="stat-number text-4xl md:text-5xl" style="color:var(--gold);">320+</p><p class="text-xs mt-1" style="color:var(--muted);">Pacientes este año</p></div>
+      <div class="text-center"><p class="stat-number text-4xl md:text-5xl" style="color:var(--mint);">4.9★</p><p class="text-xs mt-1" style="color:var(--muted);">Google Reviews</p></div>
+      <div class="text-center"><p class="stat-number text-4xl md:text-5xl text-ivory">15+</p><p class="text-xs mt-1" style="color:var(--muted);">Años de experiencia</p></div>
+      <div class="text-center"><p class="stat-number text-4xl md:text-5xl" style="color:#7c3aed;">98%</p><p class="text-xs mt-1" style="color:var(--muted);">Recomendarían la clínica</p></div>
+    </div>
+  </section>
+
+  <!-- GARANTÍA -->
+  <section class="py-20 px-6" style="background:rgba(255,255,255,0.018);">
+    <div class="max-w-3xl mx-auto text-center">
+      <div class="reveal mb-10"><p class="text-xs uppercase tracking-widest font-bold mb-2" style="color:var(--gold);">Riesgo cero para vos</p><h2 class="font-display text-3xl md:text-4xl font-bold text-ivory gold-line">La garantía más simple del mundo</h2></div>
+      <div class="flex flex-col md:flex-row gap-5 reveal" style="transition-delay:0.1s;">
+        <div class="card p-7 flex-1 text-left"><p class="text-3xl mb-4">🔒</p><h3 class="font-bold text-ivory mb-2">La consulta es gratis. Punto.</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">No te pedimos tarjeta. Sin condiciones ocultas. Si venís y no querés seguir, salís sin deber nada.</p></div>
+        <div class="card p-7 flex-1 text-left" style="border-color:rgba(200,164,74,0.3);"><p class="text-3xl mb-4">📝</p><h3 class="font-bold text-ivory mb-2">Garantía escrita en tu tratamiento</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">Carillas y coronas: 5 años. Ortodoncia: 12 meses post-retención. Si algo no está bien, lo arreglamos gratis.</p></div>
+        <div class="card p-7 flex-1 text-left"><p class="text-3xl mb-4">💰</p><h3 class="font-bold text-ivory mb-2">Presupuesto exacto antes de empezar</h3><p class="text-sm leading-relaxed" style="color:var(--muted);">Sin costos sorpresa. Lo que cotizamos es lo que pagás.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="py-20 px-6">
+    <div class="max-w-2xl mx-auto">
+      <div class="text-center mb-14 reveal"><p class="text-xs uppercase tracking-widest font-bold mb-2" style="color:var(--gold);">Sin dudas</p><h2 class="font-display text-3xl md:text-4xl font-bold text-ivory gold-line">Preguntas Frecuentes</h2></div>
+      <div class="space-y-3">
+        <details class="card p-5 reveal" style="transition-delay:0.1s;"><summary class="flex items-center justify-between text-ivory font-medium text-sm">¿La consulta es realmente gratis? ¿Hay letra chica?<span class="faq-icon ml-4 text-xl flex-shrink-0" style="color:var(--gold);">+</span></summary><p class="mt-4 text-sm leading-relaxed" style="color:var(--muted);">100% gratis, sin asteriscos. Incluye consulta, radiografía panorámica digital y plan de tratamiento. No te cobramos nada en la primera visita.</p></details>
+        <details class="card p-5 reveal" style="transition-delay:0.15s;"><summary class="flex items-center justify-between text-ivory font-medium text-sm">¿Va a doler? Tengo mucho miedo al dentista.<span class="faq-icon ml-4 text-xl flex-shrink-0" style="color:var(--gold);">+</span></summary><p class="mt-4 text-sm leading-relaxed" style="color:var(--muted);">Usamos anestesia tópica antes de cualquier inyección. El 90% de nuestros pacientes con fobia dental terminan tranquilos en la primera sesión.</p></details>
+        <details class="card p-5 reveal" style="transition-delay:0.2s;"><summary class="flex items-center justify-between text-ivory font-medium text-sm">¿Cuánto cuestan los tratamientos?<span class="faq-icon ml-4 text-xl flex-shrink-0" style="color:var(--gold);">+</span></summary><p class="mt-4 text-sm leading-relaxed" style="color:var(--muted);">Los precios varían según el tratamiento. Garantizamos transparencia total: presupuesto exacto antes de empezar. Financiamos en hasta 18 cuotas sin interés.</p></details>
+        <details class="card p-5 reveal" style="transition-delay:0.25s;"><summary class="flex items-center justify-between text-ivory font-medium text-sm">¿Cuánto tiempo tarda ver resultados?<span class="faq-icon ml-4 text-xl flex-shrink-0" style="color:var(--gold);">+</span></summary><p class="mt-4 text-sm leading-relaxed" style="color:var(--muted);">El blanqueamiento muestra resultados desde la primera sesión. Las carillas en 2-3 sesiones. La ortodoncia invisible entre 6 y 18 meses.</p></details>
+        <details class="card p-5 reveal" style="transition-delay:0.3s;"><summary class="flex items-center justify-between text-ivory font-medium text-sm">¿Dónde están ubicados?<span class="faq-icon ml-4 text-xl flex-shrink-0" style="color:var(--gold);">+</span></summary><p class="mt-4 text-sm leading-relaxed" style="color:var(--muted);">Estamos en [Tu Dirección, Ciudad]. Estacionamiento gratuito. Atendemos lunes a sábados en horarios extendidos.</p></details>
+        <details class="card p-5 reveal" style="transition-delay:0.35s;"><summary class="flex items-center justify-between text-ivory font-medium text-sm">¿Los tratamientos tienen garantía?<span class="faq-icon ml-4 text-xl flex-shrink-0" style="color:var(--gold);">+</span></summary><p class="mt-4 text-sm leading-relaxed" style="color:var(--muted);">Sí, todos tienen garantía por escrito. Carillas y coronas: hasta 5 años. Ortodoncia: 12 meses post-retención.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA FINAL -->
+  <section id="cta-final" class="py-24 px-6 text-center">
+    <div class="max-w-lg mx-auto">
+      <div class="reveal">
+        <div class="flex justify-center mb-8"><div class="seal"><span class="text-2xl">🦷</span><p class="text-xs font-bold mt-1 text-center px-3 leading-tight" style="color:var(--gold);">Consulta<br/>100% Gratis</p></div></div>
+        <p class="text-xs uppercase tracking-widest font-bold mb-4" style="color:var(--mint);">¿Seguís dudando?</p>
+        <h2 class="font-display text-3xl md:text-5xl font-bold text-ivory leading-tight mb-6">Tu Sonrisa <span class="text-gradient">te está</span><br />Esperando</h2>
+        <p class="text-base leading-relaxed mb-8" style="color:var(--muted);">La consulta es gratis. El riesgo es cero.<br />El único costo real es seguir postergando la sonrisa que merecés.</p>
+        <div class="flex justify-center mb-8"><div class="urgency-chip"><span class="ping-dot"></span>⏰ Quedan solo <strong>7 turnos</strong> disponibles para esta semana</div></div>
+        <a href="https://wa.me/595XXXXXXXXX" class="cta-pulse inline-flex items-center gap-3 font-bold text-xl px-10 py-5 rounded-full transition-all duration-200 hover:opacity-90 hover:scale-105" style="background:var(--mint);color:var(--navy);">
+          <svg class="w-7 h-7 wa-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.525 5.85L.057 23.032a.5.5 0 0 0 .611.61l5.26-1.45A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.799 9.799 0 0 1-5.031-1.39l-.36-.214-3.732 1.03 1.005-3.643-.235-.375A9.818 9.818 0 0 1 2.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>
+          Agendar mi turno GRATIS
+        </a>
+        <p class="mt-4 text-xs" style="color:var(--muted);">Sin spam. Sin llamadas no deseadas. Solo por WhatsApp.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="py-10 px-6 text-center" style="border-top:1px solid rgba(255,255,255,0.055);">
+    <p class="font-display text-xl font-bold text-ivory mb-2">Dental<span class="text-gradient">Pro</span></p>
+    <p class="text-xs mb-4" style="color:var(--muted);">📍 [Tu Dirección] · 📞 [Tu Teléfono] · Lun–Sáb 8:00–19:00</p>
+    <p class="text-xs" style="color:rgba(107,126,149,0.45);">© 2025 DentalPro Clínica. Todos los derechos reservados.</p>
+  </footer>
+
+  <!-- STICKY MOBILE -->
+  <div class="sticky-cta md:hidden" id="stickyBtn">
+    <a href="https://wa.me/595XXXXXXXXX" class="cta-pulse flex items-center gap-2 font-semibold text-sm px-6 py-3 rounded-full shadow-2xl" style="background:var(--mint);color:var(--navy);">
+      <svg class="w-5 h-5 wa-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.525 5.85L.057 23.032a.5.5 0 0 0 .611.61l5.26-1.45A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.799 9.799 0 0 1-5.031-1.39l-.36-.214-3.732 1.03 1.005-3.643-.235-.375A9.818 9.818 0 0 1 2.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>
+      Consulta GRATIS por WhatsApp
+    </a>
+  </div>
+
+  <script src="js/typebot-config.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sistema ManyChat — Secuencia WhatsApp para Clínicas Odontológicas</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: rgba(255,255,255,0.07);
+    --gold: #C8A44A;
+    --mint: #34C9AB;
+    --red: #E84545;
+    --purple: #7c6cfc;
+    --text: #e8eaf0;
+    --muted: #6b7a95;
+    --wa-green: #25D366;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  
+  .page { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* COVER */
+  .cover { text-align: center; padding: 60px 0 48px; border-bottom: 1px solid var(--border); margin-bottom: 56px; }
+  .cover-badge { display: inline-block; background: rgba(52,201,171,0.1); border: 1px solid rgba(52,201,171,0.25); color: var(--mint); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; padding: 5px 14px; border-radius: 999px; margin-bottom: 20px; }
+  .cover h1 { font-size: clamp(24px, 5vw, 38px); font-weight: 800; color: #fff; line-height: 1.15; margin-bottom: 14px; }
+  .cover h1 span { color: var(--gold); }
+  .cover p { color: var(--muted); font-size: 15px; max-width: 520px; margin: 0 auto 28px; }
+  .cover-meta { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; }
+  .cover-meta-item { text-align: center; }
+  .cover-meta-item strong { display: block; font-size: 20px; font-weight: 800; color: var(--mint); }
+  .cover-meta-item span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* SECTION HEADERS */
+  .section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); margin-bottom: 8px; }
+  .section-title { font-size: clamp(20px, 3vw, 28px); font-weight: 800; color: #fff; margin-bottom: 6px; }
+  .section-sub { font-size: 14px; color: var(--muted); margin-bottom: 32px; }
+  .section-block { margin-bottom: 64px; }
+
+  /* FLUJO VISUAL */
+  .flow-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0; margin-bottom: 12px; }
+  .flow-node { position: relative; text-align: center; padding: 14px 8px; }
+  .flow-node:not(:last-child)::after { content: '→'; position: absolute; right: -8px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 18px; }
+  .flow-icon { font-size: 22px; margin-bottom: 4px; }
+  .flow-label { font-size: 11px; font-weight: 600; color: var(--text); }
+  .flow-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .flow-badge { display: inline-block; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 99px; margin-top: 4px; }
+  .badge-hot { background: rgba(232,69,69,0.15); color: #f87171; border: 1px solid rgba(232,69,69,0.3); }
+  .badge-warm { background: rgba(200,164,74,0.15); color: var(--gold); border: 1px solid rgba(200,164,74,0.3); }
+  .badge-cold { background: rgba(107,122,149,0.15); color: var(--muted); border: 1px solid rgba(107,122,149,0.25); }
+
+  /* MENSAJE CARDS */
+  .msg-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 24px; overflow: hidden; }
+  .msg-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px; }
+  .msg-header-left { display: flex; align-items: center; gap: 12px; }
+  .msg-number { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0; }
+  .msg-title { font-weight: 700; font-size: 15px; color: #fff; }
+  .msg-timing { font-size: 11px; color: var(--muted); }
+  .msg-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 3px 10px; border-radius: 99px; }
+  .msg-body { padding: 20px; }
+  
+  /* WhatsApp bubble */
+  .wa-bubble-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .wa-bubble { background: #1e2e22; border: 1px solid rgba(37,211,102,0.12); border-radius: 0 14px 14px 14px; padding: 14px 16px; font-size: 14px; line-height: 1.65; color: #d4e8d4; max-width: 520px; position: relative; white-space: pre-line; font-family: 'Inter', sans-serif; }
+  .wa-bubble::before { content: ''; position: absolute; top: 0; left: -8px; width: 0; height: 0; border-top: 8px solid rgba(37,211,102,0.12); border-left: 8px solid transparent; }
+  .wa-sender { font-size: 11px; color: var(--wa-green); font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .wa-sender::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--wa-green); display: inline-block; }
+  .wa-time { font-size: 10px; color: rgba(255,255,255,0.3); text-align: right; margin-top: 6px; }
+
+  /* Botones del mensaje */
+  .wa-buttons { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .wa-btn { background: rgba(37,211,102,0.08); border: 1px solid rgba(37,211,102,0.2); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--wa-green); font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .wa-btn-icon { font-size: 15px; }
+
+  /* Notas de configuración */
+  .config-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-top: 16px; }
+  .config-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--gold); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .config-title::before { content: '⚙️'; margin-right: 6px; }
+  .config-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 7px; font-size: 13px; color: var(--muted); }
+  .config-row:last-child { margin-bottom: 0; }
+  .config-key { color: var(--text); font-weight: 600; min-width: 130px; flex-shrink: 0; }
+  .config-val { color: var(--muted); }
+
+  /* Objetivo del mensaje */
+  .objective-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .obj-chip { font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 99px; display: flex; align-items: center; gap: 5px; }
+  .obj-goal { background: rgba(124,108,252,0.12); border: 1px solid rgba(124,108,252,0.25); color: #a89ffc; }
+  .obj-trigger { background: rgba(52,201,171,0.1); border: 1px solid rgba(52,201,171,0.2); color: var(--mint); }
+  .obj-action { background: rgba(200,164,74,0.1); border: 1px solid rgba(200,164,74,0.2); color: var(--gold); }
+
+  /* Separador sección */
+  .divider { height: 1px; background: var(--border); margin: 48px 0; }
+
+  /* Tabla de triggers */
+  .trigger-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .trigger-table th { text-align: left; padding: 10px 14px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 600; }
+  .trigger-table td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top; }
+  .trigger-table tr:last-child td { border-bottom: none; }
+  .trigger-table td:first-child { font-weight: 600; color: #fff; width: 35%; }
+  .trigger-keyword { display: inline-block; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--mint); margin: 2px 3px 2px 0; }
+
+  /* Integración Google Sheets */
+  .sheets-flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
+  .sheets-step { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
+  .sheets-step-icon { font-size: 26px; margin-bottom: 8px; }
+  .sheets-step-title { font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .sheets-step-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+  /* Columnas Google Sheets */
+  .sheets-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin: 16px 0; }
+  .sheets-col { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .sheets-col-letter { font-size: 11px; font-weight: 700; color: var(--gold); font-family: 'JetBrains Mono', monospace; }
+  .sheets-col-name { font-size: 12px; color: var(--text); font-weight: 600; margin-top: 2px; }
+  .sheets-col-ex { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* Precios */
+  .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 24px 0; }
+  .pricing-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px; }
+  .pricing-card.featured { border-color: rgba(200,164,74,0.4); background: rgba(200,164,74,0.05); }
+  .pricing-tier { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+  .pricing-price { font-size: 32px; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 4px; }
+  .pricing-price sup { font-size: 16px; vertical-align: super; }
+  .pricing-price sub { font-size: 13px; color: var(--muted); vertical-align: baseline; }
+  .pricing-desc { font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+  .pricing-includes { list-style: none; }
+  .pricing-includes li { font-size: 12px; color: var(--muted); padding: 5px 0; display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .pricing-includes li:last-child { border-bottom: none; }
+  .pricing-includes li::before { content: '✓'; color: var(--mint); font-weight: 700; flex-shrink: 0; }
+  .pricing-tag { display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 3px 9px; border-radius: 99px; margin-bottom: 10px; }
+
+  /* Info boxes */
+  .info-box { border-radius: 12px; padding: 16px 18px; margin: 16px 0; font-size: 13px; line-height: 1.6; }
+  .info-box.tip { background: rgba(52,201,171,0.07); border: 1px solid rgba(52,201,171,0.18); color: #9ef0de; }
+  .info-box.warn { background: rgba(200,164,74,0.07); border: 1px solid rgba(200,164,74,0.2); color: #e8d4a0; }
+  .info-box.danger { background: rgba(232,69,69,0.07); border: 1px solid rgba(232,69,69,0.2); color: #fca5a5; }
+  .info-box strong { color: #fff; }
+
+  code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: rgba(255,255,255,0.07); padding: 2px 6px; border-radius: 4px; color: var(--mint); }
+
+  @media print {
+    body { background: white; color: #111; }
+    .wa-bubble { background: #e8f5e9; color: #1b4d1f; border-color: #a5d6a7; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- PORTADA -->
+  <div class="cover">
+    <div class="cover-badge">Sistema de Automatización · ManyChat + WhatsApp</div>
+    <h1>Secuencia Magic Lantern<br/><span>para Clínicas Odontológicas</span></h1>
+    <p>5 mensajes automatizados que convierten leads fríos en pacientes listos para comprar. Copy listo para pegar en ManyChat.</p>
+    <div class="cover-meta">
+      <div class="cover-meta-item"><strong>5</strong><span>Mensajes</span></div>
+      <div class="cover-meta-item"><strong>7 días</strong><span>Duración secuencia</span></div>
+      <div class="cover-meta-item"><strong>3 segmentos</strong><span>Hot / Tibio / Frío</span></div>
+      <div class="cover-meta-item"><strong>100%</strong><span>Automatizado</span></div>
+    </div>
+  </div>
+
+
+  <!-- LÓGICA DEL SISTEMA -->
+  <div class="section-block">
+    <div class="section-label">Arquitectura del sistema</div>
+    <div class="section-title">Cómo funciona el flujo completo</div>
+    <div class="section-sub">Desde que el lead entra al Typebot hasta que el dentista recibe la notificación en Google Sheets.</div>
+
+    <div class="flow-grid">
+      <div class="flow-node">
+        <div class="flow-icon">🌐</div>
+        <div class="flow-label">Landing Page</div>
+        <div class="flow-sub">Lead llega y completa el Typebot</div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-icon">🤖</div>
+        <div class="flow-label">Typebot</div>
+        <div class="flow-sub">Califica necesidad + urgencia</div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-icon">📋</div>
+        <div class="flow-label">Google Sheets</div>
+        <div class="flow-sub">Lead queda registrado con score</div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-icon">💬</div>
+        <div class="flow-label">ManyChat</div>
+        <div class="flow-sub">Dispara secuencia WhatsApp</div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-icon">📅</div>
+        <div class="flow-label">Calendly</div>
+        <div class="flow-sub">Lead agenda su turno</div>
+      </div>
+    </div>
+
+    <div class="info-box tip">
+      <strong>Regla de oro:</strong> ManyChat recibe el número de teléfono que el Typebot capturó y lo agrega automáticamente al flujo correspondiente según el tag asignado (<code>lead-caliente</code>, <code>lead-tibio</code> o <code>lead-frio</code>). Cada tag dispara una secuencia diferente con mensajes distintos.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- TRIGGERS Y KEYWORDS -->
+  <div class="section-block">
+    <div class="section-label">Configuración inicial en ManyChat</div>
+    <div class="section-title">Triggers y Keywords</div>
+    <div class="section-sub">Configurá estos triggers antes de crear los flujos. Son los disparadores que activan cada secuencia.</div>
+
+    <table class="trigger-table">
+      <thead>
+        <tr>
+          <th>Trigger / Evento</th>
+          <th>Qué dispara</th>
+          <th>Keywords a configurar</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Tag asignado: <code>lead-caliente</code></td>
+          <td>Secuencia FULL de 5 mensajes (máxima velocidad)</td>
+          <td>— (se activa por tag, no keyword)</td>
+        </tr>
+        <tr>
+          <td>Tag asignado: <code>lead-tibio</code></td>
+          <td>Secuencia de 5 mensajes con delays más largos</td>
+          <td>— (se activa por tag, no keyword)</td>
+        </tr>
+        <tr>
+          <td>Tag asignado: <code>lead-frio</code></td>
+          <td>Solo se envía Mensaje 1 + HVCO</td>
+          <td>— (se activa por tag, no keyword)</td>
+        </tr>
+        <tr>
+          <td>Keyword entrante</td>
+          <td>Reinicia conversación desde Mensaje 1</td>
+          <td><span class="trigger-keyword">QUIERO</span><span class="trigger-keyword">TURNO</span><span class="trigger-keyword">CONSULTA</span><span class="trigger-keyword">INFO</span></td>
+        </tr>
+        <tr>
+          <td>Keyword de opt-out</td>
+          <td>Detiene TODA la secuencia inmediatamente</td>
+          <td><span class="trigger-keyword">STOP</span><span class="trigger-keyword">NO GRACIAS</span><span class="trigger-keyword">BAJA</span></td>
+        </tr>
+        <tr>
+          <td>Keyword de agendado</td>
+          <td>Marca como convertido, pausa secuencia</td>
+          <td><span class="trigger-keyword">LISTO</span><span class="trigger-keyword">AGENDÉ</span><span class="trigger-keyword">YA RESERVÉ</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="info-box warn">
+      <strong>Importante:</strong> Antes de lanzar, activá el <strong>Smart Delay</strong> en ManyChat para que los mensajes no se envíen entre 22:00 y 8:00. Los mensajes de madrugada generan opt-outs y arruinan la reputación del número.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SECUENCIA: 5 MENSAJES -->
+  <div class="section-block">
+    <div class="section-label">Magic Lantern · 5 Mensajes</div>
+    <div class="section-title">La Secuencia Completa</div>
+    <div class="section-sub">Copy listo para pegar. Los textos en [CORCHETES] son los campos que personalizás para cada clínica.</div>
+
+
+    <!-- MENSAJE 1 -->
+    <div class="msg-card">
+      <div class="msg-header">
+        <div class="msg-header-left">
+          <div class="msg-number" style="background:rgba(52,201,171,0.15); color:var(--mint);">1</div>
+          <div>
+            <div class="msg-title">El Gancho — Entrega de valor inmediata</div>
+            <div class="msg-timing">⏱ Se envía: inmediatamente después del Typebot</div>
+          </div>
+        </div>
+        <div class="msg-tag" style="background:rgba(52,201,171,0.12); color:var(--mint); border:1px solid rgba(52,201,171,0.25);">TODOS LOS LEADS</div>
+      </div>
+      <div class="msg-body">
+        <div class="objective-bar">
+          <div class="obj-chip obj-goal">🎯 Objetivo: crear confianza y expectativa</div>
+          <div class="obj-chip obj-trigger">⚡ Trigger: tag asignado por Typebot</div>
+          <div class="obj-chip obj-action">✅ Acción esperada: que lean y respondan</div>
+        </div>
+
+        <div class="wa-bubble-wrap">
+          <div class="wa-sender">Clínica [NOMBRE DE LA CLÍNICA]</div>
+          <div class="wa-bubble">¡Hola, {{first name}}! 👋
+
+Gracias por completar el formulario. Soy [NOMBRE], del equipo de [CLÍNICA].
+
+En menos de 2 minutos respondiste algo que la mayoría de nuestros pacientes tardó años en decidirse a preguntar. Eso ya dice mucho de vos. 💪
+
+📋 *Recibimos tu caso:*
+→ Tratamiento de interés: {{variable:tratamiento}}
+→ Disponibilidad: {{variable:urgencia}}
+
+En las próximas horas te enviamos información específica para tu caso. Pero antes, quería darte esto:
+
+👉 [LINK A HVCO — guía gratuita o video corto del Dr.]
+
+Es nuestro regalo de bienvenida. Sin spam, te lo juro.
+
+Cualquier pregunta, escribime acá directamente. Respondemos en menos de 5 minutos en horario de atención. 🦷
+<div class="wa-time">✓✓ 09:14</div></div>
+        </div>
+
+        <div class="config-box">
+          <div class="config-title">Configuración en ManyChat</div>
+          <div class="config-row"><span class="config-key">Tipo de mensaje:</span><span class="config-val">WhatsApp Template Message (para primer contacto) o Session Message si respondieron al opt-in</span></div>
+          <div class="config-row"><span class="config-key">Variables a usar:</span><span class="config-val"><code>{{first name}}</code> · <code>{{variable:tratamiento}}</code> · <code>{{variable:urgencia}}</code> — estas vienen del Typebot vía webhook</span></div>
+          <div class="config-row"><span class="config-key">Delay post-envío:</span><span class="config-val">0 minutos (inmediato)</span></div>
+          <div class="config-row"><span class="config-key">Si no abre en 24hs:</span><span class="config-val">Igual avanzar a Mensaje 2 (no esperar respuesta)</span></div>
+          <div class="config-row"><span class="config-key">Tag a aplicar:</span><span class="config-val"><code>msg1-enviado</code></span></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- MENSAJE 2 -->
+    <div class="msg-card">
+      <div class="msg-header">
+        <div class="msg-header-left">
+          <div class="msg-number" style="background:rgba(200,164,74,0.15); color:var(--gold);">2</div>
+          <div>
+            <div class="msg-title">Caso de Éxito — Prueba social con historia</div>
+            <div class="msg-timing">⏱ Se envía: 24 horas después del Mensaje 1</div>
+          </div>
+        </div>
+        <div class="msg-tag" style="background:rgba(200,164,74,0.12); color:var(--gold); border:1px solid rgba(200,164,74,0.25);">HOT + TIBIO</div>
+      </div>
+      <div class="msg-body">
+        <div class="objective-bar">
+          <div class="obj-chip obj-goal">🎯 Objetivo: eliminar el escepticismo con historia real</div>
+          <div class="obj-chip obj-trigger">⏰ Trigger: delay de 24hs desde msg1-enviado</div>
+          <div class="obj-chip obj-action">✅ Acción esperada: que se identifiquen con el caso</div>
+        </div>
+
+        <div class="wa-bubble-wrap">
+          <div class="wa-sender">Clínica [NOMBRE DE LA CLÍNICA]</div>
+          <div class="wa-bubble">Hola de nuevo, {{first name}} 😊
+
+Te quería contar algo que pasó esta semana en la clínica.
+
+[NOMBRE DEL PACIENTE REAL, ej: "Gabriela"], una paciente de [EDAD] años, llegó exactamente como llegaste vos: con miedo, sin saber bien cuánto iba a costar y pensando que era "demasiado tarde" para arreglar su sonrisa.
+
+📸 Hoy, 3 meses después, no para de mandar fotos.
+
+Lo que más me impactó fue lo que me dijo en la última cita:
+
+*"El primer día casi no vine. Pensé que me iban a juzgar por haber esperado tanto. Pero fue todo lo contrario."*
+
+Si te suena familiar… es porque es más común de lo que imaginás.
+
+¿Querés ver su caso antes/después? Te lo mando ahora.
+<div class="wa-time">✓✓ 10:02</div></div>
+          <div class="wa-buttons">
+            <div class="wa-btn"><span class="wa-btn-icon">📸</span> Sí, quiero ver el caso</div>
+            <div class="wa-btn"><span class="wa-btn-icon">❓</span> Tengo una pregunta primero</div>
+          </div>
+        </div>
+
+        <div class="config-box">
+          <div class="config-title">Configuración en ManyChat</div>
+          <div class="config-row"><span class="config-key">Tipo de mensaje:</span><span class="config-val">Session Message (están dentro de la ventana de 24hs del opt-in)</span></div>
+          <div class="config-row"><span class="config-key">Botón "Ver caso":</span><span class="config-val">Envía automáticamente una imagen o PDF del antes/después + texto de transición al Mensaje 3</span></div>
+          <div class="config-row"><span class="config-key">Botón "Tengo pregunta":</span><span class="config-val">Abre conversación libre → notifica al equipo de la clínica para responder manualmente</span></div>
+          <div class="config-row"><span class="config-key">Si no responde en 24hs:</span><span class="config-val">Igual avanzar al Mensaje 3 automáticamente</span></div>
+          <div class="config-row"><span class="config-key">Personalizar por segmento:</span><span class="config-val">Usar un caso de implante para leads de implantes, ortodoncia para ortodoncia, etc.</span></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- MENSAJE 3 -->
+    <div class="msg-card">
+      <div class="msg-header">
+        <div class="msg-header-left">
+          <div class="msg-number" style="background:rgba(124,108,252,0.15); color:#a89ffc;">3</div>
+          <div>
+            <div class="msg-title">El Error Costoso — Educación + urgencia suave</div>
+            <div class="msg-timing">⏱ Se envía: 48 horas después del Mensaje 2</div>
+          </div>
+        </div>
+        <div class="msg-tag" style="background:rgba(124,108,252,0.12); color:#a89ffc; border:1px solid rgba(124,108,252,0.25);">HOT + TIBIO</div>
+      </div>
+      <div class="msg-body">
+        <div class="objective-bar">
+          <div class="obj-chip obj-goal">🎯 Objetivo: crear urgencia real sin presión agresiva</div>
+          <div class="obj-chip obj-trigger">⏰ Trigger: delay de 48hs desde msg2-enviado</div>
+          <div class="obj-chip obj-action">✅ Acción esperada: que entiendan el costo de no actuar</div>
+        </div>
+
+        <div class="wa-bubble-wrap">
+          <div class="wa-sender">Clínica [NOMBRE DE LA CLÍNICA]</div>
+          <div class="wa-bubble">{{first name}}, te cuento algo que en la clínica vemos seguido y que me gustaría que supieras.
+
+🦷 *El error más caro en salud dental:*
+
+Esperar.
+
+No porque seamos nosotros los que perdemos (nosotros cobramos igual 😅), sino porque cuando una caries pequeña se convierte en una endodoncia... el costo se multiplica por 8.
+
+Cuando una encía inflamada se ignora 2 años... hay pérdida ósea irreversible.
+
+Cuando un diente que se podría haber salvado se pierde... viene el implante.
+
+No lo digo para asustarte. Lo digo porque en la consulta gratuita a veces nos toca dar noticias que podrían haber sido mucho más simples 6 meses antes.
+
+La buena noticia: vos ya diste el primer paso al completar el formulario. Eso te pone adelante del 90% de las personas que "lo van a hacer la semana que viene" por años.
+
+¿Tenés 30 minutos esta semana para la consulta? Es gratis y sin compromiso.
+<div class="wa-time">✓✓ 11:30</div></div>
+          <div class="wa-buttons">
+            <div class="wa-btn"><span class="wa-btn-icon">📅</span> Sí, quiero reservar un turno</div>
+            <div class="wa-btn"><span class="wa-btn-icon">🕐</span> Todavía no puedo, más adelante</div>
+          </div>
+        </div>
+
+        <div class="config-box">
+          <div class="config-title">Configuración en ManyChat</div>
+          <div class="config-row"><span class="config-key">Botón "Reservar turno":</span><span class="config-val">Envía link de Calendly + mensaje de confirmación. Aplica tag <code>agendado</code> y PAUSA toda la secuencia.</span></div>
+          <div class="config-row"><span class="config-key">Botón "Más adelante":</span><span class="config-val">Responde "Perfecto, te escribimos la próxima semana 😊" + aplica tag <code>lead-postergador</code> + programa Mensaje 5 para en 7 días.</span></div>
+          <div class="config-row"><span class="config-key">Si no responde:</span><span class="config-val">Avanzar al Mensaje 4 en 48hs igualmente.</span></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- MENSAJE 4 -->
+    <div class="msg-card">
+      <div class="msg-header">
+        <div class="msg-header-left">
+          <div class="msg-number" style="background:rgba(232,69,69,0.15); color:#f87171;">4</div>
+          <div>
+            <div class="msg-title">La Oferta — El Grand Slam completo</div>
+            <div class="msg-timing">⏱ Se envía: 72 horas después del Mensaje 3</div>
+          </div>
+        </div>
+        <div class="msg-tag" style="background:rgba(232,69,69,0.12); color:#f87171; border:1px solid rgba(232,69,69,0.25);">SOLO LEADS CALIENTES</div>
+      </div>
+      <div class="msg-body">
+        <div class="objective-bar">
+          <div class="obj-chip obj-goal">🎯 Objetivo: cerrar la cita con oferta irresistible</div>
+          <div class="obj-chip obj-trigger">⏰ Trigger: delay de 72hs + tag lead-caliente activo</div>
+          <div class="obj-chip obj-action">✅ Acción esperada: click en Calendly</div>
+        </div>
+
+        <div class="wa-bubble-wrap">
+          <div class="wa-sender">Clínica [NOMBRE DE LA CLÍNICA]</div>
+          <div class="wa-bubble">{{first name}}, siendo completamente honesto con vos:
+
+Tenemos [NÚMERO REAL] turnos disponibles para consultas gratuitas esta semana. Después de eso, la agenda cierra hasta [FECHA REAL].
+
+Quiero asegurarte uno antes de que se llenen, porque veo que tu caso tiene solución y me gustaría que el Dr. [NOMBRE] lo vea pronto.
+
+🎁 *Lo que incluye tu consulta GRATIS:*
+✅ Diagnóstico completo con el especialista
+✅ Radiografía panorámica digital ($40.000 de valor)
+✅ Plan de tratamiento detallado con precios reales
+✅ Opciones de financiación en cuotas sin interés
+✅ Sin compromiso de compra. Sin letra chica.
+
+Valor total: $80.000 → *Para vos: GRATIS*
+
+👇 Reservá tu turno ahora (tarda 2 minutos):
+[LINK DE CALENDLY]
+
+Si preferís coordinar por acá directamente, también podemos. Solo escribime "QUIERO MI TURNO" y lo arreglamos.
+<div class="wa-time">✓✓ 09:45</div></div>
+        </div>
+
+        <div class="config-box">
+          <div class="config-title">Configuración en ManyChat</div>
+          <div class="config-row"><span class="config-key">Condición de envío:</span><span class="config-val">Solo si el contacto tiene tag <code>lead-caliente</code> Y NO tiene tag <code>agendado</code></span></div>
+          <div class="config-row"><span class="config-key">Link de Calendly:</span><span class="config-val">Usar link de seguimiento con UTM: <code>?utm_source=manychat&utm_medium=whatsapp&utm_campaign=msg4</code></span></div>
+          <div class="config-row"><span class="config-key">Keyword "QUIERO MI TURNO":</span><span class="config-val">Dispara flujo de coordinación manual + notifica al equipo de la clínica por email/Slack</span></div>
+          <div class="config-row"><span class="config-key">Post-click en Calendly:</span><span class="config-val">Calendly envía webhook a ManyChat → aplica tag <code>agendado</code> → pausa secuencia → envía confirmación automática</span></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- MENSAJE 5 -->
+    <div class="msg-card">
+      <div class="msg-header">
+        <div class="msg-header-left">
+          <div class="msg-number" style="background:rgba(107,122,149,0.2); color:var(--muted);">5</div>
+          <div>
+            <div class="msg-title">El Cierre Final — Último intento + re-engagement</div>
+            <div class="msg-timing">⏱ Se envía: 7 días después del Mensaje 1 (solo si no agendó)</div>
+          </div>
+        </div>
+        <div class="msg-tag" style="background:rgba(107,122,149,0.1); color:var(--muted); border:1px solid rgba(107,122,149,0.2);">TODOS LOS NO CONVERTIDOS</div>
+      </div>
+      <div class="msg-body">
+        <div class="objective-bar">
+          <div class="obj-chip obj-goal">🎯 Objetivo: recuperar leads fríos o cerrar el ciclo</div>
+          <div class="obj-chip obj-trigger">⏰ Trigger: 7 días desde inicio + NO tiene tag agendado</div>
+          <div class="obj-chip obj-action">✅ Acción: agendar O guardar para re-campaña en 30 días</div>
+        </div>
+
+        <div class="wa-bubble-wrap">
+          <div class="wa-sender">Clínica [NOMBRE DE LA CLÍNICA]</div>
+          <div class="wa-bubble">{{first name}}, este es mi último mensaje por ahora. No quiero ser molesto. 😊
+
+Hace una semana preguntaste por tu sonrisa y quiero saber: ¿encontraste lo que buscabas?
+
+Si ya fuiste a otra clínica o resolviste tu consulta, me alegra. En serio.
+
+Pero si todavía no tomaste acción y hay algo que te frenó — el precio, el miedo, la falta de tiempo — escribime ahora mismo y lo resolvemos juntos. Para eso estamos.
+
+La consulta sigue siendo gratuita. La agenda sigue abierta.
+
+Y si no es el momento, sin problema. Cuando llegue el momento, acá vamos a estar. 🦷
+
+[NOMBRE DEL DR.] y equipo de [CLÍNICA]
+<div class="wa-time">✓✓ 10:15</div></div>
+          <div class="wa-buttons">
+            <div class="wa-btn"><span class="wa-btn-icon">📅</span> Quiero agendar ahora</div>
+            <div class="wa-btn"><span class="wa-btn-icon">🔔</span> Avisame en 30 días</div>
+            <div class="wa-btn"><span class="wa-btn-icon">❌</span> No me interesa más</div>
+          </div>
+        </div>
+
+        <div class="config-box">
+          <div class="config-title">Configuración en ManyChat</div>
+          <div class="config-row"><span class="config-key">Botón "Agendar ahora":</span><span class="config-val">Envía link Calendly + aplica tag <code>agendado</code> + pausa secuencia.</span></div>
+          <div class="config-row"><span class="config-key">Botón "Avisame en 30 días":</span><span class="config-val">Aplica tag <code>re-campaña-30d</code>. ManyChat programa un mensaje automático en 30 días. Lead entra a una nueva secuencia corta de 2 mensajes.</span></div>
+          <div class="config-row"><span class="config-key">Botón "No me interesa":</span><span class="config-val">Aplica tag <code>opt-out</code>. DETIENE toda comunicación. NUNCA contactar de nuevo sin nuevo opt-in explícito.</span></div>
+          <div class="config-row"><span class="config-key">Si no responde en 48hs:</span><span class="config-val">Aplica tag <code>lead-inactivo</code>. Queda en lista para re-campaña en 60 días (estrategia de reactivación).</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- GOOGLE SHEETS -->
+  <div class="section-block">
+    <div class="section-label">Integración · Typebot → Google Sheets</div>
+    <div class="section-title">La Planilla del Dentista</div>
+    <div class="section-sub">Lo que el doctor abre por la mañana para saber exactamente a quién llamar primero.</div>
+
+    <div class="sheets-flow">
+      <div class="sheets-step">
+        <div class="sheets-step-icon">🤖</div>
+        <div class="sheets-step-title">Typebot termina</div>
+        <div class="sheets-step-desc">El bot captura todos los datos del lead</div>
+      </div>
+      <div class="sheets-step">
+        <div class="sheets-step-icon">🔗</div>
+        <div class="sheets-step-title">Webhook / integración nativa</div>
+        <div class="sheets-step-desc">Typebot tiene bloque "Google Sheets" nativo — sin código</div>
+      </div>
+      <div class="sheets-step">
+        <div class="sheets-step-icon">📊</div>
+        <div class="sheets-step-title">Nueva fila en la planilla</div>
+        <div class="sheets-step-desc">Cada lead = una fila nueva con todos sus datos</div>
+      </div>
+      <div class="sheets-step">
+        <div class="sheets-step-icon">🦷</div>
+        <div class="sheets-step-title">El Dr. ve su planilla</div>
+        <div class="sheets-step-desc">Ordenada por score y fecha, lista para llamar</div>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-top:24px;">Columnas de la planilla</div>
+    <div class="sheets-cols">
+      <div class="sheets-col">
+        <div class="sheets-col-letter">A</div>
+        <div class="sheets-col-name">Fecha</div>
+        <div class="sheets-col-ex">21/04/2026 09:14</div>
+      </div>
+      <div class="sheets-col">
+        <div class="sheets-col-letter">B</div>
+        <div class="sheets-col-name">Nombre</div>
+        <div class="sheets-col-ex">María González</div>
+      </div>
+      <div class="sheets-col">
+        <div class="sheets-col-letter">C</div>
+        <div class="sheets-col-name">Teléfono</div>
+        <div class="sheets-col-ex">+595 981 123 456</div>
+      </div>
+      <div class="sheets-col">
+        <div class="sheets-col-letter">D</div>
+        <div class="sheets-col-name">Email</div>
+        <div class="sheets-col-ex">maria@gmail.com</div>
+      </div>
+      <div class="sheets-col">
+        <div class="sheets-col-letter">E</div>
+        <div class="sheets-col-name">Tratamiento</div>
+        <div class="sheets-col-ex">Implantes 🦷</div>
+      </div>
+      <div class="sheets-col">
+        <div class="sheets-col-letter">F</div>
+        <div class="sheets-col-name">Urgencia</div>
+        <div class="sheets-col-ex">Lo antes posible</div>
+      </div>
+      <div class="sheets-col">
+        <div class="sheets-col-letter">G</div>
+        <div class="sheets-col-name">🔥 Score</div>
+        <div class="sheets-col-ex">CALIENTE 🔥</div>
+      </div>
+      <div class="sheets-col">
+        <div class="sheets-col-letter">H</div>
+        <div class="sheets-col-name">Estado</div>
+        <div class="sheets-col-ex">Pendiente / Agendado</div>
+      </div>
+      <div class="sheets-col">
+        <div class="sheets-col-letter">I</div>
+        <div class="sheets-col-name">Fuente</div>
+        <div class="sheets-col-ex">Landing Page</div>
+      </div>
+      <div class="sheets-col">
+        <div class="sheets-col-letter">J</div>
+        <div class="sheets-col-name">Notas</div>
+        <div class="sheets-col-ex">Campo libre para el doctor</div>
+      </div>
+    </div>
+
+    <div class="info-box tip" style="margin-top:20px;">
+      <strong>Tip de apalancamiento:</strong> Configurá un filtro en la columna G para que cuando el doctor abre la planilla, solo vea los leads <strong>CALIENTES 🔥</strong> primero. Los tibios y fríos quedan abajo. El tiempo del doctor vale más que cualquier herramienta — este filtro solo le ahorra 20 minutos por día y aumenta la tasa de conversión porque llama cuando el lead está más caliente.
+    </div>
+
+    <div class="info-box warn" style="margin-top:12px;">
+      <strong>Fórmula de score automático en Sheets (columna G):</strong><br/>
+      Copiá esto en la celda G2 y arrastrá hacia abajo:<br/><br/>
+      <code>=SI(F2="Lo antes posible","🔥 CALIENTE",SI(F2="En los próximos 1-2 meses","🟡 TIBIO","❄️ FRÍO"))</code><br/><br/>
+      El score se asigna automáticamente sin que nadie lo toque.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- PRECIOS SUGERIDOS -->
+  <div class="section-block">
+    <div class="section-label">Modelo de negocio</div>
+    <div class="section-title">Cómo cobrar este sistema</div>
+    <div class="section-sub">Precio sugerido para venderle a clínicas odontológicas en Latinoamérica. Ajustá según el mercado.</div>
+
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="pricing-tier">Básico</div>
+        <div class="pricing-price"><sup>$</sup>800<sub> USD</sub></div>
+        <div class="pricing-desc">Setup único. Sin soporte mensual. Para clínicas pequeñas con bajo presupuesto.</div>
+        <ul class="pricing-includes">
+          <li>Landing page instalada y personalizada</li>
+          <li>Typebot configurado (flujo de 5 pasos)</li>
+          <li>Google Sheets conectado</li>
+          <li>1 mes de soporte por WhatsApp</li>
+        </ul>
+      </div>
+
+      <div class="pricing-card featured">
+        <div class="pricing-tag" style="background:rgba(200,164,74,0.2); color:var(--gold); border:1px solid rgba(200,164,74,0.35);">⭐ RECOMENDADO</div>
+        <div class="pricing-tier">Sistema Completo</div>
+        <div class="pricing-price"><sup>$</sup>1,800<sub> USD</sub></div>
+        <div class="pricing-desc">Setup + ManyChat configurado + capacitación al equipo + 3 meses de soporte.</div>
+        <ul class="pricing-includes">
+          <li>Todo el plan Básico</li>
+          <li>ManyChat: secuencia de 5 mensajes lista</li>
+          <li>Integración Calendly + WhatsApp</li>
+          <li>Capacitación al equipo (2hs por Zoom)</li>
+          <li>3 meses de soporte y ajustes</li>
+          <li>Informe mensual de leads y conversiones</li>
+        </ul>
+      </div>
+
+      <div class="pricing-card">
+        <div class="pricing-tier">Sistema + Retainer</div>
+        <div class="pricing-price"><sup>$</sup>1,800<sub> setup</sub></div>
+        <div class="pricing-desc">+ <strong style="color:#fff;">$400/mes</strong> de retainer. El negocio real: ingresos recurrentes.</div>
+        <ul class="pricing-includes">
+          <li>Todo el Sistema Completo</li>
+          <li>Gestión mensual de ManyChat</li>
+          <li>Optimización de copy y flujos</li>
+          <li>Nuevas campañas y re-engagement</li>
+          <li>Reportes semanales al doctor</li>
+          <li>SLA: respuesta en menos de 24hs</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="info-box tip">
+      <strong>La matemática del retainer:</strong> Un paciente de implantes vale entre $800 y $2,000 USD. Si tu sistema genera 2 pacientes extra por mes que antes se perdían en el seguimiento manual, el dentista recupera tu fee en el primer paciente. Eso hace que el retainer sea prácticamente <strong>gratuito para él y ganancia pura para vos</strong>. Vendé el ROI, no el servicio.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- CHECKLIST DE LANZAMIENTO -->
+  <div class="section-block">
+    <div class="section-label">Antes de entregar al cliente</div>
+    <div class="section-title">Checklist de lanzamiento</div>
+    <div class="section-sub">Cada ítem que marqués reduce el riesgo de que algo falle el día del lanzamiento.</div>
+    <div style="columns: 2; column-gap: 24px; font-size: 13px; color: var(--muted); line-height: 2;">
+      <div>□ &nbsp; WhatsApp Business API conectado a ManyChat</div>
+      <div>□ &nbsp; Número de WhatsApp verificado (no puede ser personal)</div>
+      <div>□ &nbsp; Template Messages aprobados por Meta (24-48hs)</div>
+      <div>□ &nbsp; Smart Delay activado (no enviar entre 22-8hs)</div>
+      <div>□ &nbsp; Opt-out keywords configuradas (STOP, BAJA)</div>
+      <div>□ &nbsp; Variables del Typebot mapeadas en ManyChat</div>
+      <div>□ &nbsp; Webhook Typebot → ManyChat testeado con lead real</div>
+      <div>□ &nbsp; Google Sheets conectado y fórmula de score aplicada</div>
+      <div>□ &nbsp; Calendly conectado con link personalizado de la clínica</div>
+      <div>□ &nbsp; Webhook Calendly → ManyChat (tag "agendado") testeado</div>
+      <div>□ &nbsp; Flujo completo testeado con número de prueba</div>
+      <div>□ &nbsp; Capacitación al equipo sobre cómo ver la planilla</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
