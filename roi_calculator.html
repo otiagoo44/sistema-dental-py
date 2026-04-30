@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculadora de ROI — Sistema Dental Automatizado</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Cabinet+Grotesk:wght@400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --navy:  #08111C;
+      --panel: #0F1E2E;
+      --panel2: #162438;
+      --ivory: #F2EDE3;
+      --gold:  #C8A44A;
+      --gold-light: #E4C97A;
+      --mint:  #34C9AB;
+      --red:   #E84545;
+      --muted: #6B7E95;
+      --border: rgba(255,255,255,0.07);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Cabinet Grotesk', system-ui, sans-serif;
+      background: var(--navy);
+      color: var(--ivory);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Mesh background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 15% 10%, rgba(200,164,74,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 60% at 85% 80%, rgba(52,201,171,0.07) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 40% at 50% 50%, rgba(52,201,171,0.03) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 48px 20px 80px;
+    }
+
+    /* ── Header ── */
+    .page-header {
+      text-align: center;
+      margin-bottom: 52px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(232,69,69,0.1);
+      border: 1px solid rgba(232,69,69,0.3);
+      border-radius: 999px;
+      padding: 5px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: #f87171;
+      margin-bottom: 20px;
+    }
+    .ping {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #ef4444;
+      animation: ping 1.5s ease infinite;
+    }
+    @keyframes ping {
+      75%, 100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2rem, 5vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1.1;
+      color: var(--ivory);
+      margin-bottom: 14px;
+    }
+    h1 em {
+      font-style: italic;
+      background: linear-gradient(135deg, var(--gold-light), var(--gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .page-sub {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.65;
+    }
+
+    /* ── Grid layout ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 680px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      margin-bottom: 22px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title.gold { color: var(--gold); }
+    .card-title.mint { color: var(--mint); }
+    .card-title.red  { color: #f87171; }
+
+    /* ── Input groups ── */
+    .input-group {
+      margin-bottom: 20px;
+    }
+    .input-group:last-child { margin-bottom: 0; }
+
+    .input-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .input-value-display {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ivory);
+    }
+
+    .input-field {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: var(--ivory);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 600;
+      outline: none;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .input-field:focus {
+      border-color: rgba(200,164,74,0.4);
+      background: rgba(255,255,255,0.06);
+    }
+    .input-field::placeholder { color: var(--muted); font-weight: 400; }
+
+    /* ── Slider ── */
+    .slider-wrap {
+      position: relative;
+      padding-top: 4px;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 99px;
+      outline: none;
+      cursor: pointer;
+      background: linear-gradient(to right, var(--gold) 0%, var(--gold) var(--pct, 50%), rgba(255,255,255,0.1) var(--pct, 50%));
+      transition: background 0.1s;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--gold);
+      border: 3px solid var(--navy);
+      box-shadow: 0 0 0 2px rgba(200,164,74,0.3);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      box-shadow: 0 0 0 6px rgba(200,164,74,0.2);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--gold);
+      border: 3px solid var(--navy);
+      cursor: pointer;
+    }
+
+    .slider-ticks {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    /* ── Results panel ── */
+    .results-card {
+      grid-column: 1 / -1;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .results-header {
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .results-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--mint);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--mint);
+      animation: pulse-dot 2s ease infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0;
+    }
+    .result-item {
+      padding: 24px 28px;
+      border-right: 1px solid var(--border);
+      transition: background 0.3s ease;
+    }
+    .result-item:last-child { border-right: none; }
+    .result-item:hover { background: rgba(255,255,255,0.02); }
+
+    .result-label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 500;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .result-value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 700;
+      line-height: 1;
+      transition: all 0.4s cubic-bezier(0.22, 0.68, 0, 1.2);
+    }
+    .result-value.danger { color: #f87171; }
+    .result-value.gold   { color: var(--gold); }
+    .result-value.mint   { color: var(--mint); }
+    .result-value.ivory  { color: var(--ivory); }
+    .result-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ── The verdict ── */
+    .verdict-card {
+      grid-column: 1 / -1;
+      border-radius: 20px;
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.5s ease;
+    }
+    .verdict-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0.06;
+      transition: opacity 0.5s;
+    }
+    .verdict-card.negative {
+      background: rgba(232,69,69,0.08);
+      border: 1.5px solid rgba(232,69,69,0.25);
+    }
+    .verdict-card.negative::before {
+      background: radial-gradient(circle at 30% 50%, #e84545, transparent 70%);
+    }
+    .verdict-card.positive {
+      background: rgba(52,201,171,0.08);
+      border: 1.5px solid rgba(52,201,171,0.3);
+    }
+    .verdict-card.positive::before {
+      background: radial-gradient(circle at 30% 50%, #34C9AB, transparent 70%);
+    }
+
+    .verdict-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .verdict-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .verdict-headline {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.3rem, 3vw, 1.9rem);
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--ivory);
+    }
+    .verdict-text {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.65;
+      max-width: 640px;
+    }
+    .verdict-text strong { color: var(--ivory); }
+
+    /* ── ROI Breakdown ── */
+    .breakdown-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 4px;
+    }
+    @media (max-width: 520px) {
+      .breakdown-grid { grid-template-columns: 1fr; }
+    }
+    .breakdown-item {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .breakdown-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .breakdown-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .breakdown-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ivory);
+    }
+
+    /* ── CTA ── */
+    .cta-section {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding-top: 12px;
+    }
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--mint);
+      color: var(--navy);
+      font-weight: 800;
+      font-size: 15px;
+      padding: 16px 36px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      animation: pulse-ring 2.4s infinite;
+    }
+    @keyframes pulse-ring {
+      0%   { box-shadow: 0 0 0 0 rgba(52,201,171,0.55); }
+      70%  { box-shadow: 0 0 0 18px rgba(52,201,171,0); }
+      100% { box-shadow: 0 0 0 0 rgba(52,201,171,0); }
+    }
+    .cta-btn:hover { transform: scale(1.04); opacity: 0.92; }
+    .cta-sub {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── Divider ── */
+    .divider {
+      grid-column: 1 / -1;
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    /* ── Number animation ── */
+    .counting { animation: countBounce 0.3s cubic-bezier(0.22, 0.68, 0, 1.4); }
+    @keyframes countBounce {
+      0%  { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+
+    /* ── Mobile tweaks ── */
+    @media (max-width: 480px) {
+      .results-grid { grid-template-columns: 1fr 1fr; }
+      .result-item { padding: 18px 16px; }
+      .result-item:nth-child(2n) { border-right: none; }
+      .result-item:nth-child(1),
+      .result-item:nth-child(2) { border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="badge"><span class="ping"></span> Cálculo en tiempo real</div>
+    <h1>¿Cuánto está perdiendo<br />su clínica <em>cada mes</em>?</h1>
+    <p class="page-sub">Ingresá los datos de su clínica y verás exactamente cuánto dinero se está yendo por no tener un sistema de respuesta automática.</p>
+  </div>
+
+  <div class="grid">
+
+    <!-- INPUT CARD 1 — Datos de leads -->
+    <div class="card">
+      <div class="card-title gold">
+        <span>📊</span> Datos de la Clínica
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">
+          <span>Leads nuevos por mes</span>
+          <span class="input-value-display" id="val-leads">30</span>
+        </div>
+        <div class="slider-wrap">
+          <input type="range" id="sl-leads" min="5" max="200" value="30" step="5"
+                 oninput="updateSlider(this,'val-leads'); calculate()" />
+          <div class="slider-ticks"><span>5</span><span>50</span><span>100</span><span>150</span><span>200</span></div>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">
+          <span>Leads perdidos por respuesta lenta</span>
+          <span class="input-value-display" id="val-lost">50%</span>
+        </div>
+        <div class="slider-wrap">
+          <input type="range" id="sl-lost" min="10" max="90" value="50" step="5"
+                 oninput="updateSlider(this,'val-lost','%'); calculate()" />
+          <div class="slider-ticks"><span>10%</span><span>30%</span><span>50%</span><span>70%</span><span>90%</span></div>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">
+          <span>% de leads de alto ticket (implantes/ortodoncia)</span>
+          <span class="input-value-display" id="val-highpct">30%</span>
+        </div>
+        <div class="slider-wrap">
+          <input type="range" id="sl-highpct" min="5" max="80" value="30" step="5"
+                 oninput="updateSlider(this,'val-highpct','%'); calculate()" />
+          <div class="slider-ticks"><span>5%</span><span>20%</span><span>40%</span><span>60%</span><span>80%</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- INPUT CARD 2 — Datos financieros -->
+    <div class="card">
+      <div class="card-title mint">
+        <span>💰</span> Datos Financieros
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">
+          <span>Ticket promedio alto (implante) en Gs</span>
+        </div>
+        <input type="number" class="input-field" id="in-highticket"
+               value="5000000" placeholder="5.000.000"
+               oninput="calculate()" />
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">
+          <span>Ticket promedio bajo (limpieza/blanqueamiento) en Gs</span>
+        </div>
+        <input type="number" class="input-field" id="in-lowticket"
+               value="500000" placeholder="500.000"
+               oninput="calculate()" />
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">
+          <span>Margen neto del doctor (%)</span>
+          <span class="input-value-display" id="val-margin">45%</span>
+        </div>
+        <div class="slider-wrap">
+          <input type="range" id="sl-margin" min="20" max="70" value="45" step="5"
+                 oninput="updateSlider(this,'val-margin','%'); calculate()" />
+          <div class="slider-ticks"><span>20%</span><span>35%</span><span>50%</span><span>60%</span><span>70%</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- DIVIDER -->
+    <div class="divider"></div>
+
+    <!-- RESULTS -->
+    <div class="results-card">
+      <div class="results-header">
+        <div class="results-title">
+          <span>📉</span> Pérdidas actuales sin el sistema
+        </div>
+        <div class="live-indicator">
+          <span class="live-dot"></span> Actualizando en tiempo real
+        </div>
+      </div>
+      <div class="results-grid">
+        <div class="result-item">
+          <div class="result-label">Leads perdidos / mes</div>
+          <div class="result-value danger" id="r-lost-leads">15</div>
+          <div class="result-sub">pacientes que se van a la competencia</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">Ingresos perdidos / mes</div>
+          <div class="result-value danger" id="r-lost-gs">₲ 0</div>
+          <div class="result-sub" id="r-lost-usd">$0 USD</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">Ganancia neta perdida / mes</div>
+          <div class="result-value gold" id="r-lost-net">₲ 0</div>
+          <div class="result-sub" id="r-lost-net-usd">dinero que ya no vuelve</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">Pérdida acumulada / año</div>
+          <div class="result-value mint" id="r-lost-year">₲ 0</div>
+          <div class="result-sub" id="r-lost-year-usd">$0 USD / año</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VERDICT -->
+    <div class="verdict-card negative" id="verdict-card">
+      <div class="verdict-inner">
+        <div>
+          <div class="verdict-title">⚡ El veredicto</div>
+          <div class="verdict-headline" id="verdict-headline">
+            Su clínica está perdiendo dinero real cada semana.
+          </div>
+        </div>
+        <div class="verdict-text" id="verdict-text">
+          Completá los datos arriba para ver el análisis personalizado.
+        </div>
+        <div class="breakdown-grid" id="breakdown-grid">
+          <div class="breakdown-item">
+            <span class="breakdown-icon">🔧</span>
+            <div>
+              <div class="breakdown-label">Costo del sistema / mes</div>
+              <div class="breakdown-val">$200 USD</div>
+            </div>
+          </div>
+          <div class="breakdown-item">
+            <span class="breakdown-icon">📈</span>
+            <div>
+              <div class="breakdown-label">Implantes extra para cubrirlo</div>
+              <div class="breakdown-val" id="bd-implants">—</div>
+            </div>
+          </div>
+          <div class="breakdown-item">
+            <span class="breakdown-icon">⏱️</span>
+            <div>
+              <div class="breakdown-label">Meses para recuperar inversión</div>
+              <div class="breakdown-val" id="bd-payback">—</div>
+            </div>
+          </div>
+          <div class="breakdown-item">
+            <span class="breakdown-icon">💵</span>
+            <div>
+              <div class="breakdown-label">ROI mensual estimado</div>
+              <div class="breakdown-val" id="bd-roi">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-section">
+      <a href="https://wa.me/595XXXXXXXXX?text=Hola!%20Vi%20la%20calculadora%20y%20quiero%20eliminar%20estas%20fugas%20de%20mi%20cl%C3%ADnica"
+         class="cta-btn" target="_blank">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
+          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.525 5.85L.057 23.032a.5.5 0 0 0 .611.61l5.26-1.45A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.799 9.799 0 0 1-5.031-1.39l-.36-.214-3.732 1.03 1.005-3.643-.235-.375A9.818 9.818 0 0 1 2.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/>
+        </svg>
+        Quiero eliminar estas fugas ahora
+      </a>
+      <div class="cta-sub">Diagnóstico gratuito · Sin compromiso · Respondemos en &lt;5 minutos</div>
+    </div>
+
+  </div><!-- /grid -->
+</div><!-- /wrapper -->
+
+<script>
+  const USD_RATE = 7500; // Guaraníes por dólar (ajustable)
+  const SERVICE_COST_USD = 200;
+
+  function fmt(n) {
+    if (n >= 1000000) return '₲ ' + (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000)    return '₲ ' + (n / 1000).toFixed(0) + 'K';
+    return '₲ ' + Math.round(n).toLocaleString('es');
+  }
+
+  function fmtUSD(n) {
+    return '$' + Math.round(n).toLocaleString('es') + ' USD';
+  }
+
+  function animateValue(el, newVal) {
+    el.classList.remove('counting');
+    void el.offsetWidth; // reflow
+    el.classList.add('counting');
+    el.textContent = newVal;
+  }
+
+  function updateSlider(slider, displayId, suffix = '') {
+    const display = document.getElementById(displayId);
+    if (display) display.textContent = slider.value + suffix;
+    const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+    slider.style.setProperty('--pct', pct + '%');
+  }
+
+  function calculate() {
+    // Inputs
+    const totalLeads   = parseInt(document.getElementById('sl-leads').value) || 30;
+    const lostPct      = parseInt(document.getElementById('sl-lost').value) / 100 || 0.5;
+    const highPct      = parseInt(document.getElementById('sl-highpct').value) / 100 || 0.3;
+    const highTicket   = parseFloat(document.getElementById('in-highticket').value) || 5000000;
+    const lowTicket    = parseFloat(document.getElementById('in-lowticket').value) || 500000;
+    const marginPct    = parseInt(document.getElementById('sl-margin').value) / 100 || 0.45;
+
+    // Calculations
+    const lostLeads      = Math.round(totalLeads * lostPct);
+    const lostHigh       = Math.round(lostLeads * highPct);
+    const lostLow        = lostLeads - lostHigh;
+    const lostRevenue    = (lostHigh * highTicket) + (lostLow * lowTicket);
+    const lostNetGain    = lostRevenue * marginPct;
+    const lostYearly     = lostRevenue * 12;
+
+    const lostUSD        = lostRevenue / USD_RATE;
+    const lostNetUSD     = lostNetGain / USD_RATE;
+    const lostYearlyUSD  = lostYearly / USD_RATE;
+
+    // Payback / ROI
+    const serviceCostGs  = SERVICE_COST_USD * USD_RATE;
+    const implantMargin  = highTicket * marginPct;
+    const implantsNeeded = (SERVICE_COST_USD / (implantMargin / USD_RATE)).toFixed(1);
+    const monthsPayback  = lostNetGain > 0
+      ? Math.max(0.1, (serviceCostGs / (lostNetGain / 12))).toFixed(1)
+      : '∞';
+    const roiMultiple    = lostNetUSD > 0
+      ? ((lostNetUSD / SERVICE_COST_USD) * 100).toFixed(0) + '%'
+      : '—';
+
+    // Update DOM
+    animateValue(document.getElementById('r-lost-leads'), lostLeads);
+    animateValue(document.getElementById('r-lost-gs'), fmt(lostRevenue));
+    animateValue(document.getElementById('r-lost-usd'), fmtUSD(lostUSD));
+    animateValue(document.getElementById('r-lost-net'), fmt(lostNetGain));
+    animateValue(document.getElementById('r-lost-net-usd'), fmtUSD(lostNetUSD) + ' netos perdidos');
+    animateValue(document.getElementById('r-lost-year'), fmt(lostYearly));
+    animateValue(document.getElementById('r-lost-year-usd'), fmtUSD(lostYearlyUSD) + ' / año');
+
+    document.getElementById('bd-implants').textContent = implantsNeeded + ' implantes';
+    document.getElementById('bd-payback').textContent  = monthsPayback + ' mes' + (parseFloat(monthsPayback) === 1 ? '' : 'es');
+    document.getElementById('bd-roi').textContent      = roiMultiple + ' ROI';
+
+    // Verdict
+    const verdictCard = document.getElementById('verdict-card');
+    const headline    = document.getElementById('verdict-headline');
+    const text        = document.getElementById('verdict-text');
+
+    const yearlyUSDRound = Math.round(lostYearlyUSD / 100) * 100;
+    const monthlyGs      = Math.round(lostNetGain / 100000) * 100000;
+
+    if (lostNetUSD < SERVICE_COST_USD * 1.5) {
+      verdictCard.className = 'verdict-card positive';
+      headline.textContent  = 'Su clínica tiene un volumen bajo. El sistema igual se paga solo.';
+      text.innerHTML = `Con <strong>${lostLeads} leads perdidos por mes</strong>, su pérdida neta actual es <strong>${fmtUSD(lostNetUSD)}/mes</strong>. El sistema cuesta <strong>$${SERVICE_COST_USD} USD</strong>. Con recuperar <strong>${implantsNeeded} implantes extra</strong>, el sistema ya se pagó. El resto es ganancia pura.`;
+    } else if (lostNetUSD < 2000) {
+      verdictCard.className = 'verdict-card negative';
+      headline.textContent  = `Su clínica pierde ${fmtUSD(lostNetUSD)} netos cada mes. El sistema se paga en semanas.`;
+      text.innerHTML = `Eso es <strong>${fmtUSD(lostYearlyUSD)} por año</strong> que se va directo a la competencia. Con el sistema activado, necesita recuperar solo <strong>${implantsNeeded} pacientes de implante extra</strong> para que el sistema cueste exactamente $0. Todo lo demás es ganancia neta adicional.`;
+    } else {
+      verdictCard.className = 'verdict-card negative';
+      headline.textContent  = `Atención: su clínica está perdiendo ${fmtUSD(lostNetUSD)} netos por mes. Eso es ${fmtUSD(lostYearlyUSD)} por año.`;
+      text.innerHTML = `Con <strong>${lostLeads} leads perdidos mensualmente</strong> y un ticket alto de ${fmt(highTicket)}, cada mes sin automatización equivale a dejar ir <strong>${lostHigh} pacientes de implante</strong>. El sistema cuesta <strong>$${SERVICE_COST_USD} USD/mes</strong>. Su ROI estimado es <strong>${roiMultiple}</strong>. No implementar esto tiene un costo real.`;
+    }
+  }
+
+  // Init sliders visual
+  document.querySelectorAll('input[type="range"]').forEach(slider => {
+    const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+    slider.style.setProperty('--pct', pct + '%');
+  });
+
+  // Initial calculation
+  calculate();
+</script>
+</body>
+</html>
