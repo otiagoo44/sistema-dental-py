@@ -24,28 +24,3 @@
       }
   
       window.addEventListener('scroll', updateStickyVisibility, { passive: true });
-  
-      /* ── HVCO form (placeholder behavior) ── */
-      const hvcoBtn = document.querySelector('#hvco button');
-      const hvcoInput = document.querySelector('#hvco input[type="email"]');
-  
-      if (hvcoBtn && hvcoInput) {
-        hvcoBtn.addEventListener('click', () => {
-          const email = hvcoInput.value.trim();
-          if (!email || !email.includes('@')) {
-            hvcoInput.style.borderColor = 'rgba(232,69,69,0.6)';
-            hvcoInput.placeholder = 'Ingresá un email válido';
-            setTimeout(() => {
-              hvcoInput.style.borderColor = 'rgba(255,255,255,0.12)';
-              hvcoInput.placeholder = 'Tu email para recibir la guía';
-            }, 2000);
-            return;
-          }
-          hvcoBtn.textContent = '✓ ¡Guía enviada!';
-          hvcoBtn.style.background = 'var(--gold)';
-          hvcoInput.value = '';
-          hvcoInput.placeholder = 'Revisá tu bandeja de entrada';
-          hvcoInput.disabled = true;
-          hvcoBtn.disabled = true;
-        });
-      }

@@ -184,13 +184,6 @@
     }
   }
 
-  /* ── HVCO banner ── */
-  .hvco-banner {
-    background: linear-gradient(135deg, rgba(52,201,171,0.1) 0%, rgba(52,201,171,0.04) 100%);
-    border: 1.5px solid rgba(52,201,171,0.25);
-    border-radius: 20px;
-  }
-
   /* ── Para quién section ── */
   .empathy-item {
     display: flex;
