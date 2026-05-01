@@ -8,7 +8,7 @@ const ODONTO_CONFIG = {
   // Formato: https://typebot.io/my-typebot-hja5zcc
   typebotUrl:            "https://typebot.io/my-typebot-hja5zcc",
 
-  whatsappNumber:        "595XXXXXXXXX",   // ← reemplazá con el número real
+  whatsappNumber:        "595981234567",
   whatsappFallback:      "Hola! Vi su página y quiero mi consulta GRATUITA 🦷",
 
   autoOpenDelay:         0,     // segundos hasta auto-apertura (0 = desactivado)
