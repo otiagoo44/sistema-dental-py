@@ -454,7 +454,8 @@ async function submitLead() {
 
     let data = null;
     try {
-      data = await res.json();
+      const text = await res.text();
+      data = text ? JSON.parse(text) : null;
     } catch {
       data = null;
     }
@@ -463,22 +464,21 @@ async function submitLead() {
       throw new Error(data && data.message ? data.message : `Error del servidor (${res.status})`);
     }
 
-    if (data && data.success === true) {
-      if (window.DentalLeadForm) {
-        window.DentalLeadForm.lastClassification =
-          data.classification !== undefined && data.classification !== null ? data.classification : null;
-        window.DentalLeadForm.lastScore =
-          data.score !== undefined && data.score !== null ? data.score : null;
-      }
-      if (data.classification != null || data.score != null) {
-        // Útil para depuración / analítica en consola
-        console.info("[DentalLead]", "classification:", data.classification, "score:", data.score);
-      }
-      showSuccessInModal();
-      return;
+    // n8n suele responder 200 con cuerpo vacío o sin `success`; solo fallamos si viene success: false.
+    if (data && data.success === false) {
+      throw new Error(data.message ? data.message : "No se pudo procesar el envío. Intentá de nuevo.");
     }
 
-    throw new Error(data && data.message ? data.message : "No se pudo confirmar el envío. Intentá de nuevo.");
+    if (window.DentalLeadForm && data && typeof data === "object") {
+      window.DentalLeadForm.lastClassification =
+        data.classification !== undefined && data.classification !== null ? data.classification : null;
+      window.DentalLeadForm.lastScore =
+        data.score !== undefined && data.score !== null ? data.score : null;
+    }
+    if (data && typeof data === "object" && (data.classification != null || data.score != null)) {
+      console.info("[DentalLead]", "classification:", data.classification, "score:", data.score);
+    }
+    showSuccessInModal();
   } catch (err) {
     const msg =
       err instanceof TypeError && err.message === "Failed to fetch"
