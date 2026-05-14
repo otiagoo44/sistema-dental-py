@@ -7,7 +7,7 @@
 // ─── Configuración editable ─────────────────────────────────
 const LEAD_FORM_CONFIG = {
   /** URL del webhook n8n (producción). */
-  webhookUrl: "https://ot1agoo.app.n8n.cloud/webhook/dental-lead-intake",
+  webhookUrl: "https://ot1agoo.app.n8n.cloud/webhook/4779b637-51f9-4723-ac3b-6714d0a6ddbc",
 
   /** Número WhatsApp fallback si el usuario cierra sin enviar (opcional). */
   whatsappNumber: "595981234567",
@@ -446,6 +446,9 @@ async function submitLead() {
   setInlineError("");
 
   try {
+    console.log("[DentalLeadForm] Webhook URL:", LEAD_FORM_CONFIG.webhookUrl);
+    console.log("[DentalLeadForm] Payload enviado:", payload);
+
     const res = await fetch(LEAD_FORM_CONFIG.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -459,6 +462,12 @@ async function submitLead() {
     } catch {
       data = null;
     }
+
+    console.log("[DentalLeadForm] Respuesta n8n:", {
+      status: res.status,
+      ok: res.ok,
+      data
+    });
 
     if (!res.ok) {
       throw new Error(data && data.message ? data.message : `Error del servidor (${res.status})`);
