@@ -7,7 +7,7 @@
 // ─── Configuración editable ─────────────────────────────────
 const LEAD_FORM_CONFIG = {
   /** URL del webhook n8n (producción). */
-  webhookUrl: "https://ot1agoo.app.n8n.cloud/webhook/4779b637-51f9-4723-ac3b-6714d0a6ddbc",
+  webhookUrl: "https://primary-production-4afb.up.railway.app/webhook/dental-lead-supabase-v1",
 
   /** Número WhatsApp fallback si el usuario cierra sin enviar (opcional). */
   whatsappNumber: "595981234567",
@@ -473,9 +473,8 @@ async function submitLead() {
       throw new Error(data && data.message ? data.message : `Error del servidor (${res.status})`);
     }
 
-    // n8n suele responder 200 con cuerpo vacío o sin `success`; solo fallamos si viene success: false.
-    if (data && data.success === false) {
-      throw new Error(data.message ? data.message : "No se pudo procesar el envío. Intentá de nuevo.");
+    if (!data || data.success !== true) {
+      throw new Error(data && data.message ? data.message : "No se pudo confirmar el envío. Intentá de nuevo.");
     }
 
     if (window.DentalLeadForm && data && typeof data === "object") {

@@ -1,0 +1,168 @@
+{
+  "name": "Dental Lead Intake - Supabase Upsert V1",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dental-lead-supabase-v1",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "Webhook_Dental_Lead_Supabase",
+      "name": "Webhook - Recibir Lead Landing",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -760,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json.body || $json;\n\nconst CLINIC_ID = '00000000-0000-0000-0000-000000000101';\n\nfunction text(value) {\n  return String(value ?? '').trim();\n}\n\nfunction digitsOnly(value) {\n  return String(value ?? '').replace(/\\D/g, '');\n}\n\nfunction normalizePhone(value) {\n  let digits = digitsOnly(value);\n\n  if (digits.startsWith('0') && digits.length >= 9) {\n    digits = '595' + digits.slice(1);\n  }\n\n  if (digits.length === 9 && digits.startsWith('9')) {\n    digits = '595' + digits;\n  }\n\n  return {\n    phone: digits || null,\n    phone_plus: digits ? `+${digits}` : null,\n  };\n}\n\nfunction scoreTreatment(value) {\n  const v = text(value).toLowerCase();\n  if (v.includes('implante')) return 40;\n  if (v.includes('dolor') || v.includes('urgencia')) return 35;\n  if (v.includes('ortodoncia') || v.includes('bracket')) return 25;\n  if (v.includes('blanqueamiento')) return 15;\n  if (v.includes('limpieza')) return 10;\n  if (v.includes('consulta')) return 5;\n  return 5;\n}\n\nfunction scoreUrgency(value) {\n  const v = text(value).toLowerCase();\n  if (v.includes('hoy')) return 35;\n  if (v.includes('semana')) return 25;\n  if (v.includes('mes')) return 10;\n  if (v.includes('consultando') || v.includes('investigando')) return -10;\n  return 0;\n}\n\nfunction scoreEvaluation(value) {\n  const v = text(value).toLowerCase();\n  if (v.includes('radiografía') || v.includes('radiografia') || v.includes('estudio')) return 20;\n  if (v === 'sí' || v === 'si') return 15;\n  if (v === 'no') return 5;\n  return 0;\n}\n\nfunction scoreSituation(value) {\n  const v = text(value).toLowerCase();\n  if (v.includes('agendar')) return 30;\n  if (v.includes('dolor') || v.includes('molestia')) return 25;\n  if (v.includes('precio')) return 5;\n  if (v.includes('comparando')) return -10;\n  return 0;\n}\n\nfunction classify(score) {\n  if (score >= 80) return 'Lead Caliente';\n  if (score >= 45) return 'Lead Medio';\n  return 'Lead Frío';\n}\n\nfunction nextAction(classification) {\n  if (classification === 'Lead Caliente') return 'Contactar inmediatamente';\n  if (classification === 'Lead Medio') return 'Contactar hoy';\n  return 'Seguimiento automático';\n}\n\nfunction nextFollowupISO(classification, baseDate) {\n  const d = new Date(baseDate);\n  if (classification === 'Lead Caliente') d.setHours(d.getHours() + 2);\n  else if (classification === 'Lead Medio') d.setDate(d.getDate() + 1);\n  else d.setDate(d.getDate() + 3);\n  return d.toISOString();\n}\n\nfunction estimateValue(treatment) {\n  const t = text(treatment).toLowerCase();\n  if (t.includes('implante')) return 5000000;\n  if (t.includes('ortodoncia') || t.includes('bracket')) return 4000000;\n  if (t.includes('blanqueamiento')) return 500000;\n  if (t.includes('limpieza')) return 250000;\n  if (t.includes('carilla')) return 2000000;\n  if (t.includes('dolor') || t.includes('urgencia')) return 350000;\n  return 250000;\n}\n\nfunction buildWhatsappLink(phoneDigits, name, treatment) {\n  if (!phoneDigits) return null;\n  const message = `Hola ${name || ''}, vimos que dejaste tus datos por ${treatment || 'una consulta dental'}. ¿Querés que te pasemos los horarios disponibles para una evaluación?`;\n  return `https://wa.me/${phoneDigits}?text=${encodeURIComponent(message)}`;\n}\n\nconst name = text(input.nombre || input.name);\nconst phoneRaw = text(input.telefono || input.phone || input.phone_plus);\nconst treatment = text(input.tratamiento || input.treatment);\nconst urgency = text(input.urgencia || input.urgency);\nconst evaluationPrevious = text(input.evaluacion_previa || input.evaluation_previous);\nconst situation = text(input.situacion || input.situation);\nconst consultationReason = text(input.motivo_consulta || input.consultation_reason);\nconst source = text(input.origen || input.source || 'Landing odontología');\nconst page = text(input.pagina || input.page || 'landing');\nconst sentAt = input.fecha_envio ? new Date(input.fecha_envio) : new Date();\n\nconst phone = normalizePhone(phoneRaw);\n\nif (!phone.phone_plus) {\n  throw new Error('Teléfono inválido o vacío. No se puede crear el lead sin WhatsApp.');\n}\n\nlet score = 0;\nscore += scoreTreatment(treatment);\nscore += scoreUrgency(urgency);\nscore += scoreEvaluation(evaluationPrevious);\nscore += scoreSituation(situation);\nif (phone.phone_plus) score += 10;\nif (name.split(' ').filter(Boolean).length >= 2) score += 5;\n\nconst classification = classify(score);\nconst action = nextAction(classification);\n\nconst notes = [\n  source ? `Origen: ${source}` : '',\n  page ? `Página: ${page}` : '',\n  situation ? `Situación: ${situation}` : '',\n  evaluationPrevious ? `Evaluación previa: ${evaluationPrevious}` : '',\n].filter(Boolean).join(' | ');\n\nconst lead = {\n  clinic_id: CLINIC_ID,\n  name: name || 'Sin nombre',\n  phone: phone.phone,\n  phone_plus: phone.phone_plus,\n  treatment: treatment || null,\n  urgency: urgency || null,\n  score,\n  classification,\n  status: 'Nuevo',\n  situation: situation || null,\n  evaluation_previous: evaluationPrevious || null,\n  consultation_reason: consultationReason || null,\n  estimated_value: estimateValue(treatment),\n  next_action: action,\n  next_followup_at: nextFollowupISO(classification, sentAt),\n  contact_attempts: 0,\n  whatsapp_link: buildWhatsappLink(phone.phone, name, treatment),\n  source,\n  page,\n  notes: notes || null,\n};\n\nreturn {\n  json: {\n    lead,\n    frontend_response_preview: {\n      success: true,\n      message: 'Datos enviados correctamente',\n      classification,\n      score,\n    },\n  },\n};"
+      },
+      "id": "Code_Preparar_Lead_Supabase",
+      "name": "Code - Preparar Lead Supabase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -500,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://kfpdworxksqofipmjijz.supabase.co/rest/v1/leads",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "on_conflict",
+              "value": "clinic_id,phone_plus"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "REEMPLAZAR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer REEMPLAZAR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.lead) }}",
+        "options": {}
+      },
+      "id": "HTTP_Upsert_Lead_Supabase",
+      "name": "HTTP - Upsert Lead Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -220,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.body ?? $json;\nlet lead = raw;\n\nif (Array.isArray(raw)) {\n  lead = raw[0] || {};\n}\n\nif (!lead.id && raw && typeof raw === 'object' && raw[0]) {\n  lead = raw[0];\n}\n\nreturn {\n  json: {\n    success: true,\n    message: 'Datos enviados correctamente',\n    lead_id: lead.id || null,\n    classification: lead.classification || 'Lead Medio',\n    score: Number(lead.score || 0),\n    status: lead.status || 'Nuevo',\n  },\n};"
+      },
+      "id": "Code_Respuesta_Frontend",
+      "name": "Code - Respuesta Frontend",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        60,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "Respond_Landing",
+      "name": "Respond - Éxito Landing",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        320,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - Recibir Lead Landing": {
+      "main": [
+        [
+          {
+            "node": "Code - Preparar Lead Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Preparar Lead Supabase": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Upsert Lead Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Upsert Lead Supabase": {
+      "main": [
+        [
+          {
+            "node": "Code - Respuesta Frontend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Respuesta Frontend": {
+      "main": [
+        [
+          {
+            "node": "Respond - Éxito Landing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "4591243d-8d4e-4e51-b675-c67cfa3ad8eb",
+  "triggerCount": 0,
+  "tags": []
+}
