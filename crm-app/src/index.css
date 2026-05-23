@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #f2ede3;
+  background: #08111c;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(52, 201, 171, 0.12), transparent 28rem),
+    linear-gradient(135deg, #08111c 0%, #0b1624 48%, #08111c 100%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #34c9ab;
+  outline-offset: 2px;
+}
+
+.scrollbar-soft {
+  scrollbar-color: rgba(52, 201, 171, 0.45) rgba(15, 30, 46, 0.8);
+}
