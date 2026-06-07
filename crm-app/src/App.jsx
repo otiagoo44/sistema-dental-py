@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarPlus, Check, Clipboard, ExternalLink, Loader2, Phone, Plus, Save, Search } from 'lucide-react';
+import { Ban, CalendarPlus, Check, Clipboard, ExternalLink, Loader2, Phone, Plus, RefreshCw, Save, Search, UserCheck } from 'lucide-react';
 import AppLayout from './components/AppLayout';
 import Login from './components/Login';
 import EmptyState from './components/ui/EmptyState';
@@ -12,6 +12,32 @@ import { supabase } from './lib/supabase';
 
 const terminalStatuses = ['Perdido', 'Tratamiento Iniciado'];
 const statusContactDates = [...CONTACTED_STATUSES, 'No Respondió'];
+const LEAD_STATUS = {
+  scheduled: 'Consulta Agendada',
+  confirmed: 'Confirmado',
+  attended: 'Asistió',
+  noShow: 'No Asistió',
+};
+const APPOINTMENT_STATUS = {
+  scheduled: 'Agendado',
+  confirmed: 'Confirmado',
+  attended: 'Asistió',
+  noShow: 'No Asistió',
+  rescheduled: 'Reprogramado',
+};
+const APPOINTMENT_ACTIVE_STATUSES = [APPOINTMENT_STATUS.scheduled, APPOINTMENT_STATUS.confirmed, APPOINTMENT_STATUS.rescheduled];
+
+function cleanOptionalText(value) {
+  const text = String(value || '').trim();
+  return text || null;
+}
+
+function tomorrowFollowupIso() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  date.setHours(9, 0, 0, 0);
+  return date.toISOString();
+}
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -25,6 +51,9 @@ export default function App() {
   const [tasks, setTasks] = useState([]);
   const [leadEvents, setLeadEvents] = useState([]);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
+  const [appointmentModal, setAppointmentModal] = useState(null);
+  const [appointmentSaving, setAppointmentSaving] = useState(false);
+  const [appointmentActionId, setAppointmentActionId] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -57,6 +86,9 @@ export default function App() {
         setAppointments([]);
         setTasks([]);
         setLeadEvents([]);
+        setAppointmentModal(null);
+        setAppointmentSaving(false);
+        setAppointmentActionId('');
       }
     });
 
@@ -127,7 +159,7 @@ export default function App() {
         .order('created_at', { ascending: false }),
       supabase
         .from('appointments')
-        .select('*, leads(name, phone, treatment)')
+        .select('*, leads(id, name, phone, phone_plus, treatment, whatsapp_link)')
         .eq('clinic_id', clinicId)
         .order('appointment_date', { ascending: true })
         .order('appointment_time', { ascending: true }),
@@ -183,6 +215,16 @@ export default function App() {
     const statusChanged = patch.status && patch.status !== before?.status;
     const leadPatch = { ...patch };
 
+    if (statusChanged && patch.status === LEAD_STATUS.scheduled) {
+      if (!before) {
+        setError('No se pudo encontrar el lead para agendar la consulta.');
+        return;
+      }
+
+      openAppointmentModal(before);
+      return;
+    }
+
     if (statusChanged && statusContactDates.includes(patch.status) && !leadPatch.last_contact_at) {
       leadPatch.last_contact_at = new Date().toISOString();
     }
@@ -230,6 +272,254 @@ export default function App() {
     setNotice('Lead actualizado.');
   }
 
+  function openAppointmentModal(lead, appointment = null, mode = 'schedule') {
+    if (!lead?.id) {
+      setError('No se pudo identificar el lead para agendar la consulta.');
+      return;
+    }
+
+    setError('');
+    setAppointmentModal({ lead, appointment, mode });
+  }
+
+  function openRescheduleModal(appointment) {
+    const leadFromState = leads.find((lead) => lead.id === appointment.lead_id);
+    const leadFromAppointment = appointment.leads
+      ? { ...appointment.leads, id: appointment.leads.id || appointment.lead_id }
+      : { id: appointment.lead_id, name: 'Lead asociado' };
+
+    openAppointmentModal(leadFromState || leadFromAppointment, appointment, 'reschedule');
+  }
+
+  async function createLeadEvent(leadId, event) {
+    return supabase.from('lead_events').insert({
+      clinic_id: profile.clinic_id,
+      lead_id: leadId,
+      event_type: event.event_type,
+      title: event.title,
+      description: event.description || null,
+      created_by: session.user.id,
+    });
+  }
+
+  async function saveAppointmentSchedule(form) {
+    const modal = appointmentModal;
+    const lead = modal?.lead;
+
+    if (!profile?.clinic_id || !lead?.id) {
+      throw new Error('No se pudo identificar la clinica o el lead para guardar la consulta.');
+    }
+
+    const isReschedule = modal.mode === 'reschedule';
+    const appointmentPayload = {
+      clinic_id: profile.clinic_id,
+      lead_id: lead.id,
+      appointment_date: form.appointment_date,
+      appointment_time: form.appointment_time,
+      doctor_assigned: cleanOptionalText(form.doctor_assigned),
+      treatment_scheduled: cleanOptionalText(form.treatment_scheduled),
+      status: isReschedule ? APPOINTMENT_STATUS.rescheduled : APPOINTMENT_STATUS.scheduled,
+      notes: cleanOptionalText(form.notes),
+    };
+
+    setAppointmentSaving(true);
+    setError('');
+    setNotice('');
+
+    let leadUpdated = false;
+
+    try {
+      const leadPatch = {
+        status: LEAD_STATUS.scheduled,
+        next_action: 'Confirmar asistencia',
+      };
+
+      if (!isReschedule) {
+        leadPatch.last_contact_at = new Date().toISOString();
+      }
+
+      const { error: leadError } = await supabase
+        .from('leads')
+        .update(leadPatch)
+        .eq('id', lead.id)
+        .eq('clinic_id', profile.clinic_id);
+
+      if (leadError) {
+        throw new Error(`No se pudo actualizar el lead: ${leadError.message}`);
+      }
+
+      leadUpdated = true;
+
+      let appointmentId = modal.appointment?.id || null;
+
+      if (!appointmentId) {
+        const { data: activeAppointment, error: activeError } = await supabase
+          .from('appointments')
+          .select('id')
+          .eq('clinic_id', profile.clinic_id)
+          .eq('lead_id', lead.id)
+          .in('status', APPOINTMENT_ACTIVE_STATUSES)
+          .order('appointment_date', { ascending: true })
+          .order('appointment_time', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (activeError) {
+          throw new Error(`El lead se actualizo, pero no se pudo verificar si ya tenia turno activo: ${activeError.message}`);
+        }
+
+        appointmentId = activeAppointment?.id || null;
+      }
+
+      const appointmentResult = appointmentId
+        ? await supabase
+            .from('appointments')
+            .update(appointmentPayload)
+            .eq('id', appointmentId)
+            .eq('clinic_id', profile.clinic_id)
+        : await supabase.from('appointments').insert(appointmentPayload);
+
+      if (appointmentResult.error) {
+        const prefix = leadUpdated ? 'El lead se actualizo, pero ' : '';
+        throw new Error(`${prefix}no se pudo guardar el turno: ${appointmentResult.error.message}`);
+      }
+
+      const eventType = isReschedule ? 'appointment_rescheduled' : 'appointment_scheduled';
+      const eventTitle = isReschedule ? 'Consulta reprogramada' : 'Consulta agendada';
+      const { error: eventError } = await createLeadEvent(lead.id, {
+        event_type: eventType,
+        title: eventTitle,
+        description: `${eventTitle} para ${form.appointment_date} ${form.appointment_time}`,
+      });
+
+      await refreshClinicData();
+      if (selectedLeadId === lead.id) {
+        await loadLeadEvents(lead.id);
+      }
+
+      setAppointmentModal(null);
+
+      if (eventError) {
+        console.error('Error creating appointment lead event', eventError);
+        setError(`La consulta se guardo, pero no se pudo crear el evento: ${eventError.message}`);
+        return;
+      }
+
+      setNotice(isReschedule ? 'Consulta reprogramada.' : 'Consulta agendada.');
+    } catch (scheduleError) {
+      if (leadUpdated) {
+        await refreshClinicData();
+        if (selectedLeadId === lead.id) {
+          await loadLeadEvents(lead.id);
+        }
+      }
+
+      setError(scheduleError.message);
+      throw scheduleError;
+    } finally {
+      setAppointmentSaving(false);
+    }
+  }
+
+  async function updateAppointmentOutcome(appointment, action) {
+    if (!profile?.clinic_id || !appointment?.id || !appointment?.lead_id) {
+      setError('No se pudo identificar el turno o el lead asociado.');
+      return;
+    }
+
+    const configs = {
+      confirm: {
+        appointmentStatus: APPOINTMENT_STATUS.confirmed,
+        leadStatus: LEAD_STATUS.confirmed,
+        nextAction: 'Esperar asistencia',
+        event_type: 'appointment_confirmed',
+        title: 'Consulta confirmada',
+        notice: 'Turno confirmado.',
+      },
+      attended: {
+        appointmentStatus: APPOINTMENT_STATUS.attended,
+        leadStatus: LEAD_STATUS.attended,
+        nextAction: 'Enviar presupuesto o iniciar tratamiento',
+        event_type: 'appointment_attended',
+        title: 'Paciente asistió',
+        notice: 'Asistencia registrada.',
+      },
+      noShow: {
+        appointmentStatus: APPOINTMENT_STATUS.noShow,
+        leadStatus: LEAD_STATUS.noShow,
+        nextAction: 'Reprogramar consulta',
+        nextFollowupAt: tomorrowFollowupIso(),
+        event_type: 'appointment_no_show',
+        title: 'Paciente no asistió',
+        notice: 'Inasistencia registrada.',
+      },
+    };
+
+    const config = configs[action];
+    if (!config) return;
+
+    setAppointmentActionId(`${appointment.id}:${action}`);
+    setError('');
+    setNotice('');
+
+    const leadPatch = {
+      status: config.leadStatus,
+      next_action: config.nextAction,
+    };
+
+    if (config.nextFollowupAt) {
+      leadPatch.next_followup_at = config.nextFollowupAt;
+    }
+
+    const { error: appointmentError } = await supabase
+      .from('appointments')
+      .update({ status: config.appointmentStatus })
+      .eq('id', appointment.id)
+      .eq('clinic_id', profile.clinic_id);
+
+    if (appointmentError) {
+      console.error('Error updating appointment', appointmentError);
+      setError(appointmentError.message);
+      setAppointmentActionId('');
+      return;
+    }
+
+    const { error: leadError } = await supabase
+      .from('leads')
+      .update(leadPatch)
+      .eq('id', appointment.lead_id)
+      .eq('clinic_id', profile.clinic_id);
+
+    if (leadError) {
+      console.error('Error updating appointment lead', leadError);
+      setError(`El turno se actualizo, pero no se pudo actualizar el lead: ${leadError.message}`);
+      await refreshClinicData();
+      setAppointmentActionId('');
+      return;
+    }
+
+    const { error: eventError } = await createLeadEvent(appointment.lead_id, {
+      event_type: config.event_type,
+      title: config.title,
+      description: `${config.title} para ${appointment.appointment_date} ${formatTime(appointment.appointment_time)}`,
+    });
+
+    await refreshClinicData();
+    if (selectedLeadId === appointment.lead_id) {
+      await loadLeadEvents(appointment.lead_id);
+    }
+
+    setAppointmentActionId('');
+
+    if (eventError) {
+      console.error('Error creating appointment outcome event', eventError);
+      setError(`El turno se actualizo, pero no se pudo crear el evento: ${eventError.message}`);
+      return;
+    }
+
+    setNotice(config.notice);
+  }
+
   async function completeTask(taskId) {
     if (!profile?.clinic_id) return;
 
@@ -273,13 +563,28 @@ export default function App() {
 
       {activeView === 'dashboard' ? <Dashboard leads={leads} appointments={appointments} /> : null}
       {activeView === 'today' ? <TodayPriority leads={leads} onOpenLead={handleLeadSelect} /> : null}
-      {activeView === 'leads' ? <LeadsView leads={leads} onOpenLead={handleLeadSelect} onUpdateLead={updateLead} setNotice={setNotice} /> : null}
-      {activeView === 'lead-detail' ? (
-        <LeadDetail lead={selectedLead} events={leadEvents} onBack={() => setActiveView('leads')} onSave={updateLead} setNotice={setNotice} />
+      {activeView === 'leads' ? (
+        <LeadsView leads={leads} onOpenLead={handleLeadSelect} onUpdateLead={updateLead} onScheduleAppointment={openAppointmentModal} setNotice={setNotice} />
       ) : null}
-      {activeView === 'agenda' ? <AgendaView appointments={appointments} /> : null}
+      {activeView === 'lead-detail' ? (
+        <LeadDetail lead={selectedLead} events={leadEvents} onBack={() => setActiveView('leads')} onSave={updateLead} onScheduleAppointment={openAppointmentModal} setNotice={setNotice} />
+      ) : null}
+      {activeView === 'agenda' ? (
+        <AgendaView appointments={appointments} actionId={appointmentActionId} onOutcome={updateAppointmentOutcome} onReschedule={openRescheduleModal} />
+      ) : null}
       {activeView === 'tasks' ? <TasksView tasks={tasks} onComplete={completeTask} /> : null}
       {activeView === 'settings' ? <SettingsView clinic={clinic} profile={profile} /> : null}
+      {appointmentModal ? (
+        <AppointmentModal
+          clinic={clinic}
+          lead={appointmentModal.lead}
+          appointment={appointmentModal.appointment}
+          mode={appointmentModal.mode}
+          saving={appointmentSaving}
+          onClose={() => setAppointmentModal(null)}
+          onSubmit={saveAppointmentSchedule}
+        />
+      ) : null}
     </AppLayout>
   );
 }
@@ -315,7 +620,7 @@ function Dashboard({ leads, appointments }) {
     const newToday = leads.filter((lead) => toLocalIsoDate(lead.created_at) === today).length;
     const hotLeads = leads.filter((lead) => lead.classification === 'Lead Caliente').length;
     const noContact = leads.filter((lead) => ['Nuevo', 'No Contactado'].includes(lead.status) && !lead.last_contact_at).length;
-    const scheduledAppointments = appointments.filter((appointment) => ['Agendado', 'Confirmado'].includes(appointment.status)).length;
+    const scheduledAppointments = appointments.filter((appointment) => APPOINTMENT_ACTIVE_STATUSES.includes(appointment.status)).length;
     const pipeline = leads.reduce((sum, lead) => sum + Number(lead.estimated_value || 0), 0);
     const contacted = leads.filter((lead) => CONTACTED_STATUSES.includes(lead.status) || lead.last_contact_at).length;
     const scheduledLeads = leads.filter((lead) => SCHEDULED_STATUSES.includes(lead.status)).length;
@@ -405,7 +710,7 @@ function TodayPriority({ leads, onOpenLead }) {
   );
 }
 
-function LeadsView({ leads, onOpenLead, onUpdateLead, setNotice }) {
+function LeadsView({ leads, onOpenLead, onUpdateLead, onScheduleAppointment, setNotice }) {
   const [filters, setFilters] = useState({ status: '', classification: '', treatment: '', q: '' });
   const treatmentOptions = useMemo(() => [...new Set(leads.map((lead) => lead.treatment).filter(Boolean))].sort(), [leads]);
   const filteredLeads = useMemo(() => {
@@ -479,7 +784,19 @@ function LeadsView({ leads, onOpenLead, onUpdateLead, setNotice }) {
                   <Clipboard className="h-4 w-4" />
                   Copiar mensaje
                 </button>
-                <select className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream" value={lead.status} onChange={(event) => onUpdateLead(lead.id, { status: event.target.value })}>
+                <select
+                  className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream"
+                  value={lead.status}
+                  onChange={(event) => {
+                    const nextStatus = event.target.value;
+                    if (nextStatus === LEAD_STATUS.scheduled && nextStatus !== lead.status) {
+                      onScheduleAppointment(lead);
+                      return;
+                    }
+
+                    onUpdateLead(lead.id, { status: nextStatus });
+                  }}
+                >
                   {LEAD_STATUSES.map((status) => <option key={status}>{status}</option>)}
                 </select>
               </div>
@@ -493,7 +810,7 @@ function LeadsView({ leads, onOpenLead, onUpdateLead, setNotice }) {
   );
 }
 
-function LeadDetail({ lead, events, onBack, onSave, setNotice }) {
+function LeadDetail({ lead, events, onBack, onSave, onScheduleAppointment, setNotice }) {
   const [form, setForm] = useState(null);
 
   useEffect(() => {
@@ -523,6 +840,15 @@ function LeadDetail({ lead, events, onBack, onSave, setNotice }) {
       next_action: form.next_action,
       next_followup_at: form.next_followup_at ? new Date(form.next_followup_at).toISOString() : null,
     });
+  }
+
+  function handleStatusChange(value) {
+    if (value === LEAD_STATUS.scheduled && value !== lead.status) {
+      onScheduleAppointment(lead);
+      return;
+    }
+
+    setForm({ ...form, status: value });
   }
 
   return (
@@ -558,7 +884,7 @@ function LeadDetail({ lead, events, onBack, onSave, setNotice }) {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Select label="Estado" value={form.status} onChange={(value) => setForm({ ...form, status: value })} options={LEAD_STATUSES} />
+          <Select label="Estado" value={form.status} onChange={handleStatusChange} options={LEAD_STATUSES} />
           <Field label="Proxima accion" value={form.next_action} onChange={(value) => setForm({ ...form, next_action: value })} />
           <Field label="Proximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => setForm({ ...form, next_followup_at: value })} />
           <label className="block md:col-span-2">
@@ -607,7 +933,7 @@ function LeadDetail({ lead, events, onBack, onSave, setNotice }) {
   );
 }
 
-function AgendaView({ appointments }) {
+function AgendaView({ appointments, actionId, onOutcome, onReschedule }) {
   return (
     <section className="rounded-lg border border-white/10 bg-panel/90 p-4 shadow-glow">
       {appointments.length ? (
@@ -618,22 +944,64 @@ function AgendaView({ appointments }) {
                 <th className="px-3 py-3">Fecha</th>
                 <th className="px-3 py-3">Hora</th>
                 <th className="px-3 py-3">Paciente</th>
+                <th className="px-3 py-3">Teléfono</th>
                 <th className="px-3 py-3">Doctor</th>
                 <th className="px-3 py-3">Tratamiento</th>
                 <th className="px-3 py-3">Estado</th>
+                <th className="px-3 py-3">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
-              {appointments.map((appointment) => (
-                <tr key={appointment.id} className="hover:bg-white/[0.03]">
-                  <td className="px-3 py-3">{formatDate(appointment.appointment_date)}</td>
-                  <td className="px-3 py-3">{formatTime(appointment.appointment_time)}</td>
-                  <td className="px-3 py-3 font-semibold">{appointment.leads?.name || 'Sin lead'}</td>
-                  <td className="px-3 py-3">{appointment.doctor_assigned || 'Sin asignar'}</td>
-                  <td className="px-3 py-3">{appointment.treatment_scheduled || appointment.leads?.treatment || 'Sin dato'}</td>
-                  <td className="px-3 py-3"><StatusBadge value={appointment.status} /></td>
-                </tr>
-              ))}
+              {appointments.map((appointment) => {
+                const lead = appointment.leads || {};
+                const phone = lead.phone_plus || lead.phone || 'Sin telefono';
+                const isBusy = actionId.startsWith(`${appointment.id}:`);
+
+                return (
+                  <tr key={appointment.id} className="hover:bg-white/[0.03]">
+                    <td className="px-3 py-3">{formatDate(appointment.appointment_date)}</td>
+                    <td className="px-3 py-3">{formatTime(appointment.appointment_time)}</td>
+                    <td className="px-3 py-3 font-semibold">{lead.name || 'Sin lead'}</td>
+                    <td className="px-3 py-3">{phone}</td>
+                    <td className="px-3 py-3">{appointment.doctor_assigned || 'Sin asignar'}</td>
+                    <td className="px-3 py-3">{appointment.treatment_scheduled || lead.treatment || 'Sin dato'}</td>
+                    <td className="px-3 py-3"><StatusBadge value={appointment.status} /></td>
+                    <td className="min-w-[520px] px-3 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        <a className="inline-flex items-center gap-2 rounded-lg bg-mint px-3 py-2 text-xs font-semibold text-ink hover:bg-mint/90" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer">
+                          <ExternalLink className="h-4 w-4" />
+                          Abrir WhatsApp
+                        </a>
+                        <AgendaActionButton
+                          icon={Check}
+                          label="Confirmar"
+                          loading={actionId === `${appointment.id}:confirm`}
+                          disabled={isBusy || appointment.status === APPOINTMENT_STATUS.confirmed}
+                          onClick={() => onOutcome(appointment, 'confirm')}
+                        />
+                        <AgendaActionButton
+                          icon={UserCheck}
+                          label="Asistió"
+                          loading={actionId === `${appointment.id}:attended`}
+                          disabled={isBusy || appointment.status === APPOINTMENT_STATUS.attended}
+                          onClick={() => onOutcome(appointment, 'attended')}
+                        />
+                        <AgendaActionButton
+                          icon={Ban}
+                          label="No Asistió"
+                          loading={actionId === `${appointment.id}:noShow`}
+                          disabled={isBusy || appointment.status === APPOINTMENT_STATUS.noShow}
+                          onClick={() => onOutcome(appointment, 'noShow')}
+                        />
+                        <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cream/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45" type="button" onClick={() => onReschedule(appointment)} disabled={isBusy}>
+                          <RefreshCw className="h-4 w-4" />
+                          Reprogramar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -641,6 +1009,120 @@ function AgendaView({ appointments }) {
         <EmptyState title="Sin appointments visibles" text="Verifica RLS, clinic_id y datos de agenda." />
       )}
     </section>
+  );
+}
+
+function AgendaActionButton({ icon: Icon, label, loading, disabled, onClick }) {
+  return (
+    <button
+      className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cream/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
+      type="button"
+      onClick={onClick}
+      disabled={disabled || loading}
+    >
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+      {label}
+    </button>
+  );
+}
+
+function getAppointmentFormDefaults({ clinic, lead, appointment }) {
+  return {
+    appointment_date: appointment?.appointment_date || todayIsoDate(),
+    appointment_time: appointment?.appointment_time ? appointment.appointment_time.slice(0, 5) : '',
+    doctor_assigned: appointment?.doctor_assigned || clinic?.doctor_name || '',
+    treatment_scheduled: appointment?.treatment_scheduled || lead?.treatment || '',
+    notes: appointment?.notes || '',
+  };
+}
+
+function AppointmentModal({ clinic, lead, appointment, mode, saving, onClose, onSubmit }) {
+  const [form, setForm] = useState(() => getAppointmentFormDefaults({ clinic, lead, appointment }));
+  const [formError, setFormError] = useState('');
+  const isReschedule = mode === 'reschedule';
+
+  useEffect(() => {
+    setForm(getAppointmentFormDefaults({ clinic, lead, appointment }));
+    setFormError('');
+  }, [appointment?.id, clinic?.doctor_name, lead?.id, mode]);
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSubmit() {
+    if (!form.appointment_date) {
+      setFormError('Selecciona la fecha de consulta.');
+      return;
+    }
+
+    if (!form.appointment_time) {
+      setFormError('Selecciona la hora de consulta.');
+      return;
+    }
+
+    setFormError('');
+
+    try {
+      await onSubmit({
+        appointment_date: form.appointment_date,
+        appointment_time: form.appointment_time,
+        doctor_assigned: form.doctor_assigned.trim(),
+        treatment_scheduled: form.treatment_scheduled.trim(),
+        notes: form.notes.trim(),
+      });
+    } catch (submitError) {
+      setFormError(submitError.message || 'No se pudo guardar la consulta.');
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/80 px-4 py-6 backdrop-blur sm:items-center">
+      <form
+        className="w-full max-w-2xl rounded-lg border border-white/10 bg-panel p-5 shadow-glow"
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleSubmit();
+        }}
+      >
+        <div className="mb-5 flex flex-col gap-3 border-b border-white/10 pb-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-mint">{isReschedule ? 'Reprogramar' : 'Agendar'}</p>
+            <h2 className="mt-1 text-xl font-semibold text-cream">{isReschedule ? 'Reprogramar consulta' : 'Consulta agendada'}</h2>
+            <p className="mt-1 text-sm text-cream/55">{lead?.name || 'Lead asociado'}</p>
+          </div>
+          <StatusBadge value={LEAD_STATUS.scheduled} />
+        </div>
+
+        {formError ? <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-red-100">{formError}</div> : null}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Fecha de consulta" type="date" value={form.appointment_date} onChange={(value) => updateField('appointment_date', value)} disabled={saving} />
+          <Field label="Hora de consulta" type="time" value={form.appointment_time} onChange={(value) => updateField('appointment_time', value)} disabled={saving} />
+          <Field label="Doctor asignado" value={form.doctor_assigned} onChange={(value) => updateField('doctor_assigned', value)} disabled={saving} />
+          <Field label="Tratamiento agendado" value={form.treatment_scheduled} onChange={(value) => updateField('treatment_scheduled', value)} disabled={saving} />
+          <label className="block md:col-span-2">
+            <span className="mb-2 block text-xs text-cream/55">Notas opcionales</span>
+            <textarea
+              className="min-h-28 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              value={form.notes}
+              onChange={(event) => updateField('notes', event.target.value)}
+              disabled={saving}
+            />
+          </label>
+        </div>
+
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-cream/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={onClose} disabled={saving}>
+            Cancelar
+          </button>
+          <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-mint px-4 py-2 text-sm font-semibold text-ink hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isReschedule ? 'Guardar reprogramación' : 'Guardar consulta'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -746,11 +1228,11 @@ function Select({ label, value, onChange, options, placeholder }) {
   );
 }
 
-function Field({ label, value, onChange, type = 'text' }) {
+function Field({ label, value, onChange, type = 'text', disabled = false }) {
   return (
     <label className="block">
       <span className="mb-2 block text-xs text-cream/55">{label}</span>
-      <input className="w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none" type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input className="w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none disabled:cursor-not-allowed disabled:opacity-60" type={type} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
     </label>
   );
 }
