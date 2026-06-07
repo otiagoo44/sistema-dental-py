@@ -4,10 +4,18 @@
  * Envía JSON por POST al webhook de n8n.
  */
 
+// Configuracion multi-clinica editable.
+// Estos valores son publicos y reemplazan cualquier clinic_id hardcodeado en frontend.
+const CLINIC_SLUG = "dentalpro";
+const LANDING_TOKEN = "lf_FQtBqoPD7BCHLQkkDEdS4eK-pXwjj5WJCfLb8fvt6uI";
+
 // ─── Configuración editable ─────────────────────────────────
 const LEAD_FORM_CONFIG = {
-  /** URL del webhook n8n (producción). */
+  /** URL del webhook n8n (producción). Cambiar al webhook universal cuando quede desplegado. */
   webhookUrl: "https://primary-production-4afb.up.railway.app/webhook/dental-lead-supabase-v1",
+
+  clinicSlug: CLINIC_SLUG,
+  landingToken: LANDING_TOKEN,
 
   /** Número WhatsApp fallback si el usuario cierra sin enviar (opcional). */
   whatsappNumber: "595981234567",
@@ -399,13 +407,23 @@ function goNext() {
 function buildPayload() {
   const fechaEnvio = new Date().toISOString();
   const phoneResult = validatePhone(answers.telefono || "");
+  const consultationReason =
+    answers.consultation_reason ||
+    answers.motivo_consulta ||
+    answers.situacion ||
+    answers.tratamiento ||
+    null;
+
   return {
+    clinic_slug: LEAD_FORM_CONFIG.clinicSlug,
+    landing_token: LEAD_FORM_CONFIG.landingToken,
     nombre: (answers.nombre || "").trim(),
     telefono: phoneResult.ok ? phoneResult.value : (answers.telefono || "").trim(),
     tratamiento: answers.tratamiento || "",
     urgencia: answers.urgencia || "",
     evaluacion_previa: answers.evaluacion_previa || "",
     situacion: answers.situacion || "",
+    consultation_reason: consultationReason,
     horario_preferido: "",
     origen: "Landing odontología",
     pagina: "implantes",

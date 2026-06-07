@@ -12,6 +12,7 @@ export const LEAD_STATUSES = [
   'Perdido',
   'Reactivar 30d',
   'No Asistió',
+  'Archivado',
 ];
 
 export const CLASSIFICATIONS = ['Lead Caliente', 'Lead Medio', 'Lead Frío'];

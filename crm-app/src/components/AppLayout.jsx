@@ -10,7 +10,9 @@ const icons = {
   settings: Settings,
 };
 
-export default function AppLayout({ activeView, setActiveView, clinic, profile, onLogout, children }) {
+export default function AppLayout({ activeView, setActiveView, clinic, profile, isAdmin = false, onLogout, children }) {
+  const visibleNavItems = NAV_ITEMS.filter((item) => item.id !== 'settings' || isAdmin);
+
   return (
     <div className="min-h-screen bg-ink text-cream">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 border-r border-white/10 bg-panel/95 p-5 lg:block">
@@ -25,7 +27,7 @@ export default function AppLayout({ activeView, setActiveView, clinic, profile, 
         </div>
 
         <nav className="space-y-2">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = icons[item.id];
             const selected = activeView === item.id;
 
@@ -69,7 +71,7 @@ export default function AppLayout({ activeView, setActiveView, clinic, profile, 
             </div>
 
             <div className="flex flex-wrap items-center gap-2 lg:hidden">
-              {NAV_ITEMS.map((item) => (
+              {visibleNavItems.map((item) => (
                 <button
                   key={item.id}
                   className={`rounded-lg px-3 py-2 text-xs font-semibold ${activeView === item.id ? 'bg-mint text-ink' : 'bg-panel text-cream/70'}`}

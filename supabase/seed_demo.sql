@@ -167,4 +167,4 @@ on conflict (clinic_id, report_date) do update set
   pending_followups = excluded.pending_followups,
   pipeline_value = excluded.pipeline_value;
 
--- insert into public.profiles (id, clinic_id, full_name, email, role) values ('AUTH_USERS_ID_REAL', '00000000-0000-0000-0000-000000000101', 'Usuario Demo DentalPro', 'demo@dentalpro.test', 'owner');
+-- insert into public.profiles (id, clinic_id, full_name, email, role) values ('AUTH_USERS_ID_REAL', '00000000-0000-0000-0000-000000000101', 'Usuario Demo DentalPro', 'demo@dentalpro.test', 'admin');

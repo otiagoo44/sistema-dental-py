@@ -1,3 +1,6 @@
+-- Ejemplo legacy de insert directo.
+-- Para produccion multi-clinica usar n8n-universal-workflow.md y resolver clinic_id desde clinic_public_forms.
+
 insert into public.leads (
   clinic_id,
   name,
@@ -43,3 +46,6 @@ values (
   'Creado automáticamente por n8n.'
 )
 returning id;
+
+-- En el workflow, mapear consultation_reason desde el body con este fallback:
+-- body.consultation_reason || body.motivo_consulta || body.situacion || body.tratamiento || null
