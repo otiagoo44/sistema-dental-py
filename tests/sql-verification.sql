@@ -35,6 +35,19 @@ select id, clinic_id, clinic_slug, landing_url, allowed_origins, is_active, crea
 from public.clinic_public_forms
 order by created_at desc;
 
+-- Origin real de landing para dentalpro. No debe quedar Netlify ni placeholder viejo.
+select clinic_slug, allowed_origins, is_active
+from public.clinic_public_forms
+where clinic_slug = 'dentalpro';
+
+select
+  'https://sistema-dental-py.vercel.app' = any(allowed_origins) as has_vercel_landing_origin,
+  'http://localhost:5173' = any(allowed_origins) as has_local_origin,
+  'https://TU-LANDING.com' = any(allowed_origins) as has_old_placeholder,
+  'https://sistema-dentalpro-py.netlify.app' = any(allowed_origins) as has_old_netlify_origin
+from public.clinic_public_forms
+where clinic_slug = 'dentalpro';
+
 -- Agenda.
 select id, clinic_id, lead_id, appointment_date, appointment_time, status, doctor_assigned, created_at
 from public.appointments

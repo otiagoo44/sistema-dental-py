@@ -2,11 +2,17 @@ param(
   [string]$EDGE_URL = $(if ($env:EDGE_URL) { $env:EDGE_URL } else { "https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake" }),
   [string]$SLUG = $(if ($env:SLUG) { $env:SLUG } else { "dentalpro" }),
   [string]$TOKEN = $(if ($env:TOKEN) { $env:TOKEN } else { "TOKEN_PUBLICO" }),
-  [string]$ORIGIN = $(if ($env:ORIGIN) { $env:ORIGIN } else { "http://localhost:5173" })
+  [string]$LANDING_ORIGIN = $(if ($env:LANDING_ORIGIN) { $env:LANDING_ORIGIN } elseif ($env:ORIGIN) { $env:ORIGIN } else { "https://sistema-dental-py.vercel.app" }),
+  [string]$OLD_NETLIFY_ORIGIN = $(if ($env:OLD_NETLIFY_ORIGIN) { $env:OLD_NETLIFY_ORIGIN } else { "https://sistema-dentalpro-py.netlify.app" }),
+  [string]$INVALID_ORIGIN = $(if ($env:INVALID_ORIGIN) { $env:INVALID_ORIGIN } else { "https://invalid-origin.example" })
 )
 
 if ($TOKEN -eq "TOKEN_PUBLICO") {
   throw "Configura TOKEN con un landing_token real antes de ejecutar: `$env:TOKEN='lf_...'; .\tests\lead-intake-test.ps1"
+}
+
+if ($LANDING_ORIGIN.EndsWith("/")) {
+  throw "LANDING_ORIGIN debe ir sin slash final. Usa https://sistema-dental-py.vercel.app"
 }
 
 $script:Passed = 0
@@ -22,28 +28,6 @@ function New-TestPhone {
 function New-TestIp {
   $script:IpSeed += 1
   return "203.0.113.$($script:IpSeed % 250)"
-}
-
-function Invoke-LeadIntake {
-  param(
-    [hashtable]$Body,
-    [string]$Ip = $(New-TestIp)
-  )
-
-  $json = $Body | ConvertTo-Json -Depth 10
-  try {
-    $response = Invoke-WebRequest `
-      -Method Post `
-      -Uri $EDGE_URL `
-      -ContentType "application/json" `
-      -Headers @{ "X-Forwarded-For" = $Ip; "Origin" = $ORIGIN } `
-      -Body $json `
-      -UseBasicParsing
-
-    return Convert-HttpResult -Response $response
-  } catch {
-    return Convert-HttpError -ErrorRecord $_
-  }
 }
 
 function Convert-HttpResult {
@@ -102,6 +86,53 @@ function Convert-HttpError {
   }
 }
 
+function Invoke-EdgeRequest {
+  param(
+    [string]$Method = "Post",
+    [hashtable]$Body = $null,
+    [string]$RawBody = $null,
+    [string]$Origin = $LANDING_ORIGIN,
+    [string]$Ip = $(New-TestIp)
+  )
+
+  $headers = @{
+    "X-Forwarded-For" = $Ip
+  }
+
+  if ($Origin) {
+    $headers["Origin"] = $Origin
+  }
+
+  $params = @{
+    Method = $Method
+    Uri = $EDGE_URL
+    Headers = $headers
+    UseBasicParsing = $true
+  }
+
+  if ($Method -notin @("Get", "Options")) {
+    $params.ContentType = "application/json"
+    $params.Body = if ($null -ne $RawBody) { $RawBody } else { $Body | ConvertTo-Json -Depth 10 }
+  }
+
+  try {
+    $response = Invoke-WebRequest @params
+    return Convert-HttpResult -Response $response
+  } catch {
+    return Convert-HttpError -ErrorRecord $_
+  }
+}
+
+function Invoke-LeadIntake {
+  param(
+    [hashtable]$Body,
+    [string]$Origin = $LANDING_ORIGIN,
+    [string]$Ip = $(New-TestIp)
+  )
+
+  return Invoke-EdgeRequest -Method "Post" -Body $Body -Origin $Origin -Ip $Ip
+}
+
 function Assert-True {
   param(
     [string]$Name,
@@ -136,12 +167,14 @@ function New-BaseLead {
     [string]$Urgency = "Hoy",
     [string]$Evaluation = "Tengo estudios / radiografia",
     [string]$Situation = "Quiero agendar una consulta",
-    [string]$Name = "Lead Test QA"
+    [string]$Name = "Lead Test QA",
+    [string]$ClinicSlug = $SLUG,
+    [string]$LandingToken = $TOKEN
   )
 
   return @{
-    clinic_slug = $SLUG
-    landing_token = $TOKEN
+    clinic_slug = $ClinicSlug
+    landing_token = $LandingToken
     nombre = $Name
     telefono = $Phone
     tratamiento = $Treatment
@@ -151,78 +184,106 @@ function New-BaseLead {
     consultation_reason = "Test automatizado"
     origen = "tests/lead-intake-test.ps1"
     pagina = "test"
+    website = ""
+    company = ""
   }
 }
 
-Write-Host "1. Token correcto"
-$ok = Invoke-LeadIntake -Body (New-BaseLead)
-Assert-Status "token correcto devuelve 200" $ok 200
-Assert-True "token correcto success true" ($ok.Data.success -eq $true)
+Write-Host "1. Origin correcto Vercel"
+$ok = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Vercel Origin Correcto") -Origin $LANDING_ORIGIN
+Assert-Status "origin Vercel devuelve 200" $ok 200
+Assert-True "origin Vercel success true" ($ok.Data.success -eq $true)
+Assert-True "origin Vercel lead_id presente" ([string]::IsNullOrWhiteSpace($ok.Data.lead_id) -eq $false)
 
-Write-Host "2. Token falso"
-$badToken = New-BaseLead
+Write-Host "2. Origin viejo Netlify"
+$oldOrigin = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Origin Viejo Netlify") -Origin $OLD_NETLIFY_ORIGIN
+Assert-Status "origin viejo Netlify devuelve 403" $oldOrigin 403
+
+Write-Host "3. Origin invalido"
+$invalidOrigin = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Origin Invalido") -Origin $INVALID_ORIGIN
+Assert-Status "origin invalido devuelve 403" $invalidOrigin 403
+
+Write-Host "4. GET no permitido"
+$getResult = Invoke-EdgeRequest -Method "Get" -Origin $LANDING_ORIGIN
+Assert-Status "GET devuelve 405" $getResult 405
+
+Write-Host "5. Clinica inexistente"
+$missingClinic = Invoke-LeadIntake -Body (New-BaseLead -ClinicSlug "clinica-inexistente-qa" -Name "QA Clinica Inexistente")
+Assert-Status "clinica inexistente devuelve 403" $missingClinic 403
+
+Write-Host "6. XSS controlado"
+$xss = Invoke-LeadIntake -Body (New-BaseLead -Name "<script>alert(1)</script>")
+Assert-Status "XSS en nombre queda rechazado por validacion" $xss 400
+
+Write-Host "7. Payload grande"
+$largePayload = New-BaseLead -Name "QA Payload Grande"
+$largePayload.notes = "x" * 17000
+$largeRaw = $largePayload | ConvertTo-Json -Depth 10
+$largeResult = Invoke-EdgeRequest -Method "Post" -RawBody $largeRaw -Origin $LANDING_ORIGIN
+Assert-Status "payload grande devuelve 400" $largeResult 400
+
+Write-Host "8. Honeypot"
+$honeypot = New-BaseLead -Name "QA Honeypot"
+$honeypot.website = "https://spam.example"
+$honeypotResult = Invoke-LeadIntake -Body $honeypot
+Assert-Status "honeypot devuelve 403" $honeypotResult 403
+
+Write-Host "9. Token falso"
+$badToken = New-BaseLead -Name "QA Token Falso"
 $badToken.landing_token = "lf_TOKEN_FALSO_000000000000000000000000"
 $badTokenResult = Invoke-LeadIntake -Body $badToken
 Assert-Status "token falso devuelve 403" $badTokenResult 403
 
-Write-Host "3. clinic_id manipulado se ignora"
-$manipulated = New-BaseLead
+Write-Host "10. clinic_id manipulado se ignora"
+$manipulated = New-BaseLead -Name "QA Clinic Id Manipulado"
 $manipulated.clinic_id = "00000000-0000-0000-0000-000000000000"
 $manipulatedResult = Invoke-LeadIntake -Body $manipulated
 Assert-Status "clinic_id manipulado no bloquea lead valido" $manipulatedResult 200
 Assert-True "clinic_id manipulado recibe lead_id" ([string]::IsNullOrWhiteSpace($manipulatedResult.Data.lead_id) -eq $false)
 
-Write-Host "4. Telefono invalido"
-$badPhone = New-BaseLead -Phone "123"
+Write-Host "11. Telefono invalido"
+$badPhone = New-BaseLead -Phone "123" -Name "QA Telefono Invalido"
 $badPhoneResult = Invoke-LeadIntake -Body $badPhone
 Assert-Status "telefono invalido devuelve 400" $badPhoneResult 400
 
-Write-Host "5. Formulario incompleto"
+Write-Host "12. Formulario incompleto"
 $incomplete = New-BaseLead
 $incomplete.nombre = ""
 $incompleteResult = Invoke-LeadIntake -Body $incomplete
 Assert-Status "formulario incompleto devuelve 400" $incompleteResult 400
 
-Write-Host "6. Duplicado"
-$duplicate = New-BaseLead
+Write-Host "13. Duplicado"
+$duplicate = New-BaseLead -Name "QA Duplicado"
 $firstDuplicate = Invoke-LeadIntake -Body $duplicate
 $secondDuplicate = Invoke-LeadIntake -Body $duplicate
 Assert-Status "duplicado primera submission 200" $firstDuplicate 200
 Assert-Status "duplicado segunda submission 200" $secondDuplicate 200
 Assert-True "duplicado conserva lead_id" ($firstDuplicate.Data.lead_id -eq $secondDuplicate.Data.lead_id)
 
-Write-Host "7. Lead caliente"
-$hot = Invoke-LeadIntake -Body (New-BaseLead -Treatment "Implante dental" -Urgency "Hoy" -Evaluation "Tengo estudios / radiografia" -Situation "Quiero agendar una consulta")
+Write-Host "14. Lead caliente"
+$hot = Invoke-LeadIntake -Body (New-BaseLead -Treatment "Implante dental" -Urgency "Hoy" -Evaluation "Tengo estudios / radiografia" -Situation "Quiero agendar una consulta" -Name "QA Lead Caliente")
 Assert-Status "lead caliente devuelve 200" $hot 200
 Assert-True "lead caliente clasifica correcto" ($hot.Data.classification -eq "Lead Caliente")
 
-Write-Host "8. Lead medio"
-$medium = Invoke-LeadIntake -Body (New-BaseLead -Treatment "Ortodoncia / brackets" -Urgency "Esta semana" -Evaluation "No" -Situation "Quiero saber precios")
+Write-Host "15. Lead medio"
+$medium = Invoke-LeadIntake -Body (New-BaseLead -Treatment "Ortodoncia / brackets" -Urgency "Esta semana" -Evaluation "No" -Situation "Quiero saber precios" -Name "QA Lead Medio")
 Assert-Status "lead medio devuelve 200" $medium 200
 Assert-True "lead medio clasifica correcto" ($medium.Data.classification -eq "Lead Medio")
 
-Write-Host "9. Lead frio"
-$cold = Invoke-LeadIntake -Body (New-BaseLead -Treatment "Consulta general" -Urgency "Solo estoy consultando" -Evaluation "No estoy seguro" -Situation "Estoy comparando opciones")
+Write-Host "16. Lead frio"
+$cold = Invoke-LeadIntake -Body (New-BaseLead -Treatment "Consulta general" -Urgency "Solo estoy consultando" -Evaluation "No estoy seguro" -Situation "Estoy comparando opciones" -Name "QA Lead Frio")
 Assert-Status "lead frio devuelve 200" $cold 200
-if ([string]$cold.Data.classification -like "Lead Fr*o") {
-  $cold.Data.classification = "Lead Frio"
-}
-Assert-True "lead frio clasifica correcto" ($cold.Data.classification -eq "Lead Frio" -or $cold.Data.classification -eq "Lead Frío")
+Assert-True "lead frio clasifica correcto" ([string]$cold.Data.classification -like "Lead Fr*o")
 
-Write-Host "10. Rate limit mismo telefono"
-$rateLead = New-BaseLead
+Write-Host "17. Rate limit mismo telefono"
+$rateLead = New-BaseLead -Name "QA Rate Limit"
 $rateIp = "203.0.113.240"
 $rateResults = 1..4 | ForEach-Object { Invoke-LeadIntake -Body $rateLead -Ip $rateIp }
 Assert-Status "rate limit cuarto envio devuelve 429" $rateResults[-1] 429
 
-Write-Host "11. CORS OPTIONS"
-try {
-  $options = Invoke-WebRequest -Method Options -Uri $EDGE_URL -Headers @{ Origin = $ORIGIN } -UseBasicParsing
-  Assert-True "OPTIONS devuelve 200" ([int]$options.StatusCode -eq 200)
-} catch {
-  $optionsError = Convert-HttpError -ErrorRecord $_
-  Assert-True "OPTIONS devuelve 200" ($optionsError.StatusCode -eq 200) "Obtuvo $($optionsError.StatusCode): $($optionsError.Raw)"
-}
+Write-Host "18. CORS OPTIONS"
+$options = Invoke-EdgeRequest -Method "Options" -Origin $LANDING_ORIGIN
+Assert-True "OPTIONS devuelve 200" ($options.StatusCode -eq 200) "Obtuvo $($options.StatusCode): $($options.Raw)"
 
 Write-Host "Resultado: $script:Passed passed, $script:Failed failed"
 if ($script:Failed -gt 0) {

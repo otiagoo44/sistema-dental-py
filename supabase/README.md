@@ -57,6 +57,8 @@ returning id;
 
 ## Crear Formulario Publico
 
+Para `dentalpro`, la landing real actual es `https://sistema-dental-py.vercel.app` sin slash final. `http://localhost:5173` se mantiene para pruebas locales.
+
 ```sql
 insert into public.clinic_public_forms (
   clinic_id, clinic_slug, public_token, landing_url, allowed_origins, is_active
@@ -64,13 +66,15 @@ insert into public.clinic_public_forms (
   'CLINIC_ID_REAL',
   'clinica-demo',
   'lf_REEMPLAZAR_TOKEN_LARGO_SEGURO_1234567890',
-  'https://clinica-demo.com',
-  array['https://clinica-demo.com'],
+  'https://sistema-dental-py.vercel.app',
+  array['https://sistema-dental-py.vercel.app', 'http://localhost:5173'],
   true
 );
 ```
 
 La landing envia solo `clinic_slug` y `landing_token`. La Edge Function resuelve el `clinic_id` real y descarta cualquier `clinic_id` enviado por el navegador.
+
+El dominio CRM se configura aparte en Supabase Auth. No confundir landing publica con `https://TU-CRM.vercel.app`.
 
 ## Crear Settings
 

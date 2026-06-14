@@ -12,6 +12,8 @@ Landing / iframe publico
   -> n8n asincronico desde automation_jobs
 ```
 
+Landing real actual: `https://sistema-dental-py.vercel.app` (sin slash final).
+
 Regla central: Supabase guarda primero el lead. n8n automatiza despues. Si n8n, email, WhatsApp o cualquier alerta falla, el lead ya queda en Supabase y visible en el CRM.
 
 ## Carpetas
@@ -35,8 +37,8 @@ npm run build
 Variables locales del CRM:
 
 ```text
-VITE_SUPABASE_URL=https://PROJECT_REF.supabase.co
-VITE_SUPABASE_ANON_KEY=SUPABASE_ANON_KEY
+VITE_SUPABASE_URL=https://kfpdworxksqofipmjijz.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_xxx
 VITE_PUBLIC_LEAD_WEBHOOK_URL=https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake
 ```
 
@@ -48,8 +50,9 @@ No poner `SUPABASE_SERVICE_ROLE_KEY`, `FORM_HASH_SALT` ni secretos en frontend.
 2. Configurar secrets de Edge Function.
 3. Deployar `lead-intake`.
 4. Configurar Vercel con root `crm-app`.
-5. Configurar Auth URLs en Supabase.
-6. Probar token correcto, token falso, telefono invalido, duplicado y rate limit.
+5. Configurar Auth URLs del CRM en Supabase cuando exista dominio CRM.
+6. Configurar `allowed_origins` del formulario publico con `https://sistema-dental-py.vercel.app` y `http://localhost:5173`.
+7. Probar token correcto, token falso, telefono invalido, duplicado y rate limit.
 
 ## Checklist Antes De Vender
 
@@ -69,6 +72,7 @@ Ver detalle en `docs/checklist-produccion.md`.
 ```powershell
 $env:TOKEN = "lf_TOKEN_REAL"
 $env:SLUG = "dentalpro"
+$env:LANDING_ORIGIN = "https://sistema-dental-py.vercel.app"
 .\tests\lead-intake-test.ps1
 .\tests\load-30-leads.ps1
 ```

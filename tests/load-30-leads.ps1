@@ -2,13 +2,17 @@ param(
   [string]$EDGE_URL = $(if ($env:EDGE_URL) { $env:EDGE_URL } else { "https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake" }),
   [string]$SLUG = $(if ($env:SLUG) { $env:SLUG } else { "dentalpro" }),
   [string]$TOKEN = $(if ($env:TOKEN) { $env:TOKEN } else { "TOKEN_PUBLICO" }),
-  [string]$ORIGIN = $(if ($env:ORIGIN) { $env:ORIGIN } else { "http://localhost:5173" }),
+  [string]$LANDING_ORIGIN = $(if ($env:LANDING_ORIGIN) { $env:LANDING_ORIGIN } elseif ($env:ORIGIN) { $env:ORIGIN } else { "https://sistema-dental-py.vercel.app" }),
   [int]$BatchSize = 10,
   [int]$PauseAfterBatchSeconds = 610
 )
 
 if ($TOKEN -eq "TOKEN_PUBLICO") {
   throw "Configura TOKEN con un landing_token real antes de ejecutar: `$env:TOKEN='lf_...'; .\tests\load-30-leads.ps1"
+}
+
+if ($LANDING_ORIGIN.EndsWith("/")) {
+  throw "LANDING_ORIGIN debe ir sin slash final. Usa https://sistema-dental-py.vercel.app"
 }
 
 $success = 0
@@ -41,7 +45,7 @@ $runId = Get-Random -Minimum 100 -Maximum 999
       -Method Post `
       -Uri $EDGE_URL `
       -ContentType "application/json" `
-      -Headers @{ "X-Forwarded-For" = $ip; "Origin" = $ORIGIN } `
+      -Headers @{ "X-Forwarded-For" = $ip; "Origin" = $LANDING_ORIGIN } `
       -Body $json `
       -UseBasicParsing
 

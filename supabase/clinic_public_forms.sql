@@ -100,7 +100,7 @@ values (
   'dentalpro',
   'lf_FQtBqoPD7BCHLQkkDEdS4eK-pXwjj5WJCfLb8fvt6uI',
   null,
-  array['http://localhost:5173', 'https://TU-LANDING.com']::text[],
+  array['https://sistema-dental-py.vercel.app', 'http://localhost:5173']::text[],
   true
 )
 on conflict (clinic_slug) do update set

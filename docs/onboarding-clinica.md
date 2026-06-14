@@ -15,7 +15,7 @@ Datos necesarios antes del alta:
 - Tratamientos ofrecidos.
 - Tickets estimados por tratamiento.
 - Color principal o marca.
-- URL de landing.
+- URL de landing. Para `dentalpro`: `https://sistema-dental-py.vercel.app` sin slash final.
 - `allowed_origins` exactos: dominio de landing y dominio CRM si usa iframe.
 - Usuarios admin/owner.
 - Usuarios receptionist.
@@ -28,10 +28,13 @@ Datos necesarios antes del alta:
 4. Crear usuarios en Supabase Auth.
 5. Crear `public.profiles` con rol `admin`, `owner` o `receptionist`.
 6. Verificar que `profiles.clinic_id` apunta a la clinica correcta.
+7. Para `dentalpro`, confirmar `allowed_origins = ['https://sistema-dental-py.vercel.app', 'http://localhost:5173']` mientras no exista dominio CRM real.
 
 ## Prueba Inicial
 
 - Token correcto crea lead.
+- Origin real Vercel responde 200.
+- Origin viejo o invalido responde 403.
 - Token falso responde 403.
 - Body con `clinic_id` manipulado se ignora.
 - Telefono invalido responde 400.

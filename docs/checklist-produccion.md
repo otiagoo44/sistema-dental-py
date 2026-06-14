@@ -6,6 +6,9 @@
 - [ ] Edge Function `lead-intake` deployada.
 - [ ] Secrets configurados solo en Supabase Edge Functions.
 - [ ] Landing conectada a Edge Function.
+- [ ] Landing real `https://sistema-dental-py.vercel.app` configurada sin slash final.
+- [ ] `allowed_origins` incluye `https://sistema-dental-py.vercel.app` y `http://localhost:5173`.
+- [ ] Origins viejos o invalidos responden 403.
 - [ ] CRM snippets apuntan a Edge Function.
 - [ ] Vercel env vars configuradas.
 - [ ] Vite build sin sourcemaps.
@@ -13,6 +16,8 @@
 - [ ] Admin/owner creado.
 - [ ] Receptionist creado.
 - [ ] Token correcto probado.
+- [ ] Origin Vercel real probado.
+- [ ] Origin viejo Netlify rechazado con 403.
 - [ ] Token falso probado.
 - [ ] `clinic_id` manipulado probado.
 - [ ] Telefono invalido probado.

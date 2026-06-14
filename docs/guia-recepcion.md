@@ -22,7 +22,7 @@
 ## Que No Tocar
 
 - No cambiar tokens de landing.
-- No editar `allowed_origins`.
+- No editar `allowed_origins`; para `dentalpro` la landing real es `https://sistema-dental-py.vercel.app`.
 - No archivar leads.
 - No crear usuarios.
 - No borrar datos.

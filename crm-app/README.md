@@ -20,8 +20,8 @@ npm run build
 Variables:
 
 ```text
-VITE_SUPABASE_URL=https://PROJECT_REF.supabase.co
-VITE_SUPABASE_ANON_KEY=SUPABASE_ANON_KEY
+VITE_SUPABASE_URL=https://kfpdworxksqofipmjijz.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_xxx
 VITE_PUBLIC_LEAD_WEBHOOK_URL=https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake
 ```
 
@@ -36,6 +36,8 @@ Configurar en Supabase Auth:
   - `http://localhost:5173/**`
   - `https://TU-CRM.vercel.app/**`
 
+La landing real `https://sistema-dental-py.vercel.app` es el origin publico del formulario. No usarla como Site URL del CRM salvo que el CRM se publique ahi.
+
 ## Seguridad
 
 - La app obtiene `clinic_id` desde `profiles`, no desde formularios publicos.
@@ -47,6 +49,8 @@ Configurar en Supabase Auth:
 - `vercel.json` no usa `X-Frame-Options: DENY` global porque `/form/:slug` puede embeberse como iframe autorizado por `allowed_origins`.
 
 ## Formulario Publico / Snippets
+
+Origin publico real para `allowed_origins`: `https://sistema-dental-py.vercel.app`.
 
 Los snippets usan:
 
