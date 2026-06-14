@@ -1,0 +1,613 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
+const MAX_BODY_BYTES = 16_384;
+const RATE_WINDOW_MINUTES = 10;
+const MAX_IP_SUBMISSIONS = 10;
+const MAX_PHONE_SUBMISSIONS = 3;
+const EDGE_HEADERS = "authorization, x-client-info, apikey, content-type";
+const EDGE_METHODS = "POST, OPTIONS";
+
+type IntakeBody = Record<string, unknown>;
+
+type PhoneResult =
+  | { ok: true; phone: string; phonePlus: string }
+  | { ok: false };
+
+function corsHeaders(origin: string | null) {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Headers": EDGE_HEADERS,
+    "Access-Control-Allow-Methods": EDGE_METHODS,
+    "Vary": "Origin",
+  };
+}
+
+function jsonResponse(origin: string | null, status: number, payload: Record<string, unknown>) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      ...corsHeaders(origin),
+      "Content-Type": "application/json; charset=utf-8",
+    },
+  });
+}
+
+function sanitizeText(value: unknown, maxLength: number, fallback = "") {
+  const raw = typeof value === "string" || typeof value === "number" ? String(value) : "";
+  const clean = raw
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<\/?[^>]+>/g, "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+
+  return clean || fallback;
+}
+
+function normalizeText(value: unknown) {
+  return sanitizeText(value, 500)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function normalizeClinicSlug(value: unknown) {
+  return sanitizeText(value, 120)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeParaguayPhone(value: unknown): PhoneResult {
+  const digits = sanitizeText(value, 32).replace(/\D/g, "");
+  let local = "";
+
+  if (digits.startsWith("595") && digits.length === 12) {
+    local = digits.slice(3);
+  } else if (digits.startsWith("0") && digits.length === 10) {
+    local = digits.slice(1);
+  } else if (digits.length === 9) {
+    local = digits;
+  }
+
+  if (!/^9\d{8}$/.test(local)) {
+    return { ok: false };
+  }
+
+  const phone = `595${local}`;
+  return { ok: true, phone, phonePlus: `+${phone}` };
+}
+
+async function sha256Hex(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function hashWithSalt(salt: string, value: string | null) {
+  if (!value) return null;
+  return await sha256Hex(`${salt}:${value}`);
+}
+
+function getClientIp(req: Request) {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]?.trim() || null;
+  return req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || null;
+}
+
+function isHoneypotFilled(body: IntakeBody) {
+  return Boolean(sanitizeText(body.website, 120) || sanitizeText(body.company, 120));
+}
+
+function dbErrorMessage(error: unknown) {
+  if (!error) return "unknown";
+  if (typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message || "unknown");
+  }
+  return "unknown";
+}
+
+function getTreatmentScore(treatment: string) {
+  const text = normalizeText(treatment);
+  if (text.includes("implante")) return 40;
+  if (text.includes("dolor") || text.includes("urgencia")) return 35;
+  if (text.includes("ortodoncia") || text.includes("bracket")) return 25;
+  if (text.includes("blanqueamiento")) return 15;
+  if (text.includes("limpieza")) return 10;
+  return 5;
+}
+
+function getUrgencyScore(urgency: string) {
+  const text = normalizeText(urgency);
+  if (text.includes("hoy")) return 35;
+  if (text.includes("semana")) return 25;
+  if (text.includes("mes")) return 10;
+  if (text.includes("solo") || text.includes("consultando")) return -10;
+  return 0;
+}
+
+function getEvaluationScore(evaluation: string) {
+  const text = normalizeText(evaluation);
+  if (text.includes("estudio") || text.includes("radiografia")) return 20;
+  if (text === "si" || text.startsWith("si ")) return 15;
+  if (text === "no" || text.startsWith("no ")) return 5;
+  return 0;
+}
+
+function getSituationScore(situation: string) {
+  const text = normalizeText(situation);
+  if (text.includes("agendar")) return 30;
+  if (text.includes("dolor") || text.includes("molestia")) return 25;
+  if (text.includes("precio")) return 5;
+  if (text.includes("comparando")) return -10;
+  return 0;
+}
+
+function getEstimatedValue(treatment: string) {
+  const text = normalizeText(treatment);
+  if (text.includes("implante")) return 5_000_000;
+  if (text.includes("ortodoncia") || text.includes("bracket")) return 4_000_000;
+  if (text.includes("blanqueamiento")) return 500_000;
+  if (text.includes("limpieza")) return 250_000;
+  if (text.includes("carilla")) return 2_000_000;
+  if (text.includes("dolor") || text.includes("urgencia")) return 350_000;
+  return 250_000;
+}
+
+function classify(score: number) {
+  if (score >= 80) return "Lead Caliente";
+  if (score >= 45) return "Lead Medio";
+  return "Lead Fr\u00edo";
+}
+
+function addTimeIso(amount: number, unit: "minutes" | "hours" | "days") {
+  const date = new Date();
+  if (unit === "minutes") date.setMinutes(date.getMinutes() + amount);
+  if (unit === "hours") date.setHours(date.getHours() + amount);
+  if (unit === "days") date.setDate(date.getDate() + amount);
+  return date.toISOString();
+}
+
+function nextActionFor(classification: string) {
+  if (classification === "Lead Caliente") return "Contactar inmediatamente";
+  if (classification === "Lead Medio") return "Contactar hoy";
+  return "Seguimiento autom\u00e1tico";
+}
+
+function nextFollowupFor(classification: string) {
+  if (classification === "Lead Caliente") return addTimeIso(2, "hours");
+  if (classification === "Lead Medio") return addTimeIso(1, "days");
+  return addTimeIso(3, "days");
+}
+
+function taskFor(classification: string) {
+  if (classification === "Lead Caliente") {
+    return {
+      title: "Contactar lead caliente",
+      type: "contact",
+      priority: "Alta",
+      due_at: addTimeIso(5, "minutes"),
+    };
+  }
+
+  if (classification === "Lead Medio") {
+    return {
+      title: "Contactar lead medio",
+      type: "contact",
+      priority: "Media",
+      due_at: addTimeIso(0, "hours"),
+    };
+  }
+
+  return {
+    title: "Seguimiento lead fr\u00edo",
+    type: "followup",
+    priority: "Baja",
+    due_at: addTimeIso(3, "days"),
+  };
+}
+
+Deno.serve(async (req) => {
+  const origin = req.headers.get("Origin");
+
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders(origin) });
+  }
+
+  if (req.method !== "POST") {
+    return jsonResponse(origin, 405, {
+      success: false,
+      message: "Metodo no permitido",
+    });
+  }
+
+  try {
+    const contentLength = Number(req.headers.get("content-length") || "0");
+    if (contentLength > MAX_BODY_BYTES) {
+      return jsonResponse(origin, 400, {
+        success: false,
+        message: "Payload invalido",
+      });
+    }
+
+    const rawBody = await req.text();
+    if (rawBody.length > MAX_BODY_BYTES) {
+      return jsonResponse(origin, 400, {
+        success: false,
+        message: "Payload invalido",
+      });
+    }
+
+    let body: IntakeBody;
+    try {
+      body = JSON.parse(rawBody || "{}");
+    } catch {
+      return jsonResponse(origin, 400, {
+        success: false,
+        message: "JSON invalido",
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "https://kfpdworxksqofipmjijz.supabase.co";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const hashSalt = Deno.env.get("FORM_HASH_SALT");
+
+    if (!supabaseUrl || !serviceRoleKey || !hashSalt) {
+      return jsonResponse(origin, 500, {
+        success: false,
+        message: "Error interno",
+      });
+    }
+
+    const clinicSlug = normalizeClinicSlug(body.clinic_slug);
+    const landingToken = sanitizeText(body.landing_token, 160);
+
+    if (!clinicSlug || !landingToken) {
+      return jsonResponse(origin, 400, {
+        success: false,
+        message: "Datos incompletos",
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    const { data: publicForm, error: formError } = await supabase
+      .from("clinic_public_forms")
+      .select("id, clinic_id, clinic_slug, public_token, allowed_origins, is_active")
+      .eq("clinic_slug", clinicSlug)
+      .eq("public_token", landingToken)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (formError) throw formError;
+
+    if (!publicForm) {
+      return jsonResponse(origin, 403, {
+        success: false,
+        message: "Formulario no autorizado",
+      });
+    }
+
+    const allowedOrigins = Array.isArray(publicForm.allowed_origins)
+      ? publicForm.allowed_origins.filter(Boolean)
+      : [];
+
+    const clientIp = getClientIp(req);
+    const ipHash = await hashWithSalt(hashSalt, clientIp);
+    let phoneHash: string | null = null;
+
+    async function insertSubmissionLog(status: "accepted" | "rate_limited" | "invalid_token" | "error") {
+      const { error: logError } = await supabase.from("form_submission_logs").insert({
+        clinic_public_form_id: publicForm.id,
+        clinic_id: publicForm.clinic_id,
+        ip_hash: ipHash,
+        phone_hash: phoneHash,
+        status,
+      });
+
+      if (logError) {
+        console.error("lead-intake submission log failed", dbErrorMessage(logError));
+      }
+    }
+
+    if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
+      await insertSubmissionLog("error");
+      return jsonResponse(origin, 403, {
+        success: false,
+        message: "Origin no permitido",
+      });
+    }
+
+    if (isHoneypotFilled(body)) {
+      await insertSubmissionLog("error");
+      return jsonResponse(origin, 403, {
+        success: false,
+        message: "Formulario no autorizado",
+      });
+    }
+
+    const phoneResult = normalizeParaguayPhone(body.telefono);
+    if (!phoneResult.ok) {
+      await insertSubmissionLog("error");
+      return jsonResponse(origin, 400, {
+        success: false,
+        message: "Tel\u00e9fono inv\u00e1lido",
+      });
+    }
+
+    phoneHash = await hashWithSalt(hashSalt, phoneResult.phonePlus);
+
+    const name = sanitizeText(body.nombre, 120);
+    if (name.length < 2) {
+      await insertSubmissionLog("error");
+      return jsonResponse(origin, 400, {
+        success: false,
+        message: "Datos incompletos",
+      });
+    }
+
+    const windowStart = new Date(Date.now() - RATE_WINDOW_MINUTES * 60 * 1000).toISOString();
+
+    async function countRecentByHash(column: "ip_hash" | "phone_hash", hash: string | null) {
+      if (!hash) return 0;
+      const { count, error } = await supabase
+        .from("form_submission_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("clinic_public_form_id", publicForm.id)
+        .eq(column, hash)
+        .gte("created_at", windowStart);
+
+      if (error) throw error;
+      return count || 0;
+    }
+
+    const [recentIpCount, recentPhoneCount] = await Promise.all([
+      countRecentByHash("ip_hash", ipHash),
+      countRecentByHash("phone_hash", phoneHash),
+    ]);
+
+    if (recentIpCount >= MAX_IP_SUBMISSIONS || recentPhoneCount >= MAX_PHONE_SUBMISSIONS) {
+      await insertSubmissionLog("rate_limited");
+      return jsonResponse(origin, 429, {
+        success: false,
+        message: "Demasiados intentos. Prob\u00e1 de nuevo m\u00e1s tarde.",
+      });
+    }
+
+    const treatment = sanitizeText(body.tratamiento, 120, "Consulta general");
+    const urgency = sanitizeText(body.urgencia, 80, "No especificado");
+    const evaluationPrevious = sanitizeText(body.evaluacion_previa, 120);
+    const situation = sanitizeText(body.situacion, 160);
+    const consultationReason = sanitizeText(
+      body.consultation_reason || body.motivo_consulta || body.situacion || body.tratamiento,
+      300,
+    ) || null;
+    const source = sanitizeText(body.origen || body.source, 120, "Landing odontologia");
+    const page = sanitizeText(body.pagina || body.page, 120, "landing");
+    const notes = sanitizeText(body.notes, 1000) || null;
+
+    const score = Math.max(
+      0,
+      getTreatmentScore(treatment) +
+        getUrgencyScore(urgency) +
+        getEvaluationScore(evaluationPrevious) +
+        getSituationScore(situation) +
+        10 +
+        (name.trim().split(/\s+/).length >= 2 ? 5 : 0),
+    );
+
+    const classification = classify(score);
+    const estimatedValue = getEstimatedValue(treatment);
+    const nextAction = nextActionFor(classification);
+    const nextFollowupAt = nextFollowupFor(classification);
+    const whatsappMessage = encodeURIComponent(
+      `Hola ${name}, vimos que dejaste tus datos por ${treatment}. \u00bfQuer\u00e9s que te pasemos los horarios disponibles para una evaluaci\u00f3n?`,
+    );
+    const whatsappLink = `https://wa.me/${phoneResult.phone}?text=${whatsappMessage}`;
+
+    const { data: existingLead, error: existingLeadError } = await supabase
+      .from("leads")
+      .select("id, status, contact_attempts, next_action")
+      .eq("clinic_id", publicForm.clinic_id)
+      .eq("phone_plus", phoneResult.phonePlus)
+      .maybeSingle();
+
+    if (existingLeadError) throw existingLeadError;
+
+    let leadId: string;
+    let eventType = "lead_created_from_landing";
+    let eventTitle = "Lead creado desde landing";
+
+    if (existingLead?.id) {
+      eventType = "lead_duplicate_submission";
+      eventTitle = "Lead actualizado desde landing";
+
+      const updatePayload: Record<string, unknown> = {
+        name,
+        treatment,
+        urgency,
+        score,
+        classification,
+        situation,
+        evaluation_previous: evaluationPrevious,
+        consultation_reason: consultationReason,
+        estimated_value: estimatedValue,
+        source,
+        page,
+        whatsapp_link: whatsappLink,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (!existingLead.next_action) {
+        updatePayload.next_action = nextAction;
+      }
+
+      const { data: updatedLead, error: updateError } = await supabase
+        .from("leads")
+        .update(updatePayload)
+        .eq("id", existingLead.id)
+        .eq("clinic_id", publicForm.clinic_id)
+        .select("id")
+        .single();
+
+      if (updateError) throw updateError;
+      leadId = updatedLead.id;
+    } else {
+      const { data: createdLead, error: insertLeadError } = await supabase
+        .from("leads")
+        .insert({
+          clinic_id: publicForm.clinic_id,
+          name,
+          phone: phoneResult.phone,
+          phone_plus: phoneResult.phonePlus,
+          treatment,
+          urgency,
+          score,
+          classification,
+          status: "Nuevo",
+          situation,
+          evaluation_previous: evaluationPrevious,
+          consultation_reason: consultationReason,
+          estimated_value: estimatedValue,
+          next_action: nextAction,
+          next_followup_at: nextFollowupAt,
+          contact_attempts: 0,
+          whatsapp_link: whatsappLink,
+          source,
+          page,
+          notes,
+        })
+        .select("id")
+        .single();
+
+      if (insertLeadError) throw insertLeadError;
+      leadId = createdLead.id;
+    }
+
+    const eventMetadata = {
+      score,
+      classification,
+      treatment,
+      urgency,
+      source,
+      page,
+      form_id: publicForm.id,
+    };
+
+    async function insertLeadEvent(payload: Record<string, unknown>) {
+      let { error: eventInsertError } = await supabase.from("lead_events").insert(payload);
+
+      if (eventInsertError && dbErrorMessage(eventInsertError).includes("metadata")) {
+        const legacyPayload = { ...payload };
+        delete legacyPayload.metadata;
+        const retry = await supabase.from("lead_events").insert(legacyPayload);
+        eventInsertError = retry.error;
+      }
+
+      if (eventInsertError) {
+        console.error("lead-intake lead event failed", dbErrorMessage(eventInsertError));
+      }
+    }
+
+    await insertLeadEvent({
+      clinic_id: publicForm.clinic_id,
+      lead_id: leadId,
+      event_type: eventType,
+      title: eventTitle,
+      description: existingLead?.id
+        ? "Nueva submission publica para telefono existente"
+        : "Lead creado desde formulario publico",
+      metadata: eventMetadata,
+    });
+
+    const task = taskFor(classification);
+    const { data: existingTask, error: existingTaskError } = await supabase
+      .from("tasks")
+      .select("id")
+      .eq("clinic_id", publicForm.clinic_id)
+      .eq("lead_id", leadId)
+      .eq("type", task.type)
+      .in("status", ["pendiente", "Pendiente", "vencido", "Vencida"])
+      .limit(1)
+      .maybeSingle();
+
+    if (existingTaskError) {
+      console.error("lead-intake task lookup failed", dbErrorMessage(existingTaskError));
+    } else if (!existingTask?.id) {
+      const { error: taskError } = await supabase.from("tasks").insert({
+        clinic_id: publicForm.clinic_id,
+        lead_id: leadId,
+        title: task.title,
+        type: task.type,
+        priority: task.priority,
+        status: "Pendiente",
+        due_at: task.due_at,
+      });
+
+      if (taskError) {
+        console.error("lead-intake task insert failed", dbErrorMessage(taskError));
+      }
+    }
+
+    const jobs = [
+      {
+        clinic_id: publicForm.clinic_id,
+        lead_id: leadId,
+        workflow_name: "lead_created",
+        status: "pending",
+        payload: {
+          lead_id: leadId,
+          clinic_id: publicForm.clinic_id,
+          classification,
+          score,
+        },
+      },
+    ];
+
+    if (classification === "Lead Caliente") {
+      jobs.push({
+        clinic_id: publicForm.clinic_id,
+        lead_id: leadId,
+        workflow_name: "lead_hot_alert",
+        status: "pending",
+        payload: {
+          lead_id: leadId,
+          clinic_id: publicForm.clinic_id,
+          classification,
+          score,
+        },
+      });
+    }
+
+    const { error: jobsError } = await supabase.from("automation_jobs").insert(jobs);
+    if (jobsError) {
+      console.error("lead-intake automation jobs failed", dbErrorMessage(jobsError));
+    }
+
+    await insertSubmissionLog("accepted");
+
+    return jsonResponse(origin, 200, {
+      success: true,
+      message: "Datos enviados correctamente",
+      classification,
+      score,
+      lead_id: leadId,
+      clinic_slug: clinicSlug,
+    });
+  } catch (error) {
+    console.error("lead-intake internal error", error instanceof Error ? error.message : "unknown");
+    return jsonResponse(origin, 500, {
+      success: false,
+      message: "Error interno",
+    });
+  }
+});
