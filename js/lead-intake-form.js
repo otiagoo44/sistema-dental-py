@@ -1,18 +1,19 @@
 /**
  * Formulario multi-paso de captura de leads (reemplazo de Typebot).
  * Abre en modal al hacer clic en los CTAs de WhatsApp de la landing.
- * Envía JSON por POST al webhook de n8n.
+ * Envia JSON por POST a Supabase Edge Function lead-intake.
  */
 
 // Configuracion multi-clinica editable.
 // Estos valores son publicos y reemplazan cualquier clinic_id hardcodeado en frontend.
 const CLINIC_SLUG = "dentalpro";
 const LANDING_TOKEN = "lf_FQtBqoPD7BCHLQkkDEdS4eK-pXwjj5WJCfLb8fvt6uI";
+const WEBHOOK_URL = "https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake";
 
 // ─── Configuración editable ─────────────────────────────────
 const LEAD_FORM_CONFIG = {
-  /** URL del webhook n8n (producción). Cambiar al webhook universal cuando quede desplegado. */
-  webhookUrl: "https://primary-production-4afb.up.railway.app/webhook/dental-lead-supabase-v1",
+  /** URL publica de Supabase Edge Function lead-intake. */
+  webhookUrl: WEBHOOK_URL,
 
   clinicSlug: CLINIC_SLUG,
   landingToken: LANDING_TOKEN,
@@ -403,7 +404,7 @@ function goNext() {
   renderCurrentStep();
 }
 
-/** Construye el cuerpo JSON para n8n. */
+/** Construye el cuerpo JSON para Supabase Edge Function. */
 function buildPayload() {
   const fechaEnvio = new Date().toISOString();
   const phoneResult = validatePhone(answers.telefono || "");
@@ -428,6 +429,8 @@ function buildPayload() {
     origen: "Landing odontología",
     pagina: "implantes",
     fecha_envio: fechaEnvio,
+    website: "",
+    company: "",
   };
 }
 
@@ -464,9 +467,6 @@ async function submitLead() {
   setInlineError("");
 
   try {
-    console.log("[DentalLeadForm] Webhook URL:", LEAD_FORM_CONFIG.webhookUrl);
-    console.log("[DentalLeadForm] Payload enviado:", payload);
-
     const res = await fetch(LEAD_FORM_CONFIG.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -480,12 +480,6 @@ async function submitLead() {
     } catch {
       data = null;
     }
-
-    console.log("[DentalLeadForm] Respuesta n8n:", {
-      status: res.status,
-      ok: res.ok,
-      data
-    });
 
     if (!res.ok) {
       throw new Error(data && data.message ? data.message : `Error del servidor (${res.status})`);
@@ -501,14 +495,11 @@ async function submitLead() {
       window.DentalLeadForm.lastScore =
         data.score !== undefined && data.score !== null ? data.score : null;
     }
-    if (data && typeof data === "object" && (data.classification != null || data.score != null)) {
-      console.info("[DentalLead]", "classification:", data.classification, "score:", data.score);
-    }
     showSuccessInModal();
   } catch (err) {
     const msg =
       err instanceof TypeError && err.message === "Failed to fetch"
-        ? "No pudimos conectar. Revisá tu conexión o la URL del webhook (CORS en n8n)."
+        ? "No pudimos conectar. Revisa tu conexion o intenta de nuevo."
         : err instanceof Error
           ? err.message
           : "Ocurrió un error inesperado.";
@@ -625,7 +616,6 @@ function wireCtaButtons() {
       openLeadFormModal();
     });
   });
-  console.info("[DentalLeadForm]", btns.length, "CTAs enlazados al formulario de leads.");
 }
 
 document.addEventListener("DOMContentLoaded", () => {

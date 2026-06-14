@@ -1,0 +1,10 @@
+node_modules/
+crm-app/node_modules/
+dist/
+crm-app/dist/
+.env
+.env.*
+!.env.example
+supabase/.temp/
+*.log
+*.map

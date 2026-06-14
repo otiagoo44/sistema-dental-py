@@ -12,6 +12,7 @@ import { supabase } from './lib/supabase';
 
 const ROLE = {
   admin: 'admin',
+  owner: 'owner',
   receptionist: 'receptionist',
 };
 const ARCHIVED_STATUS = 'Archivado';
@@ -31,7 +32,7 @@ const APPOINTMENT_STATUS = {
   rescheduled: 'Reprogramado',
 };
 const APPOINTMENT_ACTIVE_STATUSES = [APPOINTMENT_STATUS.scheduled, APPOINTMENT_STATUS.confirmed, APPOINTMENT_STATUS.rescheduled];
-const TASK_OPEN_STATUSES = ['pendiente', 'vencido'];
+const TASK_OPEN_STATUSES = ['pendiente', 'vencido', 'Pendiente', 'Vencida'];
 const TASK_PRIORITY_BY_CLASSIFICATION = {
   'Lead Caliente': 'alta',
   'Lead Medio': 'media',
@@ -54,8 +55,8 @@ const LEAD_ADMIN_EDIT_FIELDS = [
   'next_followup_at',
   'notes',
 ];
-const LEAD_RECEPTIONIST_EDIT_FIELDS = ['status', 'next_action', 'next_followup_at', 'notes'];
-const DEFAULT_PUBLIC_FORM_WEBHOOK_URL = 'https://TU-N8N.up.railway.app/webhook/dental-lead-universal';
+const LEAD_RECEPTIONIST_EDIT_FIELDS = ['status', 'next_action', 'next_followup_at', 'contact_attempts', 'notes'];
+const DEFAULT_PUBLIC_FORM_WEBHOOK_URL = 'https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake';
 const PUBLIC_LEAD_WEBHOOK_URL = import.meta.env.VITE_PUBLIC_LEAD_WEBHOOK_URL || DEFAULT_PUBLIC_FORM_WEBHOOK_URL;
 const DEFAULT_EMBED_BASE_URL = 'https://TU-DOMINIO.vercel.app';
 
@@ -65,7 +66,7 @@ function cleanOptionalText(value) {
 }
 
 function normalizeRole(role) {
-  return role === ROLE.admin ? ROLE.admin : ROLE.receptionist;
+  return role === ROLE.admin || role === ROLE.owner ? ROLE.admin : ROLE.receptionist;
 }
 
 function isArchivedLead(lead) {
@@ -189,7 +190,7 @@ function publicFormPayloadExample(config) {
 
 function publicFormFetchSnippet(config) {
   const payload = publicFormPayloadExample(config);
-  return `const WEBHOOK_URL = "${DEFAULT_PUBLIC_FORM_WEBHOOK_URL}";
+  return `const WEBHOOK_URL = "${PUBLIC_LEAD_WEBHOOK_URL}";
 
 const payload = ${JSON.stringify(payload, null, 2)};
 
@@ -223,6 +224,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
   if (['Nuevo', 'No Contactado'].includes(status)) {
     return {
       title: 'Contactar lead nuevo',
+      type: 'contact',
       due_at: nowIso(),
       priority: priorityForClassification(lead?.classification),
     };
@@ -231,6 +233,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
   if (status === 'Contactado') {
     return {
       title: 'Hacer seguimiento',
+      type: 'followup',
       due_at: lead?.next_followup_at || tomorrowFollowupIso(),
       priority: 'media',
     };
@@ -239,6 +242,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
   if (status === LEAD_STATUS.scheduled) {
     return {
       title: 'Confirmar asistencia',
+      type: 'confirm',
       due_at: appointmentDueIso(appointment, -24) || nowIso(),
       priority: 'media',
     };
@@ -247,6 +251,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
   if (status === LEAD_STATUS.confirmed) {
     return {
       title: 'Esperar asistencia',
+      type: 'attendance',
       due_at: appointmentDueIso(appointment, 0) || nowIso(),
       priority: 'media',
     };
@@ -255,6 +260,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
   if (status === LEAD_STATUS.attended) {
     return {
       title: 'Enviar presupuesto o iniciar tratamiento',
+      type: 'followup',
       due_at: addDaysIso(1),
       priority: 'media',
     };
@@ -263,6 +269,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
   if (status === 'Presupuesto Enviado') {
     return {
       title: 'Dar seguimiento al presupuesto',
+      type: 'followup',
       due_at: addHoursIso(48),
       priority: 'media',
     };
@@ -271,6 +278,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
   if (status === 'No Respondió') {
     return {
       title: 'Intentar contacto nuevamente',
+      type: 'contact',
       due_at: tomorrowFollowupIso(),
       priority: 'media',
     };
@@ -279,6 +287,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
   if (status === LEAD_STATUS.noShow) {
     return {
       title: 'Reprogramar consulta',
+      type: 'followup',
       due_at: tomorrowFollowupIso(),
       priority: 'alta',
     };
@@ -287,6 +296,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
   if (status === 'Perdido') {
     return {
       title: 'Revisar motivo perdido',
+      type: 'followup',
       due_at: nowIso(),
       priority: 'baja',
     };
@@ -295,6 +305,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
   if (status === 'Reactivar 30d') {
     return {
       title: 'Reactivar lead',
+      type: 'followup',
       due_at: addDaysIso(30),
       priority: 'media',
     };
@@ -467,10 +478,15 @@ export default function App() {
       return;
     }
 
-    setProfile({ ...profileData, raw_role: profileData.role, role: normalizeRole(profileData.role) });
+    const profileRole = normalizeRole(profileData.role);
+    setProfile({ ...profileData, raw_role: profileData.role, role: profileRole });
     setClinic(clinicData);
     await refreshClinicData(profileData.clinic_id);
-    await loadPublicFormConfig(profileData.clinic_id);
+    if (profileRole === ROLE.admin) {
+      await loadPublicFormConfig(profileData.clinic_id);
+    } else {
+      setPublicFormConfig(null);
+    }
     setBootLoading(false);
   }
 
@@ -670,6 +686,7 @@ export default function App() {
       clinic_id: profile.clinic_id,
       lead_id: lead.id,
       title: config.title,
+      type: config.type || 'followup',
       description: config.description || null,
       due_at: config.due_at,
       priority: config.priority || 'media',
@@ -1327,9 +1344,11 @@ export default function App() {
   async function completeTask(taskId) {
     if (!profile?.clinic_id) return;
 
+    const task = tasks.find((item) => item.id === taskId);
+
     const { error: taskError } = await supabase
       .from('tasks')
-      .update({ status: 'hecho' })
+      .update({ status: 'hecho', completed_at: new Date().toISOString() })
       .eq('id', taskId)
       .eq('clinic_id', profile.clinic_id);
 
@@ -1337,6 +1356,18 @@ export default function App() {
       console.error('Error completing task', taskError);
       setError(taskError.message);
       return;
+    }
+
+    if (task?.lead_id) {
+      const { error: eventError } = await createLeadEvent(task.lead_id, {
+        event_type: 'task_completed',
+        title: 'Tarea completada',
+        description: task.title || 'Tarea marcada como hecha',
+      });
+
+      if (eventError) {
+        setError(`La tarea se marco como hecha, pero no se pudo registrar el evento: ${eventError.message}`);
+      }
     }
 
     await refreshClinicData();
@@ -2522,7 +2553,6 @@ function SettingsView({ clinic, profile, publicFormConfig, savingPublicForm, onS
             <Info label="Nombre" value={profile?.full_name || 'Sin dato'} />
             <Info label="Email" value={profile?.email || 'Sin dato'} />
             <Info label="Rol" value={profile?.role || 'Sin dato'} />
-            <Info label="Clinic ID" value={profile?.clinic_id || 'Sin dato'} />
           </div>
         </div>
       </div>

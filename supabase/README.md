@@ -1,122 +1,135 @@
-# Supabase CRM Dental
+# Supabase
 
-Estos archivos preparan la base de datos de un CRM dental multi-clinica con Supabase Auth, PostgreSQL, RLS por `clinic_id`, datos demo opcionales y ejemplo de insercion desde n8n.
+Supabase es el backend principal del sistema: Auth, Postgres, RLS y Edge Function `lead-intake`.
 
-## Archivos
+Regla central: Supabase guarda primero el lead. n8n automatiza despues desde `automation_jobs`.
 
-- `schema.sql`: crea tablas, constraints, indices, triggers `updated_at`, funciones privadas y politicas RLS.
-- `security_rls.sql`: migracion segura propuesta para archivado de leads, rol `admin/receptionist`, `Archivado` en status y bloqueo de DELETE operativo.
-- `clinic_public_forms.sql`: crea la configuracion publica por landing (`clinic_slug` + `public_token`) con RLS y seed demo `dentalpro`.
-- `seed_demo.sql`: inserta datos demo para la clinica `DentalPro Paraguay`.
-- `n8n_insert_example.sql`: ejemplo de `INSERT` para crear un lead desde n8n.
+## Orden De Migraciones
 
-## Orden De Ejecucion
+Aplicar en este orden:
 
-1. Abrir Supabase SQL Editor.
-2. Pegar y ejecutar completo `supabase/schema.sql`.
-3. Si ya tenes una base existente, revisar y ejecutar `supabase/security_rls.sql`.
-4. Ejecutar `supabase/clinic_public_forms.sql` para habilitar formularios multi-clinica.
-5. Opcionalmente pegar y ejecutar `supabase/seed_demo.sql`.
-6. Usar `supabase/n8n_insert_example.sql` y `n8n-universal-workflow.md` como referencia para n8n.
+1. `supabase/migrations/20260515021456_create_dental_crm_schema.sql`
+2. `supabase/migrations/20260612140000_production_schema_hardening.sql`
+3. `supabase/migrations/20260612141000_rls_professional_policies.sql`
+4. `supabase/migrations/20260612142000_edge_function_support_indexes.sql`
 
-No ejecutes `seed_demo.sql` si ya tenes datos reales y no queres cargar la clinica demo.
+Comando:
 
-## Bootstrap Del Primer Usuario
-
-1. Crear primero un usuario real desde Supabase Auth.
-2. Copiar el `id` real de `auth.users.id`.
-3. Insertar un registro en `public.profiles` usando ese `id`, el `clinic_id` correspondiente y `role = 'admin'`.
-4. No insertar usuarios manualmente en `auth.users`.
-
-Ejemplo:
-
-```sql
-insert into public.profiles (id, clinic_id, full_name, email, role)
-values (
-  'AUTH_USERS_ID_REAL',
-  '00000000-0000-0000-0000-000000000101',
-  'Nombre del Owner',
-  'owner@example.com',
-  'admin'
-);
+```powershell
+npx.cmd supabase db push
 ```
 
-## Roles
+No ejecutar `seed_demo.sql` en bases con datos reales salvo que quieras cargar datos demo.
 
-Roles soportados por el CRM:
+## Secrets Edge Function
 
-- `admin`: configuracion, crear lead manual, editar lead completo, archivar, crear/editar tareas.
-- `receptionist`: operacion diaria, cambios de estado, agenda, notas, proxima accion, proximo seguimiento y marcar tareas como hechas.
+Configurar sin imprimir valores reales:
 
-Si un perfil no tiene `role = 'admin'`, el frontend lo trata como `receptionist` por seguridad.
-
-Si tenes datos antiguos con `role = 'owner'` o `role = 'doctor'`, actualizalos manualmente:
-
-```sql
-update public.profiles
-set role = 'admin'
-where id = 'AUTH_USERS_ID_REAL'
-  and clinic_id = 'CLINIC_ID_REAL';
+```powershell
+npx.cmd supabase secrets set FORM_HASH_SALT=REEMPLAZAR_SALT_LARGO --project-ref kfpdworxksqofipmjijz
+npx.cmd supabase functions deploy lead-intake --no-verify-jwt --project-ref kfpdworxksqofipmjijz
 ```
 
-## Proceso Multi-Clinica
+`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` son variables reservadas/inyectadas por Supabase Edge Runtime en este proyecto. `FORM_HASH_SALT` es custom y server-side. Nunca poner service role ni salts en Vercel, landing publica, snippets ni navegador.
 
-1. Crear una fila en `public.clinics`.
-2. Crear el usuario en Supabase Auth.
-3. Crear `public.profiles` con el `id` del usuario, `clinic_id` de la clinica y `role` (`admin` o `receptionist`).
-4. Crear `public.clinic_public_forms` con `clinic_slug`, `public_token`, `allowed_origins` e `is_active = true`.
-5. Configurar la landing con `CLINIC_SLUG`, `LANDING_TOKEN` y webhook universal n8n.
-6. Enviar un lead de prueba y verificar que aparece solo para usuarios de esa clinica.
+## Crear Clinica
 
-No aceptes un `clinic_id` arbitrario enviado desde el navegador sin validarlo en n8n/Railway contra una configuracion interna.
+```sql
+insert into public.clinics (
+  name, slug, doctor_name, whatsapp, email, owner_email,
+  reception_phone, address_link, calendar_link, timezone, status, is_active
+) values (
+  'Clinica Demo',
+  'clinica-demo',
+  'Dra. Demo',
+  '595981000000',
+  'contacto@clinica.test',
+  'owner@clinica.test',
+  '595981000001',
+  'https://maps.example.com',
+  'https://calendario.example.com',
+  'America/Asuncion',
+  'active',
+  true
+)
+returning id;
+```
 
-Ejemplo de formulario publico:
+## Crear Formulario Publico
 
 ```sql
 insert into public.clinic_public_forms (
-  clinic_id,
-  clinic_slug,
-  public_token,
-  landing_url,
-  allowed_origins,
-  is_active
-)
-values (
+  clinic_id, clinic_slug, public_token, landing_url, allowed_origins, is_active
+) values (
   'CLINIC_ID_REAL',
   'clinica-demo',
-  'lf_REEMPLAZAR_POR_TOKEN_LARGO',
+  'lf_REEMPLAZAR_TOKEN_LARGO_SEGURO_1234567890',
   'https://clinica-demo.com',
-  array['https://clinica-demo.com']::text[],
+  array['https://clinica-demo.com'],
   true
 );
 ```
 
-## Fallback Para Motivo De Consulta
+La landing envia solo `clinic_slug` y `landing_token`. La Edge Function resuelve el `clinic_id` real y descarta cualquier `clinic_id` enviado por el navegador.
 
-En landing/n8n, mapear `consultation_reason` asi:
+## Crear Settings
 
-```js
-body.consultation_reason ||
-body.motivo_consulta ||
-body.situacion ||
-body.tratamiento ||
-null
+```sql
+insert into public.clinic_settings (
+  clinic_id, opening_hours, treatments, treatment_prices, hot_lead_threshold
+) values (
+  'CLINIC_ID_REAL',
+  'Lunes a viernes 08:00-18:00',
+  '["Implante dental", "Ortodoncia / brackets", "Blanqueamiento"]'::jsonb,
+  '{"Implante dental": 5000000, "Ortodoncia / brackets": 4000000}'::jsonb,
+  80
+)
+on conflict (clinic_id) do update set
+  opening_hours = excluded.opening_hours,
+  treatments = excluded.treatments,
+  treatment_prices = excluded.treatment_prices,
+  hot_lead_threshold = excluded.hot_lead_threshold,
+  updated_at = now();
 ```
 
-Esto evita que leads comerciales lleguen sin motivo cuando el formulario usa otro nombre de campo.
+## Crear Usuarios
 
-## Seguridad Y Keys
+1. Crear usuario en Supabase Auth.
+2. Copiar `auth.users.id`.
+3. Crear profile:
 
-n8n debe usar la `service_role key` solo desde backend/server-side. Esa key salta RLS, por lo que nunca debe estar en frontend, landing publica, app web, variables expuestas ni navegador.
+```sql
+insert into public.profiles (id, clinic_id, full_name, email, role, active)
+values (
+  'AUTH_USER_ID',
+  'CLINIC_ID_REAL',
+  'Admin Clinica',
+  'admin@clinica.test',
+  'admin',
+  true
+);
+```
 
-n8n debe validar el `clinic_id` antes de insertar leads. No aceptes un `clinic_id` arbitrario enviado desde el formulario publico sin validarlo contra la landing, dominio, token interno o configuracion del workflow.
+Roles:
 
-El frontend debe usar la `anon key` con Supabase Auth. El aislamiento de datos del panel web queda delegado a RLS: cada usuario autenticado solo ve datos de su clinica segun su registro en `profiles`.
+- `admin` / `owner`: configura landing, archiva leads, crea/edita leads, agenda y tareas.
+- `receptionist`: ve leads, actualiza estado/notas/seguimiento, agenda, confirma/no-show y completa tareas.
 
-## Datos Sensibles
+## Verificar RLS
 
-La tabla `leads` esta pensada para informacion comercial y seguimiento. No guardar diagnosticos, historia clinica, imagenes clinicas, documentos medicos ni datos sensibles innecesarios.
+Usar `tests/sql-verification.sql` en Supabase SQL Editor o ejecutar consultas equivalentes:
 
-## Pruebas Recomendadas
+```sql
+select n.nspname, c.relname, c.relrowsecurity
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+order by c.relname;
 
-Antes de produccion, crear dos clinicas y dos usuarios en Supabase Auth, asignar cada usuario a una clinica distinta en `profiles`, y verificar que no puedan leer ni modificar datos de la otra clinica.
+select tablename, policyname, cmd, roles
+from pg_policies
+where schemaname = 'public'
+order by tablename, policyname;
+```
+
+Debe existir RLS en tablas multi-clinica y no debe haber policies DELETE para leads, lead_events, appointments ni tasks desde frontend.
