@@ -7,8 +7,8 @@
 // Configuracion multi-clinica editable.
 // Estos valores son publicos y reemplazan cualquier clinic_id hardcodeado en frontend.
 const CLINIC_SLUG = "dentalpro";
-const LANDING_TOKEN = "lf_FQtBqoPD7BCHLQkkDEdS4eK-pXwjj5WJCfLb8fvt6uI";
-const WEBHOOK_URL = "https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake";
+const LANDING_TOKEN = "lf_FPBOEl9YF_dTGRm6tv3WKBzQgjpmwp__ImBx7pCyHAY";
+const WEBHOOK_URL = "https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake";
 
 // ─── Configuración editable ─────────────────────────────────
 const LEAD_FORM_CONFIG = {
@@ -83,7 +83,7 @@ const LEAD_STEPS = [
 // ─── Estado del modal ───────────────────────────────────────
 let modalOpen = false;
 let currentStepIndex = 0;
-/** @type {Record<string, string>} */
+/** @type {Record<string, string | boolean>} */
 const answers = {};
 let overlayEl = null;
 /** Evita doble avance si el usuario aprieta "Siguiente" y el auto-avance del mismo paso. */
@@ -299,6 +299,7 @@ function renderCurrentStep() {
   } else if (stepDef.type === "fields") {
     const nombre = answers.nombre || "";
     const telefono = answers.telefono || "";
+    const consentimiento = answers.consentimiento_contacto === true;
     root.innerHTML = `
       <h3 class="font-display text-xl sm:text-2xl font-bold text-ivory leading-snug mb-5">
         ${escapeHtml(stepDef.question)}
@@ -323,6 +324,19 @@ function renderCurrentStep() {
         `
           )
           .join("")}
+        <label class="flex items-start gap-3 rounded-xl border border-white/[0.1] bg-white/[0.03] p-4 text-sm text-ivory">
+          <input
+            type="checkbox"
+            data-lead-consent
+            ${consentimiento ? "checked" : ""}
+            class="mt-0.5 h-4 w-4 shrink-0 accent-mint"
+          />
+          <span>Acepto que la clínica me contacte sobre mi consulta.</span>
+        </label>
+        <p class="text-xs leading-relaxed text-muted">
+          Al enviar este formulario aceptás que la clínica use tus datos para contactarte sobre tu consulta.
+          No compartas información médica sensible por este formulario. Este formulario no reemplaza una consulta odontológica.
+        </p>
       </div>
     `;
   }
@@ -363,6 +377,10 @@ function currentStepIsValid() {
       setInlineError(p.message);
       return false;
     }
+    if (answers.consentimiento_contacto !== true) {
+      setInlineError("Aceptá el consentimiento para que la clínica pueda contactarte.");
+      return false;
+    }
     return true;
   }
   return false;
@@ -375,6 +393,8 @@ function syncFieldAnswersFromDOM() {
     const input = overlayEl.querySelector(`[data-lead-field="${f.key}"]`);
     if (input) answers[f.key] = input.value;
   });
+  const consent = overlayEl.querySelector("[data-lead-consent]");
+  answers.consentimiento_contacto = Boolean(consent && consent.checked);
 }
 
 function goBack() {
@@ -429,6 +449,7 @@ function buildPayload() {
     origen: "Landing odontología",
     pagina: "implantes",
     fecha_envio: fechaEnvio,
+    consentimiento_contacto: answers.consentimiento_contacto === true,
     website: "",
     company: "",
   };

@@ -3,7 +3,7 @@
   "disabled": true,
   "description": "Este archivo reemplaza el workflow legacy que recibia leads en n8n y hacia upsert directo en Supabase. La arquitectura vigente es Landing -> Supabase Edge Function lead-intake -> Supabase Postgres -> automation_jobs -> n8n asincronico. No importar como workflow operativo.",
   "replacement": {
-    "edge_function": "https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake",
+    "edge_function": "https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake",
     "async_jobs_table": "public.automation_jobs",
     "docs": [
       "docs/n8n-asincronico.md",

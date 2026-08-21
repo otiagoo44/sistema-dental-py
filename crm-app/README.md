@@ -20,9 +20,9 @@ npm run build
 Variables:
 
 ```text
-VITE_SUPABASE_URL=https://kfpdworxksqofipmjijz.supabase.co
+VITE_SUPABASE_URL=https://unybqqzhgqxhrwucrofm.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_xxx
-VITE_PUBLIC_LEAD_WEBHOOK_URL=https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake
+VITE_PUBLIC_LEAD_WEBHOOK_URL=https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake
 ```
 
 Solo usar anon key en frontend. No usar service role ni salts en Vercel public env vars.
@@ -55,7 +55,7 @@ Origin publico real para `allowed_origins`: `https://sistema-dental-py.vercel.ap
 Los snippets usan:
 
 ```js
-const WEBHOOK_URL = "https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake";
+const WEBHOOK_URL = "https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake";
 ```
 
 Payload publico:
@@ -72,11 +72,14 @@ Payload publico:
   situacion: "Quiero agendar una consulta",
   consultation_reason: "Le falta una pieza",
   origen: "Landing odontologia",
-  pagina: "implantes"
+  pagina: "implantes",
+  consentimiento_contacto: true
 }
 ```
 
-No incluir `clinic_id`, anon key, service role ni secrets en snippets publicos.
+No incluir `clinic_id`, anon key, service role ni secrets en snippets publicos. El formulario exige consentimiento de contacto y recuerda que no se debe compartir informacion medica sensible.
+
+El iframe real se construye con el dominio actual del CRM: `/form/{clinic_slug}?landing_token=TOKEN`. En documentacion de staging se usa `https://TU-CRM-REAL.vercel.app` como placeholder deliberado hasta asignar el dominio.
 
 ## Test Manual CRM
 

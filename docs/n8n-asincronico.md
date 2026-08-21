@@ -32,3 +32,5 @@ n8n procesa `public.automation_jobs`:
 ## Errores Visibles
 
 Los errores deben quedar en `automation_jobs.last_error`. Admin/owner puede revisar jobs fallidos desde SQL o una vista futura del CRM.
+
+El workflow incluido en este repositorio es solo una referencia de configuracion y no contiene nodos operativos. Hasta implementar, probar y habilitar un workflow real, ninguna automatizacion n8n debe presentarse como activa. Los jobs pendientes no afectan el guardado ni la visibilidad del lead.

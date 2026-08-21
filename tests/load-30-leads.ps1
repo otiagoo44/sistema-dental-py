@@ -1,5 +1,5 @@
 param(
-  [string]$EDGE_URL = $(if ($env:EDGE_URL) { $env:EDGE_URL } else { "https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake" }),
+  [string]$EDGE_URL = $(if ($env:EDGE_URL) { $env:EDGE_URL } else { "https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake" }),
   [string]$SLUG = $(if ($env:SLUG) { $env:SLUG } else { "dentalpro" }),
   [string]$TOKEN = $(if ($env:TOKEN) { $env:TOKEN } else { "TOKEN_PUBLICO" }),
   [string]$LANDING_ORIGIN = $(if ($env:LANDING_ORIGIN) { $env:LANDING_ORIGIN } elseif ($env:ORIGIN) { $env:ORIGIN } else { "https://sistema-dental-py.vercel.app" }),
@@ -34,6 +34,7 @@ $runId = Get-Random -Minimum 100 -Maximum 999
     consultation_reason = "Carga controlada 30 leads"
     origen = "tests/load-30-leads.ps1"
     pagina = "load-test"
+    consentimiento_contacto = $true
   }
 
   $json = $body | ConvertTo-Json -Depth 10

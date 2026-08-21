@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const MAX_BODY_BYTES = 16_384;
 const RATE_WINDOW_MINUTES = 10;
-const MAX_IP_SUBMISSIONS = 10;
+const MAX_IP_SUBMISSIONS = 60;
 const MAX_PHONE_SUBMISSIONS = 3;
 const EDGE_HEADERS = "authorization, x-client-info, apikey, content-type";
 const EDGE_METHODS = "POST, OPTIONS";
@@ -15,9 +15,10 @@ type PhoneResult =
 
 function corsHeaders(origin: string | null) {
   return {
-    "Access-Control-Allow-Origin": origin || "*",
+    ...(origin ? { "Access-Control-Allow-Origin": origin } : {}),
     "Access-Control-Allow-Headers": EDGE_HEADERS,
     "Access-Control-Allow-Methods": EDGE_METHODS,
+    "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
 }
@@ -252,9 +253,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "https://kfpdworxksqofipmjijz.supabase.co";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const hashSalt = Deno.env.get("FORM_HASH_SALT");
+    const allowNoOriginTests = Deno.env.get("ALLOW_NO_ORIGIN_TESTS") === "true";
 
     if (!supabaseUrl || !serviceRoleKey || !hashSalt) {
       return jsonResponse(origin, 500, {
@@ -305,7 +307,7 @@ Deno.serve(async (req) => {
     const ipHash = await hashWithSalt(hashSalt, clientIp);
     let phoneHash: string | null = null;
 
-    async function insertSubmissionLog(status: "accepted" | "rate_limited" | "invalid_token" | "error") {
+    async function insertSubmissionLog(status: "accepted" | "rate_limited" | "invalid_token" | "spam" | "error") {
       const { error: logError } = await supabase.from("form_submission_logs").insert({
         clinic_public_form_id: publicForm.id,
         clinic_id: publicForm.clinic_id,
@@ -319,19 +321,36 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
+    if (origin && !allowedOrigins.includes(origin)) {
       await insertSubmissionLog("error");
-      return jsonResponse(origin, 403, {
+      return jsonResponse(null, 403, {
         success: false,
         message: "Origin no permitido",
       });
     }
 
-    if (isHoneypotFilled(body)) {
+    if (!origin && !allowNoOriginTests) {
       await insertSubmissionLog("error");
+      return jsonResponse(null, 403, {
+        success: false,
+        message: "Origin requerido",
+      });
+    }
+
+    if (isHoneypotFilled(body)) {
+      await insertSubmissionLog("spam");
       return jsonResponse(origin, 403, {
         success: false,
         message: "Formulario no autorizado",
+      });
+    }
+
+    const consentContact = body.consentimiento_contacto === true || body.consent_contact === true;
+    if (!consentContact) {
+      await insertSubmissionLog("error");
+      return jsonResponse(origin, 400, {
+        success: false,
+        message: "Debés aceptar el consentimiento de contacto",
       });
     }
 
@@ -394,6 +413,7 @@ Deno.serve(async (req) => {
     const source = sanitizeText(body.origen || body.source, 120, "Landing odontologia");
     const page = sanitizeText(body.pagina || body.page, 120, "landing");
     const notes = sanitizeText(body.notes, 1000) || null;
+    const consentAt = new Date().toISOString();
 
     const score = Math.max(
       0,
@@ -444,6 +464,10 @@ Deno.serve(async (req) => {
         source,
         page,
         whatsapp_link: whatsappLink,
+        consent_contact: true,
+        consent_at: consentAt,
+        consent_source: source,
+        consent_page: page,
         updated_at: new Date().toISOString(),
       };
 
@@ -485,6 +509,10 @@ Deno.serve(async (req) => {
           source,
           page,
           notes,
+          consent_contact: true,
+          consent_at: consentAt,
+          consent_source: source,
+          consent_page: page,
         })
         .select("id")
         .single();
@@ -501,6 +529,8 @@ Deno.serve(async (req) => {
       source,
       page,
       form_id: publicForm.id,
+      consent_contact: true,
+      consent_at: consentAt,
     };
 
     async function insertLeadEvent(payload: Record<string, unknown>) {

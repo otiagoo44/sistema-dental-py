@@ -1,5 +1,5 @@
 param(
-  [string]$EDGE_URL = $(if ($env:EDGE_URL) { $env:EDGE_URL } else { "https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake" }),
+  [string]$EDGE_URL = $(if ($env:EDGE_URL) { $env:EDGE_URL } else { "https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake" }),
   [string]$SLUG = $(if ($env:SLUG) { $env:SLUG } else { "dentalpro" }),
   [string]$TOKEN = $(if ($env:TOKEN) { $env:TOKEN } else { "TOKEN_PUBLICO" }),
   [string]$LANDING_ORIGIN = $(if ($env:LANDING_ORIGIN) { $env:LANDING_ORIGIN } elseif ($env:ORIGIN) { $env:ORIGIN } else { "https://sistema-dental-py.vercel.app" }),
@@ -112,7 +112,7 @@ function Invoke-EdgeRequest {
 
   if ($Method -notin @("Get", "Options")) {
     $params.ContentType = "application/json"
-    $params.Body = if ($null -ne $RawBody) { $RawBody } else { $Body | ConvertTo-Json -Depth 10 }
+    $params.Body = if (-not [string]::IsNullOrEmpty($RawBody)) { $RawBody } else { $Body | ConvertTo-Json -Depth 10 }
   }
 
   try {
@@ -184,6 +184,7 @@ function New-BaseLead {
     consultation_reason = "Test automatizado"
     origen = "tests/lead-intake-test.ps1"
     pagina = "test"
+    consentimiento_contacto = $true
     website = ""
     company = ""
   }
@@ -202,6 +203,10 @@ Assert-Status "origin viejo Netlify devuelve 403" $oldOrigin 403
 Write-Host "3. Origin invalido"
 $invalidOrigin = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Origin Invalido") -Origin $INVALID_ORIGIN
 Assert-Status "origin invalido devuelve 403" $invalidOrigin 403
+
+Write-Host "3b. Request sin Origin"
+$missingOrigin = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Sin Origin") -Origin ""
+Assert-Status "request sin Origin devuelve 403" $missingOrigin 403
 
 Write-Host "4. GET no permitido"
 $getResult = Invoke-EdgeRequest -Method "Get" -Origin $LANDING_ORIGIN
@@ -252,6 +257,12 @@ $incomplete.nombre = ""
 $incompleteResult = Invoke-LeadIntake -Body $incomplete
 Assert-Status "formulario incompleto devuelve 400" $incompleteResult 400
 
+Write-Host "12b. Consentimiento faltante"
+$missingConsent = New-BaseLead -Name "QA Sin Consentimiento"
+$missingConsent.Remove("consentimiento_contacto")
+$missingConsentResult = Invoke-LeadIntake -Body $missingConsent
+Assert-Status "consentimiento faltante devuelve 400" $missingConsentResult 400
+
 Write-Host "13. Duplicado"
 $duplicate = New-BaseLead -Name "QA Duplicado"
 $firstDuplicate = Invoke-LeadIntake -Body $duplicate
@@ -280,6 +291,13 @@ $rateLead = New-BaseLead -Name "QA Rate Limit"
 $rateIp = "203.0.113.240"
 $rateResults = 1..4 | ForEach-Object { Invoke-LeadIntake -Body $rateLead -Ip $rateIp }
 Assert-Status "rate limit cuarto envio devuelve 429" $rateResults[-1] 429
+
+Write-Host "17b. Rate limit misma IP"
+$ipRateAddress = "203.0.113.241"
+$ipRateResults = 1..61 | ForEach-Object {
+  Invoke-LeadIntake -Body (New-BaseLead -Name "QA Rate IP $_") -Ip $ipRateAddress
+}
+Assert-Status "rate limit IP envio sesenta y uno devuelve 429" $ipRateResults[-1] 429
 
 Write-Host "18. CORS OPTIONS"
 $options = Invoke-EdgeRequest -Method "Options" -Origin $LANDING_ORIGIN

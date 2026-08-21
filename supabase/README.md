@@ -12,22 +12,24 @@ Aplicar en este orden:
 2. `supabase/migrations/20260612140000_production_schema_hardening.sql`
 3. `supabase/migrations/20260612141000_rls_professional_policies.sql`
 4. `supabase/migrations/20260612142000_edge_function_support_indexes.sql`
+5. `supabase/migrations/20260821180858_rebuild_new_supabase_production_schema.sql`
 
 Comando:
 
 ```powershell
-npx.cmd supabase db push
+npx.cmd supabase db push --dry-run --linked
+npx.cmd supabase db push --linked
 ```
 
-No ejecutar `seed_demo.sql` en bases con datos reales salvo que quieras cargar datos demo.
+Para una instalacion QA nueva ejecutar `supabase/seed_qa.sql` una vez aplicadas las migraciones. Es idempotente y solo carga datos sinteticos; no ejecutar seeds en bases con datos reales.
 
 ## Secrets Edge Function
 
 Configurar sin imprimir valores reales:
 
 ```powershell
-npx.cmd supabase secrets set FORM_HASH_SALT=REEMPLAZAR_SALT_LARGO --project-ref kfpdworxksqofipmjijz
-npx.cmd supabase functions deploy lead-intake --no-verify-jwt --project-ref kfpdworxksqofipmjijz
+npx.cmd supabase secrets set FORM_HASH_SALT=REEMPLAZAR_SALT_LARGO --project-ref unybqqzhgqxhrwucrofm
+npx.cmd supabase functions deploy lead-intake --no-verify-jwt --project-ref unybqqzhgqxhrwucrofm
 ```
 
 `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` son variables reservadas/inyectadas por Supabase Edge Runtime en este proyecto. `FORM_HASH_SALT` es custom y server-side. Nunca poner service role ni salts en Vercel, landing publica, snippets ni navegador.
@@ -72,7 +74,7 @@ insert into public.clinic_public_forms (
 );
 ```
 
-La landing envia solo `clinic_slug` y `landing_token`. La Edge Function resuelve el `clinic_id` real y descarta cualquier `clinic_id` enviado por el navegador.
+La landing envia `clinic_slug`, `landing_token`, los datos comerciales y `consentimiento_contacto=true`. La Edge Function resuelve el `clinic_id` real y descarta cualquier `clinic_id` enviado por el navegador.
 
 El dominio CRM se configura aparte en Supabase Auth. No confundir landing publica con `https://TU-CRM.vercel.app`.
 
@@ -137,3 +139,5 @@ order by tablename, policyname;
 ```
 
 Debe existir RLS en tablas multi-clinica y no debe haber policies DELETE para leads, lead_events, appointments ni tasks desde frontend.
+
+Para probar RPCs y aislamiento con claims `authenticated` sin dejar usuarios de test, ejecutar `tests/rls-rpc-transactional.sql`; el script finaliza con `ROLLBACK`.

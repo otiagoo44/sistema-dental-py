@@ -37,22 +37,24 @@ npm run build
 Variables locales del CRM:
 
 ```text
-VITE_SUPABASE_URL=https://kfpdworxksqofipmjijz.supabase.co
+VITE_SUPABASE_URL=https://unybqqzhgqxhrwucrofm.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_xxx
-VITE_PUBLIC_LEAD_WEBHOOK_URL=https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake
+VITE_PUBLIC_LEAD_WEBHOOK_URL=https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake
 ```
 
 No poner `SUPABASE_SERVICE_ROLE_KEY`, `FORM_HASH_SALT` ni secretos en frontend.
 
 ## Deploy
 
-1. Aplicar migraciones Supabase.
+1. Confirmar que el repo esta linkeado a `unybqqzhgqxhrwucrofm` y aplicar migraciones.
 2. Configurar secrets de Edge Function.
 3. Deployar `lead-intake`.
 4. Configurar Vercel con root `crm-app`.
 5. Configurar Auth URLs del CRM en Supabase cuando exista dominio CRM.
 6. Configurar `allowed_origins` del formulario publico con `https://sistema-dental-py.vercel.app` y `http://localhost:5173`.
-7. Probar token correcto, token falso, telefono invalido, duplicado y rate limit.
+7. Probar consentimiento, token correcto/falso, telefono invalido, duplicado, origins y rate limit.
+
+El formulario es exclusivamente comercial: solicita consentimiento para contacto y advierte que no se comparta informacion medica sensible. No reemplaza una consulta odontologica ni es una historia clinica.
 
 ## Checklist Antes De Vender
 
@@ -78,3 +80,14 @@ $env:LANDING_ORIGIN = "https://sistema-dental-py.vercel.app"
 ```
 
 `tests/sql-verification.sql` se ejecuta en Supabase SQL Editor para confirmar RLS, policies, duplicados, tareas, eventos, jobs y logs.
+
+`tests/rls-rpc-transactional.sql` prueba aislamiento multi-clinica, permisos por rol, RPCs, doble reserva, no-show y task completed dentro de una transaccion que termina en `ROLLBACK`.
+
+`tests/rls-real-users.sql` repite el aislamiento y los permisos usando los UUID Auth QA permanentes, tambien con `ROLLBACK`.
+
+Documentacion operativa:
+
+- `docs/privacidad-y-seguridad-operativa.md`
+- `docs/qa-rls-multiclinica.md`
+- `docs/qa-manual-release.md`
+- `docs/vercel-staging.md`

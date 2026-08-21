@@ -29,6 +29,7 @@ Datos necesarios antes del alta:
 5. Crear `public.profiles` con rol `admin`, `owner` o `receptionist`.
 6. Verificar que `profiles.clinic_id` apunta a la clinica correcta.
 7. Para `dentalpro`, confirmar `allowed_origins = ['https://sistema-dental-py.vercel.app', 'http://localhost:5173']` mientras no exista dominio CRM real.
+8. Activar MFA para admin/owner, rotar la contrasena temporal y registrar responsable de privacidad/backups.
 
 ## Prueba Inicial
 
@@ -39,6 +40,8 @@ Datos necesarios antes del alta:
 - Body con `clinic_id` manipulado se ignora.
 - Telefono invalido responde 400.
 - Duplicado actualiza el lead existente sin romper estado avanzado.
+- Consentimiento ausente responde 400 y consentimiento marcado queda con timestamp/origen/pagina.
+- POST sin `Origin` responde 403 en produccion.
 - Lead aparece en CRM.
 - `lead_events`, `tasks`, `form_submission_logs` y `automation_jobs` quedan poblados.
 
@@ -51,3 +54,6 @@ Datos necesarios antes del alta:
 - Practicar No Asistio.
 - Practicar completar tareas.
 - Aclarar que recepcion no edita tokens ni archiva leads.
+- Aclarar que el formulario es comercial, no historia clinica, y que no se debe solicitar informacion medica sensible.
+
+Ver `docs/privacidad-y-seguridad-operativa.md` y `docs/qa-rls-multiclinica.md` antes del piloto.

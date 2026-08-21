@@ -6,7 +6,19 @@ import EmptyState from './components/ui/EmptyState';
 import StatCard from './components/ui/StatCard';
 import StatusBadge from './components/ui/StatusBadge';
 import { CLASSIFICATIONS, CONTACT_ATTEMPT_STATUSES, CONTACTED_STATUSES, LEAD_STATUSES, SCHEDULED_STATUSES } from './lib/constants';
-import { formatDate, formatDateTime, formatMoney, formatTime, normalizeText, todayIsoDate, toLocalIsoDate } from './lib/formatters';
+import {
+  addDaysAsuncion,
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  formatTime,
+  fromDatetimeLocalAsuncion,
+  normalizeText,
+  todayIsoDate,
+  toDatetimeLocalAsuncion,
+  toLocalIsoDate,
+  tomorrowFollowupAsuncion,
+} from './lib/formatters';
 import { buildLeadMessage, buildWhatsappUrl } from './lib/messages';
 import { supabase } from './lib/supabase';
 
@@ -32,6 +44,7 @@ const APPOINTMENT_STATUS = {
   rescheduled: 'Reprogramado',
 };
 const APPOINTMENT_ACTIVE_STATUSES = [APPOINTMENT_STATUS.scheduled, APPOINTMENT_STATUS.confirmed, APPOINTMENT_STATUS.rescheduled];
+const APPOINTMENT_OUTCOME_LEAD_STATUSES = [LEAD_STATUS.confirmed, LEAD_STATUS.attended, LEAD_STATUS.noShow];
 const TASK_OPEN_STATUSES = ['pendiente', 'vencido', 'Pendiente', 'Vencida'];
 const TASK_PRIORITY_BY_CLASSIFICATION = {
   'Lead Caliente': 'alta',
@@ -56,9 +69,9 @@ const LEAD_ADMIN_EDIT_FIELDS = [
   'notes',
 ];
 const LEAD_RECEPTIONIST_EDIT_FIELDS = ['status', 'next_action', 'next_followup_at', 'contact_attempts', 'notes'];
-const DEFAULT_PUBLIC_FORM_WEBHOOK_URL = 'https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake';
+const DEFAULT_PUBLIC_FORM_WEBHOOK_URL = 'https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake';
 const PUBLIC_LEAD_WEBHOOK_URL = import.meta.env.VITE_PUBLIC_LEAD_WEBHOOK_URL || DEFAULT_PUBLIC_FORM_WEBHOOK_URL;
-const DEFAULT_EMBED_BASE_URL = 'https://TU-DOMINIO.vercel.app';
+const DEFAULT_EMBED_BASE_URL = typeof window === 'undefined' ? 'https://TU-CRM-REAL.vercel.app' : window.location.origin;
 
 function cleanOptionalText(value) {
   const text = String(value || '').trim();
@@ -77,13 +90,6 @@ function displayConsultationReason(lead) {
   return lead?.consultation_reason || 'Sin especificar';
 }
 
-function tomorrowFollowupIso() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  date.setHours(9, 0, 0, 0);
-  return date.toISOString();
-}
-
 function nowIso() {
   return new Date().toISOString();
 }
@@ -95,41 +101,16 @@ function addHoursIso(hours) {
 }
 
 function addDaysIso(days, hour = 9) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  date.setHours(hour, 0, 0, 0);
-  return date.toISOString();
-}
-
-function appointmentDateTime(appointment) {
-  if (!appointment?.appointment_date || !appointment?.appointment_time) return null;
-  const date = new Date(`${appointment.appointment_date}T${String(appointment.appointment_time).slice(0, 5)}:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return addDaysAsuncion(days, hour);
 }
 
 function appointmentDueIso(appointment, offsetHours = 0) {
-  const date = appointmentDateTime(appointment);
-  if (!date) return null;
+  if (!appointment?.appointment_date || !appointment?.appointment_time) return null;
+  const iso = fromDatetimeLocalAsuncion(`${appointment.appointment_date}T${String(appointment.appointment_time).slice(0, 5)}`);
+  if (!iso) return null;
+  const date = new Date(iso);
   date.setHours(date.getHours() + offsetHours);
   return date.toISOString();
-}
-
-function toDatetimeLocal(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-function toIsoOrNull(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function numberOrNull(value) {
@@ -185,6 +166,7 @@ function publicFormPayloadExample(config) {
     origen: 'Landing odontología',
     pagina: 'implantes',
     fecha_envio: 'auto',
+    consentimiento_contacto: true,
   };
 }
 
@@ -234,7 +216,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
     return {
       title: 'Hacer seguimiento',
       type: 'followup',
-      due_at: lead?.next_followup_at || tomorrowFollowupIso(),
+      due_at: lead?.next_followup_at || tomorrowFollowupAsuncion(),
       priority: 'media',
     };
   }
@@ -279,7 +261,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
     return {
       title: 'Intentar contacto nuevamente',
       type: 'contact',
-      due_at: tomorrowFollowupIso(),
+      due_at: tomorrowFollowupAsuncion(),
       priority: 'media',
     };
   }
@@ -288,7 +270,7 @@ function taskConfigForLeadStatus(lead, newStatus, appointment) {
     return {
       title: 'Reprogramar consulta',
       type: 'followup',
-      due_at: tomorrowFollowupIso(),
+      due_at: tomorrowFollowupAsuncion(),
       priority: 'alta',
     };
   }
@@ -333,7 +315,7 @@ function buildLeadFormPatch(form, fields) {
   }
   if (allowed.has('estimated_value')) patch.estimated_value = numberOrNull(form.estimated_value);
   if (allowed.has('next_action')) patch.next_action = cleanOptionalText(form.next_action);
-  if (allowed.has('next_followup_at')) patch.next_followup_at = toIsoOrNull(form.next_followup_at);
+  if (allowed.has('next_followup_at')) patch.next_followup_at = fromDatetimeLocalAsuncion(form.next_followup_at);
   if (allowed.has('notes')) patch.notes = cleanOptionalText(form.notes);
 
   return patch;
@@ -577,6 +559,11 @@ export default function App() {
     const before = leads.find((lead) => lead.id === leadId);
     const statusChanged = patch.status && patch.status !== before?.status;
     const leadPatch = { ...patch };
+
+    if (statusChanged && APPOINTMENT_OUTCOME_LEAD_STATUSES.includes(patch.status)) {
+      setError('Confirmado, Asistió y No Asistió se registran desde Agenda para mantener el turno sincronizado.');
+      return;
+    }
 
     if (statusChanged && patch.status === LEAD_STATUS.scheduled) {
       if (!before) {
@@ -848,6 +835,10 @@ export default function App() {
 
     const statusChanged = patch.status && patch.status !== lead.status;
 
+    if (statusChanged && APPOINTMENT_OUTCOME_LEAD_STATUSES.includes(patch.status)) {
+      throw new Error('Confirmado, Asistió y No Asistió se registran desde Agenda para mantener el turno sincronizado.');
+    }
+
     if (statusChanged && patch.status === LEAD_STATUS.scheduled) {
       const patchWithoutStatus = { ...patch };
       delete patchWithoutStatus.status;
@@ -1017,7 +1008,7 @@ export default function App() {
       lead_id: cleanOptionalText(form.lead_id),
       title,
       description: cleanOptionalText(form.description),
-      due_at: toIsoOrNull(form.due_at),
+      due_at: fromDatetimeLocalAsuncion(form.due_at),
       priority: form.priority || 'media',
       status: form.status || 'pendiente',
     };
@@ -1104,96 +1095,28 @@ export default function App() {
     }
 
     const isReschedule = modal.mode === 'reschedule';
-    const appointmentPayload = {
-      clinic_id: profile.clinic_id,
-      lead_id: lead.id,
-      appointment_date: form.appointment_date,
-      appointment_time: form.appointment_time,
-      doctor_assigned: cleanOptionalText(form.doctor_assigned),
-      treatment_scheduled: cleanOptionalText(form.treatment_scheduled),
-      status: isReschedule ? APPOINTMENT_STATUS.rescheduled : APPOINTMENT_STATUS.scheduled,
-      notes: cleanOptionalText(form.notes),
-    };
 
     setAppointmentSaving(true);
     setError('');
     setNotice('');
 
-    let leadUpdated = false;
-
     try {
-      const leadPatch = {
-        status: LEAD_STATUS.scheduled,
-        next_action: 'Confirmar asistencia',
-      };
-
-      if (!isReschedule) {
-        leadPatch.last_contact_at = new Date().toISOString();
-      }
-
-      const { error: leadError } = await supabase
-        .from('leads')
-        .update(leadPatch)
-        .eq('id', lead.id)
-        .eq('clinic_id', profile.clinic_id);
-
-      if (leadError) {
-        throw new Error(`No se pudo actualizar el lead: ${leadError.message}`);
-      }
-
-      leadUpdated = true;
-
-      let appointmentId = modal.appointment?.id || null;
-
-      if (!appointmentId) {
-        const { data: activeAppointment, error: activeError } = await supabase
-          .from('appointments')
-          .select('id')
-          .eq('clinic_id', profile.clinic_id)
-          .eq('lead_id', lead.id)
-          .in('status', APPOINTMENT_ACTIVE_STATUSES)
-          .order('appointment_date', { ascending: true })
-          .order('appointment_time', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-
-        if (activeError) {
-          throw new Error(`El lead se actualizo, pero no se pudo verificar si ya tenia turno activo: ${activeError.message}`);
-        }
-
-        appointmentId = activeAppointment?.id || null;
-      }
-
-      const appointmentResult = appointmentId
-        ? await supabase
-            .from('appointments')
-            .update(appointmentPayload)
-            .eq('id', appointmentId)
-            .eq('clinic_id', profile.clinic_id)
-            .select('*')
-            .single()
-        : await supabase.from('appointments').insert(appointmentPayload).select('*').single();
-
-      if (appointmentResult.error) {
-        const prefix = leadUpdated ? 'El lead se actualizo, pero ' : '';
-        throw new Error(`${prefix}no se pudo guardar el turno: ${appointmentResult.error.message}`);
-      }
-
-      const savedAppointment = appointmentResult.data || appointmentPayload;
-
-      const eventType = isReschedule ? 'appointment_rescheduled' : 'appointment_scheduled';
-      const eventTitle = isReschedule ? 'Consulta reprogramada' : 'Consulta agendada';
-      const { error: eventError } = await createLeadEvent(lead.id, {
-        event_type: eventType,
-        title: eventTitle,
-        description: `${eventTitle} para ${form.appointment_date} ${form.appointment_time}`,
+      const { error: scheduleError } = await supabase.rpc('schedule_lead_appointment', {
+        p_lead_id: lead.id,
+        p_appointment_date: form.appointment_date,
+        p_appointment_time: form.appointment_time,
+        p_doctor_assigned: form.doctor_assigned.trim(),
+        p_treatment_scheduled: cleanOptionalText(form.treatment_scheduled),
+        p_notes: cleanOptionalText(form.notes),
+        p_appointment_id: modal.appointment?.id || null,
       });
 
-      const { error: taskError } = await syncTasksForLeadStatus(
-        { ...lead, ...leadPatch, clinic_id: profile.clinic_id },
-        LEAD_STATUS.scheduled,
-        savedAppointment,
-      );
+      if (scheduleError) {
+        const message = /ocupado|unique|appointments_active_slot/i.test(scheduleError.message || '')
+          ? 'Ese horario ya está ocupado para este doctor.'
+          : scheduleError.message;
+        throw new Error(message || 'No se pudo guardar la consulta.');
+      }
 
       await refreshClinicData();
       if (selectedLeadId === lead.id) {
@@ -1201,27 +1124,8 @@ export default function App() {
       }
 
       setAppointmentModal(null);
-
-      if (eventError) {
-        console.error('Error creating appointment lead event', eventError);
-        setError(`La consulta se guardo, pero no se pudo crear el evento: ${eventError.message}`);
-        return;
-      }
-
-      if (taskError) {
-        setError(`La consulta se guardo, pero no se pudo sincronizar la tarea: ${taskError.message}`);
-        return;
-      }
-
       setNotice(isReschedule ? 'Consulta reprogramada.' : 'Consulta agendada.');
     } catch (scheduleError) {
-      if (leadUpdated) {
-        await refreshClinicData();
-        if (selectedLeadId === lead.id) {
-          await loadLeadEvents(lead.id);
-        }
-      }
-
       setError(scheduleError.message);
       throw scheduleError;
     } finally {
@@ -1237,29 +1141,15 @@ export default function App() {
 
     const configs = {
       confirm: {
-        appointmentStatus: APPOINTMENT_STATUS.confirmed,
-        leadStatus: LEAD_STATUS.confirmed,
-        nextAction: 'Esperar asistencia',
-        event_type: 'appointment_confirmed',
-        title: 'Consulta confirmada',
+        outcome: APPOINTMENT_STATUS.confirmed,
         notice: 'Turno confirmado.',
       },
       attended: {
-        appointmentStatus: APPOINTMENT_STATUS.attended,
-        leadStatus: LEAD_STATUS.attended,
-        nextAction: 'Enviar presupuesto o iniciar tratamiento',
-        event_type: 'appointment_attended',
-        title: 'Paciente asistió',
+        outcome: APPOINTMENT_STATUS.attended,
         notice: 'Asistencia registrada.',
       },
       noShow: {
-        appointmentStatus: APPOINTMENT_STATUS.noShow,
-        leadStatus: LEAD_STATUS.noShow,
-        nextAction: 'Reprogramar consulta',
-        nextFollowupAt: tomorrowFollowupIso(),
-        event_type: 'appointment_no_show',
-        title: 'Paciente no asistió',
-        description: 'Se debe reprogramar la consulta',
+        outcome: APPOINTMENT_STATUS.noShow,
         notice: 'Inasistencia registrada.',
       },
     };
@@ -1271,54 +1161,17 @@ export default function App() {
     setError('');
     setNotice('');
 
-    const leadPatch = {
-      status: config.leadStatus,
-      next_action: config.nextAction,
-    };
-
-    if (config.nextFollowupAt) {
-      leadPatch.next_followup_at = config.nextFollowupAt;
-    }
-
-    const { error: appointmentError } = await supabase
-      .from('appointments')
-      .update({ status: config.appointmentStatus })
-      .eq('id', appointment.id)
-      .eq('clinic_id', profile.clinic_id);
-
-    if (appointmentError) {
-      console.error('Error updating appointment', appointmentError);
-      setError(appointmentError.message);
-      setAppointmentActionId('');
-      return;
-    }
-
-    const { error: leadError } = await supabase
-      .from('leads')
-      .update(leadPatch)
-      .eq('id', appointment.lead_id)
-      .eq('clinic_id', profile.clinic_id);
-
-    if (leadError) {
-      console.error('Error updating appointment lead', leadError);
-      setError(`El turno se actualizo, pero no se pudo actualizar el lead: ${leadError.message}`);
-      await refreshClinicData();
-      setAppointmentActionId('');
-      return;
-    }
-
-    const { error: eventError } = await createLeadEvent(appointment.lead_id, {
-      event_type: config.event_type,
-      title: config.title,
-      description: config.description || `${config.title} para ${appointment.appointment_date} ${formatTime(appointment.appointment_time)}`,
+    const { error: outcomeError } = await supabase.rpc('update_appointment_outcome', {
+      p_appointment_id: appointment.id,
+      p_outcome: config.outcome,
     });
 
-    const leadBefore = leads.find((lead) => lead.id === appointment.lead_id);
-    const { error: taskError } = await syncTasksForLeadStatus(
-      { ...leadBefore, ...leadPatch, id: appointment.lead_id, clinic_id: profile.clinic_id },
-      config.leadStatus,
-      { ...appointment, status: config.appointmentStatus },
-    );
+    if (outcomeError) {
+      console.error('Error updating appointment outcome', outcomeError);
+      setError(outcomeError.message || 'No se pudo actualizar el resultado del turno.');
+      setAppointmentActionId('');
+      return;
+    }
 
     await refreshClinicData();
     if (selectedLeadId === appointment.lead_id) {
@@ -1326,48 +1179,20 @@ export default function App() {
     }
 
     setAppointmentActionId('');
-
-    if (eventError) {
-      console.error('Error creating appointment outcome event', eventError);
-      setError(`El turno se actualizo, pero no se pudo crear el evento: ${eventError.message}`);
-      return;
-    }
-
-    if (taskError) {
-      setError(`El turno se actualizo, pero no se pudo sincronizar la tarea: ${taskError.message}`);
-      return;
-    }
-
     setNotice(config.notice);
   }
 
   async function completeTask(taskId) {
     if (!profile?.clinic_id) return;
 
-    const task = tasks.find((item) => item.id === taskId);
-
-    const { error: taskError } = await supabase
-      .from('tasks')
-      .update({ status: 'hecho', completed_at: new Date().toISOString() })
-      .eq('id', taskId)
-      .eq('clinic_id', profile.clinic_id);
+    const { error: taskError } = await supabase.rpc('complete_task', {
+      p_task_id: taskId,
+    });
 
     if (taskError) {
       console.error('Error completing task', taskError);
       setError(taskError.message);
       return;
-    }
-
-    if (task?.lead_id) {
-      const { error: eventError } = await createLeadEvent(task.lead_id, {
-        event_type: 'task_completed',
-        title: 'Tarea completada',
-        description: task.title || 'Tarea marcada como hecha',
-      });
-
-      if (eventError) {
-        setError(`La tarea se marco como hecha, pero no se pudo registrar el evento: ${eventError.message}`);
-      }
     }
 
     await refreshClinicData();
@@ -1482,6 +1307,7 @@ function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
     evaluacion_previa: '',
     situacion: '',
     consultation_reason: '',
+    consentimiento_contacto: false,
   });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -1511,6 +1337,11 @@ function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
       return;
     }
 
+    if (!form.consentimiento_contacto) {
+      setError('Debés aceptar el consentimiento para que la clínica pueda contactarte.');
+      return;
+    }
+
     const consultationReason = cleanOptionalText(form.consultation_reason) || cleanOptionalText(form.situacion) || cleanOptionalText(form.tratamiento);
     const payload = {
       clinic_slug: clinicSlug,
@@ -1525,6 +1356,8 @@ function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
       origen: 'Formulario embebido',
       pagina: `form/${clinicSlug}`,
       fecha_envio: new Date().toISOString(),
+      consentimiento_contacto: true,
+      website: '',
     };
 
     setSending(true);
@@ -1552,6 +1385,7 @@ function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
         evaluacion_previa: '',
         situacion: '',
         consultation_reason: '',
+        consentimiento_contacto: false,
       });
     } catch (submitError) {
       setError(submitError.message || 'No se pudo enviar el formulario.');
@@ -1579,6 +1413,20 @@ function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
           <Field label="Evaluacion previa" value={form.evaluacion_previa} onChange={(value) => updateField('evaluacion_previa', value)} disabled={sending} />
           <Field label="Situacion" value={form.situacion} onChange={(value) => updateField('situacion', value)} disabled={sending} />
           <TextArea label="Motivo de consulta" value={form.consultation_reason} onChange={(value) => updateField('consultation_reason', value)} disabled={sending} className="md:col-span-2" />
+          <label className="md:col-span-2 flex items-start gap-3 rounded-lg border border-white/10 bg-ink/50 p-4 text-sm text-cream/80">
+            <input
+              className="mt-1 h-4 w-4 accent-mint"
+              type="checkbox"
+              checked={form.consentimiento_contacto}
+              onChange={(event) => updateField('consentimiento_contacto', event.target.checked)}
+              disabled={sending}
+              required
+            />
+            <span>Acepto que la clínica me contacte sobre mi consulta.</span>
+          </label>
+          <p className="md:col-span-2 text-xs leading-relaxed text-cream/55">
+            Al enviar este formulario aceptás que la clínica use tus datos para contactarte sobre tu consulta. No compartas información médica sensible por este formulario. Este formulario no reemplaza una consulta odontológica.
+          </p>
         </div>
 
         <button className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-mint px-4 py-3 font-semibold text-ink hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={sending}>
@@ -1869,7 +1717,7 @@ function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchiveLead,
         status: lead.status || 'Nuevo',
         notes: lead.notes || '',
         next_action: lead.next_action || '',
-        next_followup_at: lead.next_followup_at ? lead.next_followup_at.slice(0, 16) : '',
+        next_followup_at: toDatetimeLocalAsuncion(lead.next_followup_at),
       });
     }
   }, [lead]);
@@ -1888,7 +1736,7 @@ function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchiveLead,
       status: form.status,
       notes: form.notes,
       next_action: form.next_action,
-      next_followup_at: form.next_followup_at ? new Date(form.next_followup_at).toISOString() : null,
+      next_followup_at: fromDatetimeLocalAsuncion(form.next_followup_at),
     });
   }
 
@@ -2201,7 +2049,7 @@ function getLeadFormDefaults(lead) {
     consultation_reason: lead?.consultation_reason || '',
     estimated_value: lead?.estimated_value ?? '',
     next_action: lead?.next_action || '',
-    next_followup_at: toDatetimeLocal(lead?.next_followup_at),
+    next_followup_at: toDatetimeLocalAsuncion(lead?.next_followup_at),
     notes: lead?.notes || '',
   };
 }
@@ -2328,7 +2176,7 @@ function getTaskFormDefaults(task) {
     lead_id: task?.lead_id || '',
     title: task?.title || '',
     description: task?.description || '',
-    due_at: toDatetimeLocal(task?.due_at),
+    due_at: toDatetimeLocalAsuncion(task?.due_at),
     priority: task?.priority || 'media',
     status: task?.status || 'pendiente',
   };

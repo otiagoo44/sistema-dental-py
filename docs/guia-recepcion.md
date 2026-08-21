@@ -27,5 +27,7 @@
 - No crear usuarios.
 - No borrar datos.
 - No exportar listados de pacientes sin autorizacion del owner.
+- No pedir ni copiar diagnosticos, estudios o informacion medica sensible en este CRM comercial.
+- Cerrar sesion al terminar, especialmente en equipos compartidos.
 
 Ante dudas, dejar nota en el lead y avisar a admin/owner.

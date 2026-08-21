@@ -1,101 +1,195 @@
--- Run in Supabase SQL Editor after applying migrations and deploying lead-intake.
+-- Verificacion automatizable del rebuild. Ejecutar con postgres/SQL Editor.
+-- Falla de inmediato si falta una proteccion critica.
 
--- Ultimos leads.
-select id, clinic_id, name, phone_plus, treatment, classification, score, status, source, page, created_at
-from public.leads
-order by created_at desc
-limit 30;
+do $$
+declare
+  expected_tables text[] := array[
+    'clinics','profiles','leads','lead_events','appointments','tasks',
+    'clinic_public_forms','form_submission_logs','clinic_settings',
+    'automation_jobs','audit_logs','campaigns','messages','treatment_prices',
+    'message_templates','daily_reports'
+  ];
+  missing_tables text[];
+  rls_missing text[];
+  missing_rpcs text[];
+  delete_policy_count integer;
+  duplicate_count integer;
+  anon_privilege_count integer;
+begin
+  select array_agg(name order by name)
+  into missing_tables
+  from unnest(expected_tables) as name
+  where to_regclass(format('public.%I', name)) is null;
 
--- Eventos recientes.
-select id, clinic_id, lead_id, event_type, title, metadata, created_at
-from public.lead_events
-order by created_at desc
-limit 50;
+  if missing_tables is not null then
+    raise exception 'Tablas faltantes: %', missing_tables;
+  end if;
 
--- Tareas recientes.
-select id, clinic_id, lead_id, title, type, priority, status, due_at, completed_at, created_at
-from public.tasks
-order by created_at desc
-limit 50;
+  select array_agg(c.relname order by c.relname)
+  into rls_missing
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public'
+    and c.relname = any(expected_tables)
+    and not c.relrowsecurity;
 
--- Jobs asincronicos para n8n.
-select id, clinic_id, lead_id, workflow_name, status, attempts, next_retry_at, created_at
-from public.automation_jobs
-order by created_at desc
-limit 50;
+  if rls_missing is not null then
+    raise exception 'RLS desactivado: %', rls_missing;
+  end if;
 
--- Logs de formulario.
-select id, clinic_public_form_id, clinic_id, status, created_at
-from public.form_submission_logs
-order by created_at desc
-limit 50;
+  select array_agg(name order by name)
+  into missing_rpcs
+  from unnest(array['schedule_lead_appointment','update_appointment_outcome','complete_task']) as name
+  where not exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = name
+  );
 
--- Formularios publicos.
-select id, clinic_id, clinic_slug, landing_url, allowed_origins, is_active, created_at, updated_at
-from public.clinic_public_forms
-order by created_at desc;
+  if missing_rpcs is not null then
+    raise exception 'RPCs faltantes: %', missing_rpcs;
+  end if;
 
--- Origin real de landing para dentalpro. No debe quedar Netlify ni placeholder viejo.
-select clinic_slug, allowed_origins, is_active
-from public.clinic_public_forms
-where clinic_slug = 'dentalpro';
+  select count(*) into delete_policy_count
+  from pg_policies
+  where schemaname = 'public'
+    and tablename = any(expected_tables)
+    and cmd = 'DELETE';
+
+  if delete_policy_count <> 0 then
+    raise exception 'Hay % policies DELETE en tablas operativas', delete_policy_count;
+  end if;
+
+  if to_regclass('public.appointments_active_slot_unique_idx') is null then
+    raise exception 'Falta el indice de doble reserva appointments_active_slot_unique_idx';
+  end if;
+
+  if to_regclass('public.leads_clinic_phone_plus_unique') is null then
+    raise exception 'Falta el indice unico de duplicados por clinica y telefono';
+  end if;
+
+  select count(*) into duplicate_count
+  from (
+    select clinic_id, phone_plus
+    from public.leads
+    where phone_plus is not null
+    group by clinic_id, phone_plus
+    having count(*) > 1
+  ) duplicates;
+
+  if duplicate_count <> 0 then
+    raise exception 'Existen % telefonos duplicados dentro de una clinica', duplicate_count;
+  end if;
+
+  if exists (select 1 from public.leads where clinic_id is null) then
+    raise exception 'Existen leads sin clinic_id';
+  end if;
+
+  if exists (
+    select 1 from public.leads
+    where consent_contact is true and consent_at is null
+  ) then
+    raise exception 'Hay consentimientos positivos sin timestamp';
+  end if;
+
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'form_submission_logs'
+      and column_name in ('ip', 'ip_address', 'raw_ip', 'phone', 'phone_plus', 'telefono')
+  ) then
+    raise exception 'form_submission_logs contiene una columna de PII cruda';
+  end if;
+
+  if exists (
+    select 1 from public.form_submission_logs
+    where status = 'accepted' and phone_hash is null
+  ) then
+    raise exception 'Hay logs accepted sin phone_hash';
+  end if;
+
+  select count(*) into anon_privilege_count
+  from information_schema.role_table_grants
+  where grantee = 'anon'
+    and table_schema = 'public'
+    and table_name = any(expected_tables);
+
+  if anon_privilege_count <> 0 then
+    raise exception 'anon conserva % privilegios directos sobre tablas CRM', anon_privilege_count;
+  end if;
+
+  if has_function_privilege(
+    'anon',
+    'public.schedule_lead_appointment(uuid,date,time without time zone,text,text,text,uuid)',
+    'EXECUTE'
+  ) then
+    raise exception 'anon puede ejecutar schedule_lead_appointment';
+  end if;
+end
+$$;
+
+select 'PASS' as result, 'schema_rls_rpc_indexes_privileges' as test;
 
 select
-  'https://sistema-dental-py.vercel.app' = any(allowed_origins) as has_vercel_landing_origin,
-  'http://localhost:5173' = any(allowed_origins) as has_local_origin,
-  'https://TU-LANDING.com' = any(allowed_origins) as has_old_placeholder,
-  'https://sistema-dentalpro-py.netlify.app' = any(allowed_origins) as has_old_netlify_origin
-from public.clinic_public_forms
-where clinic_slug = 'dentalpro';
-
--- Agenda.
-select id, clinic_id, lead_id, appointment_date, appointment_time, status, doctor_assigned, created_at
-from public.appointments
-order by appointment_date desc, appointment_time desc
-limit 50;
-
--- RLS habilitado en tablas esperadas.
-select n.nspname as schema_name, c.relname as table_name, c.relrowsecurity as rls_enabled
+  c.relname as table_name,
+  c.relrowsecurity as rls_enabled,
+  count(p.policyname) as policy_count
 from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
+left join pg_policies p on p.schemaname = n.nspname and p.tablename = c.relname
 where n.nspname = 'public'
   and c.relname in (
     'clinics','profiles','leads','lead_events','appointments','tasks',
-    'treatment_prices','message_templates','daily_reports','clinic_public_forms',
-    'form_submission_logs','automation_jobs','audit_logs','campaigns','messages',
-    'clinic_settings'
+    'clinic_public_forms','form_submission_logs','clinic_settings',
+    'automation_jobs','audit_logs','campaigns','messages','treatment_prices',
+    'message_templates','daily_reports'
   )
+group by c.relname, c.relrowsecurity
 order by c.relname;
 
--- Policies instaladas.
-select schemaname, tablename, policyname, cmd, roles, qual, with_check
-from pg_policies
+select
+  clinic_slug,
+  is_active,
+  'https://sistema-dental-py.vercel.app' = any(allowed_origins) as allows_real_landing,
+  'http://localhost:5173' = any(allowed_origins) as allows_localhost
+from public.clinic_public_forms
+order by clinic_slug;
+
+select
+  (select count(*) from public.clinics where slug in ('dentalpro', 'qa-clinic-b')) as qa_clinics,
+  (select count(*) from public.clinic_public_forms where clinic_slug in ('dentalpro', 'qa-clinic-b')) as qa_forms,
+  (select count(*) from public.leads where source = 'seed_qa') as qa_leads,
+  (select count(*) from public.appointments where notes like 'QA:%') as qa_appointments,
+  (select count(*) from public.tasks) as tasks,
+  (select count(*) from public.lead_events) as events,
+  (select count(*) from public.automation_jobs) as automation_jobs,
+  (select count(*) from public.profiles) as profiles;
+
+select
+  status,
+  count(*) as logs,
+  count(*) filter (where phone_hash is not null) as with_phone_hash,
+  count(*) filter (where ip_hash is not null) as with_ip_hash
+from public.form_submission_logs
+group by status
+order by status;
+
+select
+  indexname,
+  indexdef
+from pg_indexes
 where schemaname = 'public'
-order by tablename, policyname;
+  and indexname in (
+    'appointments_active_slot_unique_idx',
+    'leads_clinic_phone_plus_unique',
+    'tasks_open_lead_type_unique_idx'
+  )
+order by indexname;
 
--- Helpers app_private esperados.
-select n.nspname as schema_name, p.proname as function_name, pg_get_function_arguments(p.oid) as args
-from pg_proc p
-join pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'app_private'
-order by p.proname;
-
--- No debe haber DELETE frontend en tablas operativas.
-select tablename, policyname, cmd, roles
-from pg_policies
-where schemaname = 'public'
-  and cmd = 'DELETE'
-  and tablename in ('leads', 'lead_events', 'appointments', 'tasks');
-
--- Leads sin clinic_id no deben existir.
-select count(*) as leads_without_clinic_id
-from public.leads
-where clinic_id is null;
-
--- Duplicados por clinica y phone_plus.
-select clinic_id, phone_plus, count(*) as duplicates
-from public.leads
-where phone_plus is not null
-group by clinic_id, phone_plus
-having count(*) > 1
-order by duplicates desc;
+select
+  (app_private.tomorrow_at_asuncion(9) at time zone 'America/Asuncion')::date
+    = (now() at time zone 'America/Asuncion')::date + 1 as no_show_is_tomorrow,
+  (app_private.tomorrow_at_asuncion(9) at time zone 'America/Asuncion')::time = time '09:00'
+    as no_show_is_0900_asuncion;
