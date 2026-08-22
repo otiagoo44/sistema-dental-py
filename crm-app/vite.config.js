@@ -6,5 +6,14 @@ export default defineConfig({
   build: {
     sourcemap: false,
     minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom'],
+          motion: ['motion/react'],
+          supabase: ['@supabase/supabase-js'],
+        },
+      },
+    },
   },
 });

@@ -1,4 +1,5 @@
 import { BarChart3, CalendarDays, CheckSquare2, Gauge, LogOut, Settings, Sparkles, Stethoscope, Users } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { NAV_ITEMS } from '../lib/constants';
 
 const icons = {
@@ -97,7 +98,18 @@ export default function AppLayout({ activeView, setActiveView, clinic, profile, 
           </nav>
         </header>
 
-        <main key={activeView} className="page-enter mx-auto w-full max-w-[1600px] p-4 pb-12 md:p-8">{children}</main>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.main
+            key={activeView}
+            className="safe-bottom mx-auto w-full max-w-[1600px] p-4 pb-12 md:p-8"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -3 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {children}
+          </motion.main>
+        </AnimatePresence>
       </div>
     </div>
   );

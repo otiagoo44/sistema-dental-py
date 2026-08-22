@@ -1,0 +1,182 @@
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarCheck2 } from 'lucide-react';
+import { TREATMENT_OPTIONS } from '../../lib/constants';
+import { normalizeText, todayIsoDate, toLocalIsoDate } from '../../lib/formatters';
+import { ROLE, LEAD_STATUS, APPOINTMENT_ACTIVE_STATUSES, uniqueStrings, startOfAsuncionDate } from '../../lib/crmDomain';
+import { Select } from '../crm/CrmPrimitives';
+import Button from '../ui/Button';
+import StatusBadge from '../ui/StatusBadge';
+import ModalShell from '../ui/ModalShell';
+
+function getAppointmentFormDefaults({ clinic, lead, appointment }) {
+  return {
+    appointment_date: appointment?.appointment_date || todayIsoDate(),
+    appointment_time: appointment?.appointment_time ? appointment.appointment_time.slice(0, 5) : '',
+    doctor_assigned: appointment?.doctor_assigned || clinic?.doctor_name || 'Sin asignar',
+    treatment_scheduled: appointment?.treatment_scheduled || lead?.treatment || '',
+    notes: appointment?.notes || '',
+  };
+}
+
+function buildTimeSlots() {
+  const periods = [[8, 12], [14, 18]];
+  return periods.flatMap(([start, end]) => {
+    const slots = [];
+    for (let minutes = start * 60; minutes < end * 60; minutes += 30) {
+      slots.push(`${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`);
+    }
+    return slots;
+  });
+}
+
+export default function AppointmentModal({ clinic, lead, appointment, appointments, profiles, clinicSettings, mode, saving, onClose, onSubmit }) {
+  const [form, setForm] = useState(() => getAppointmentFormDefaults({ clinic, lead, appointment }));
+  const [formError, setFormError] = useState('');
+  const isReschedule = mode === 'reschedule';
+  const timeSlots = useMemo(buildTimeSlots, []);
+  const dateOptions = useMemo(() => Array.from({ length: 14 }, (_, index) => {
+    const date = startOfAsuncionDate(index);
+    return { iso: toLocalIsoDate(date), date };
+  }), []);
+  const doctorOptions = useMemo(() => uniqueStrings([
+    appointment?.doctor_assigned,
+    clinic?.doctor_name,
+    ...(appointments || []).map((item) => item.doctor_assigned),
+    ...(profiles || []).filter((profile) => profile.role !== ROLE.receptionist).map((profile) => profile.full_name),
+    'Sin asignar',
+  ]), [appointment?.doctor_assigned, clinic?.doctor_name, appointments, profiles]);
+  const treatmentOptions = useMemo(() => uniqueStrings([
+    lead?.treatment,
+    ...(Array.isArray(clinicSettings?.treatments) ? clinicSettings.treatments.map((item) => typeof item === 'string' ? item : item?.name || item?.treatment) : []),
+    ...TREATMENT_OPTIONS,
+  ]), [lead?.treatment, clinicSettings]);
+  const occupiedTimes = useMemo(() => new Set((appointments || [])
+    .filter((item) => item.id !== appointment?.id
+      && item.appointment_date === form.appointment_date
+      && normalizeText(item.doctor_assigned) === normalizeText(form.doctor_assigned)
+      && APPOINTMENT_ACTIVE_STATUSES.includes(item.status))
+    .map((item) => String(item.appointment_time).slice(0, 5))), [appointments, appointment?.id, form.appointment_date, form.doctor_assigned]);
+
+  useEffect(() => {
+    setForm(getAppointmentFormDefaults({ clinic, lead, appointment }));
+    setFormError('');
+  }, [appointment?.id, clinic?.doctor_name, lead?.id, mode]);
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSubmit() {
+    if (!form.appointment_date) {
+      setFormError('Selecciona la fecha de consulta.');
+      return;
+    }
+
+    if (!form.appointment_time) {
+      setFormError('Elegí un horario disponible.');
+      return;
+    }
+
+    if (!form.doctor_assigned.trim()) {
+      setFormError('Elegí el profesional o responsable del turno.');
+      return;
+    }
+
+    if (occupiedTimes.has(form.appointment_time)) {
+      setFormError('Ese horario ya está ocupado. Elegí otro slot disponible.');
+      return;
+    }
+
+    setFormError('');
+
+    try {
+      await onSubmit({
+        appointment_date: form.appointment_date,
+        appointment_time: form.appointment_time,
+        doctor_assigned: form.doctor_assigned.trim(),
+        treatment_scheduled: form.treatment_scheduled.trim(),
+        notes: form.notes.trim(),
+      });
+    } catch (submitError) {
+      setFormError(submitError.message || 'No se pudo guardar la consulta.');
+    }
+  }
+
+  return (
+    <ModalShell
+      className="max-w-4xl p-4 sm:p-6"
+      onSubmit={(event) => {
+        event.preventDefault();
+        handleSubmit();
+      }}
+    >
+        <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-mint">{isReschedule ? 'Reprogramar' : 'Nuevo turno'}</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-cream">{isReschedule ? 'Reprogramar consulta' : 'Agendar consulta'}</h2>
+            <p className="mt-1 text-sm text-slate-500">{lead?.name || 'Lead asociado'} · elegí día, profesional y horario.</p>
+          </div>
+          <StatusBadge value={LEAD_STATUS.scheduled} />
+        </div>
+
+        {formError ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
+
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="space-y-5">
+            <div>
+              <div className="flex items-end justify-between gap-3">
+                <div><p className="text-sm font-bold text-cream">1. Elegí el día</p><p className="mt-1 text-xs text-slate-500">Próximos 14 días</p></div>
+                <label className="text-xs font-semibold text-slate-500">Otra fecha <input className="ml-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-700" type="date" min={todayIsoDate()} value={form.appointment_date} onChange={(event) => { updateField('appointment_date', event.target.value); updateField('appointment_time', ''); }} disabled={saving} /></label>
+              </div>
+              <div className="scrollbar-soft mt-3 grid grid-cols-4 gap-2 sm:grid-cols-7">
+                {dateOptions.map(({ iso, date }) => {
+                  const selected = form.appointment_date === iso;
+                  return (
+                    <button key={iso} className={`min-h-[74px] rounded-xl border px-2 py-2 text-center transition ${selected ? 'border-mint bg-mint text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'}`} type="button" onClick={() => { updateField('appointment_date', iso); updateField('appointment_time', ''); }} disabled={saving}>
+                      <span className="block text-[10px] font-bold uppercase">{new Intl.DateTimeFormat('es-PY', { weekday: 'short', timeZone: 'America/Asuncion' }).format(date).replace('.', '')}</span>
+                      <span className="mt-1 block text-lg font-bold">{new Intl.DateTimeFormat('es-PY', { day: '2-digit', timeZone: 'America/Asuncion' }).format(date)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Select label="2. Profesional / responsable" value={form.doctor_assigned} onChange={(value) => { updateField('doctor_assigned', value); updateField('appointment_time', ''); }} options={doctorOptions} disabled={saving} />
+              <Select label="Tratamiento agendado" value={form.treatment_scheduled} onChange={(value) => updateField('treatment_scheduled', value)} options={treatmentOptions} placeholder="Seleccionar tratamiento" disabled={saving} />
+            </div>
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold text-slate-500">Notas opcionales</span>
+              <textarea className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition focus:border-mint focus:ring-4 focus:ring-blue-50" value={form.notes} onChange={(event) => updateField('notes', event.target.value)} disabled={saving} placeholder="Indicaciones comerciales o de coordinación (sin datos clínicos sensibles)." />
+            </label>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-bold text-cream">3. Elegí un horario</p>
+            <p className="mt-1 text-xs text-slate-500">Slots de 30 minutos. Los ocupados están bloqueados.</p>
+            <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-3">
+              {timeSlots.map((time) => {
+                const occupied = occupiedTimes.has(time);
+                const selected = form.appointment_time === time;
+                return (
+                  <button key={time} className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-bold transition ${occupied ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 line-through' : selected ? 'border-mint bg-mint text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'}`} type="button" onClick={() => !occupied && updateField('appointment_time', time)} disabled={saving || occupied} aria-label={`${time}${occupied ? ', ocupado' : ', disponible'}`}>
+                    {time}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-mint" />Seleccionado</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-white ring-1 ring-slate-300" />Disponible</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-slate-300" />Ocupado</span></div>
+            {clinicSettings?.opening_hours ? <p className="mt-4 rounded-xl bg-white p-3 text-xs leading-5 text-slate-500">Horario configurado: {clinicSettings.opening_hours}. Los slots visuales usan 08:00–12:00 y 14:00–18:00; la restricción de base sigue siendo la autoridad final.</p> : null}
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+          <Button variant="secondary" type="button" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button type="submit" loading={saving}>
+            {!saving ? <CalendarCheck2 className="h-4 w-4" /> : null}
+            {isReschedule ? 'Guardar reprogramación' : 'Agendar cita'}
+          </Button>
+        </div>
+    </ModalShell>
+  );
+}

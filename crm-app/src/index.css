@@ -21,6 +21,10 @@ body {
     #f4f7fb;
 }
 
+#root {
+  min-height: 100vh;
+}
+
 button,
 input,
 select,
@@ -38,6 +42,12 @@ textarea {
 
 button {
   touch-action: manipulation;
+}
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 button:focus-visible,
