@@ -21,12 +21,12 @@ Cuando llega un mensaje directo:
 1. Responder rápido y confirmar que es una consulta comercial para la clínica.
 2. Pedir nombre, tratamiento buscado y disponibilidad de contacto.
 3. Abrir CRM → Leads → `Nuevo lead`.
-4. Cargar nombre y teléfono; usar teléfono internacional si está disponible.
-5. Elegir la fuente exacta.
-6. Registrar tratamiento, urgencia y motivo en lenguaje breve.
-7. Elegir responsable, clasificación/score, próxima acción y seguimiento.
+4. Cargar nombre y teléfono: son los únicos datos básicos de escritura obligatoria.
+5. Elegir la fuente exacta, tratamiento, urgencia, evaluación y situación desde menús.
+6. Elegir responsable, clasificación, próxima acción y una fecha rápida: Hoy, Mañana, 3 días o 7 días.
+7. Agregar una nota breve sólo si aporta contexto comercial; no copiar la conversación completa.
 8. Marcar consentimiento sólo si el paciente autorizó contacto por esos datos.
-9. Guardar y confirmar el event y la task en el detalle.
+9. Usar `Guardar lead`; si la persona ya quiere turno, usar `Guardar y agendar` y elegir un slot disponible.
 10. Completar la task al realizar el contacto; si no responde, dejar el siguiente seguimiento.
 
 No copiar diagnósticos, imágenes, estudios ni información clínica sensible en este CRM comercial.
@@ -42,6 +42,7 @@ No copiar diagnósticos, imágenes, estudios ni información clínica sensible e
 | Formulario ajeno a la landing principal | Formulario externo |
 | Lead descargado/copiado manualmente desde Meta Ads | Meta Ads manual |
 | Formulario web cargado manualmente por contingencia | Formulario web |
+| Persona que llegó físicamente a la clínica | Presencial |
 | Caso no cubierto | Otro, explicando el origen en nota interna |
 
 No usar `Formulario web` para WhatsApp o Instagram: la fuente debe permitir medir el canal real.
@@ -52,7 +53,7 @@ No usar `Formulario web` para WhatsApp o Instagram: la fuente debe permitir medi
 - Lead Medio: interés real, compara opciones o quiere información para esta semana/mes. Contactar hoy.
 - Lead Frío: consulta exploratoria sin intención o plazo claro. Dejar seguimiento, no descartarlo sin motivo.
 
-El score y la clasificación son una decisión de recepción en la carga manual; no afirmar que fueron calculados automáticamente. Si hay duda, elegir Lead Medio y pedir revisión del owner/admin.
+La clasificación es una decisión de recepción en la carga manual; no afirmar que fue calculada automáticamente. El score queda con el valor interno por defecto hasta revisión de un admin. Si hay duda, elegir Lead Medio y pedir revisión.
 
 ## Consentimiento y contacto permitido
 
@@ -113,6 +114,15 @@ Antes de usar los textos, el owner debe aprobar tono, horario y aviso de privaci
 3. No crear leads duplicados para cada conversación.
 4. Completar la task anterior sólo después de dejar la siguiente acción cuando corresponda.
 5. Archivar únicamente por owner/admin, con motivo; recepción no archiva.
+
+## Cola diaria de Seguimientos
+
+1. Abrir `Seguimientos`, no recorrer toda la lista de Leads.
+2. Resolver primero Vencidos, luego Para hoy y No-shows.
+3. Usar `Marcar contactado` para registrar contacto y generar la siguiente tarea.
+4. Si la persona pidió otra fecha, usar `Posponer` una sola vez; la RPC actualiza la tarea abierta en lugar de duplicarla.
+5. Agendar desde el mismo item cuando haya intención concreta.
+6. Completar la tarea sólo después de dejar definido el próximo paso.
 
 ## Control diario de cierre
 

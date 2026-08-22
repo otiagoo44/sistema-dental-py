@@ -30,27 +30,28 @@ export default function Login() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
-      <section className="w-full max-w-md rounded-lg border border-white/10 bg-panel/95 p-8 shadow-glow">
+    <main className="flex min-h-screen items-center justify-center bg-ink px-4 py-10">
+      <section className="modal-enter w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-glow">
         <div className="mb-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-mint">CRM Dental</p>
-          <h1 className="mt-3 text-3xl font-semibold text-cream">Acceso clinico</h1>
-          <p className="mt-2 text-sm text-cream/60">Ingresa con Supabase Auth para operar tu clinica.</p>
+          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-mint text-white shadow-sm"><LockKeyhole className="h-5 w-5" /></div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-mint">Sistema anti-pérdida</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em] text-cream">Acceso a la clínica</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-500">Ingresá para ver las oportunidades que necesitan atención.</p>
         </div>
 
         {!hasSupabaseConfig ? (
-          <div className="mb-5 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-red-100">
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             Faltan variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.
           </div>
         ) : null}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <label className="block">
-            <span className="mb-2 block text-sm text-cream/70">Email</span>
-            <span className="flex items-center gap-3 rounded-lg border border-white/10 bg-ink px-3 py-3">
+            <span className="mb-2 block text-sm font-medium text-slate-700">Email</span>
+            <span className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 transition focus-within:border-mint focus-within:ring-4 focus-within:ring-blue-50">
               <Mail className="h-4 w-4 text-mint" />
               <input
-                className="w-full bg-transparent text-cream outline-none placeholder:text-cream/35"
+                className="w-full bg-transparent text-cream outline-none placeholder:text-slate-400"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
@@ -62,11 +63,11 @@ export default function Login() {
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm text-cream/70">Password</span>
-            <span className="flex items-center gap-3 rounded-lg border border-white/10 bg-ink px-3 py-3">
+            <span className="mb-2 block text-sm font-medium text-slate-700">Contraseña</span>
+            <span className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 transition focus-within:border-mint focus-within:ring-4 focus-within:ring-blue-50">
               <LockKeyhole className="h-4 w-4 text-mint" />
               <input
-                className="w-full bg-transparent text-cream outline-none placeholder:text-cream/35"
+                className="w-full bg-transparent text-cream outline-none placeholder:text-slate-400"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -77,14 +78,14 @@ export default function Login() {
             </span>
           </label>
 
-          {error ? <p className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-red-100">{error}</p> : null}
+          {error ? <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">No pudimos iniciar sesión. Revisá el email y la contraseña.</p> : null}
 
           <button
-            className="w-full rounded-lg bg-mint px-4 py-3 font-semibold text-ink transition hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-xl bg-mint px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             type="submit"
             disabled={loading || !hasSupabaseConfig}
           >
-            {loading ? 'Ingresando...' : 'Login'}
+            {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
         </form>
       </section>

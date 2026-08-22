@@ -1,11 +1,57 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, Ban, CalendarPlus, Check, Clipboard, Edit3, ExternalLink, FilePlus, Loader2, Phone, Plus, RefreshCw, Save, Search, UserCheck, X } from 'lucide-react';
+import {
+  AlarmClock,
+  Archive,
+  ArrowDownUp,
+  Ban,
+  CalendarCheck2,
+  CalendarDays,
+  CalendarPlus,
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  CircleDollarSign,
+  Clipboard,
+  Clock3,
+  Edit3,
+  ExternalLink,
+  FilePlus,
+  Filter,
+  Flame,
+  Loader2,
+  MessageCircle,
+  Phone,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  TrendingUp,
+  UserCheck,
+  UserRound,
+  UsersRound,
+  X,
+} from 'lucide-react';
 import AppLayout from './components/AppLayout';
 import Login from './components/Login';
 import EmptyState from './components/ui/EmptyState';
+import Button from './components/ui/Button';
+import Card from './components/ui/Card';
+import PageHeader from './components/ui/PageHeader';
 import StatCard from './components/ui/StatCard';
 import StatusBadge from './components/ui/StatusBadge';
-import { CLASSIFICATIONS, CONTACT_ATTEMPT_STATUSES, CONTACTED_STATUSES, LEAD_STATUSES, SCHEDULED_STATUSES } from './lib/constants';
+import {
+  CLASSIFICATIONS,
+  CONTACT_ATTEMPT_STATUSES,
+  CONTACTED_STATUSES,
+  EVALUATION_OPTIONS,
+  LEAD_STATUSES,
+  NEXT_ACTION_OPTIONS,
+  SCHEDULED_STATUSES,
+  SITUATION_OPTIONS,
+  TREATMENT_OPTIONS,
+  URGENCY_OPTIONS,
+} from './lib/constants';
 import {
   addDaysAsuncion,
   formatDate,
@@ -59,6 +105,7 @@ const MANUAL_LEAD_SOURCES = [
   'Formulario externo',
   'Meta Ads manual',
   'Formulario web',
+  'Presencial',
   'Otro',
 ];
 const LEAD_ADMIN_EDIT_FIELDS = [
@@ -98,6 +145,31 @@ function isArchivedLead(lead) {
 
 function displayConsultationReason(lead) {
   return lead?.consultation_reason || 'Sin especificar';
+}
+
+function uniqueStrings(values) {
+  return [...new Set(values.map((value) => String(value || '').trim()).filter(Boolean))];
+}
+
+function getTreatmentOptions(clinicSettings, treatmentPrices = []) {
+  const configured = Array.isArray(clinicSettings?.treatments)
+    ? clinicSettings.treatments.map((item) => (typeof item === 'string' ? item : item?.name || item?.treatment))
+    : [];
+  return uniqueStrings([...configured, ...treatmentPrices.map((item) => item.treatment), ...TREATMENT_OPTIONS]);
+}
+
+function isOpenTask(task) {
+  return !['hecho', 'cancelado'].includes(normalizeText(task?.status));
+}
+
+function startOfAsuncionDate(daysOffset = 0) {
+  const base = new Date(`${todayIsoDate()}T12:00:00`);
+  base.setDate(base.getDate() + daysOffset);
+  return base;
+}
+
+function daysBetween(from, to = new Date()) {
+  return Math.max(0, Math.floor((to.getTime() - new Date(from).getTime()) / 86400000));
 }
 
 function nowIso() {
@@ -352,6 +424,8 @@ export default function App() {
   const [leads, setLeads] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [clinicSettings, setClinicSettings] = useState(null);
+  const [treatmentPrices, setTreatmentPrices] = useState([]);
   const [leadEvents, setLeadEvents] = useState([]);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [appointmentModal, setAppointmentModal] = useState(null);
@@ -397,6 +471,8 @@ export default function App() {
         setLeads([]);
         setAppointments([]);
         setTasks([]);
+        setClinicSettings(null);
+        setTreatmentPrices([]);
         setLeadEvents([]);
         setAppointmentModal(null);
         setAppointmentSaving(false);
@@ -428,10 +504,22 @@ export default function App() {
   const normalizedRole = normalizeRole(profile?.role);
   const canAdmin = normalizedRole === ROLE.admin;
   const activeLeads = useMemo(() => leads.filter((lead) => !isArchivedLead(lead)), [leads]);
+  const navCounts = useMemo(() => {
+    const now = Date.now();
+    const today = todayIsoDate();
+    const openTasks = tasks.filter((task) => !['hecho', 'cancelado'].includes(task.status));
+    const followups = activeLeads.filter((lead) => lead.next_followup_at && new Date(lead.next_followup_at).getTime() <= now && !terminalStatuses.includes(lead.status));
+    return {
+      leads: activeLeads.filter((lead) => ['Nuevo', 'No Contactado'].includes(lead.status)).length,
+      followups: followups.length,
+      agenda: appointments.filter((appointment) => appointment.appointment_date === today && APPOINTMENT_ACTIVE_STATUSES.includes(appointment.status)).length,
+      tasks: openTasks.filter((task) => !task.due_at || new Date(task.due_at).getTime() <= now).length,
+    };
+  }, [activeLeads, appointments, tasks]);
   const publicFormRoute = getPublicFormRoute();
 
   useEffect(() => {
-    if (activeView === 'settings' && !canAdmin) {
+    if (['settings', 'metrics'].includes(activeView) && !canAdmin) {
       setActiveView('dashboard');
     }
   }, [activeView, canAdmin]);
@@ -508,7 +596,7 @@ export default function App() {
     if (!clinicId) return;
     setError('');
 
-    const [leadsResult, appointmentsResult, tasksResult, profilesResult] = await Promise.all([
+    const [leadsResult, appointmentsResult, tasksResult, profilesResult, settingsResult, pricesResult] = await Promise.all([
       supabase
         .from('leads')
         .select('*')
@@ -531,9 +619,19 @@ export default function App() {
         .eq('clinic_id', clinicId)
         .eq('active', true)
         .order('full_name', { ascending: true }),
+      supabase
+        .from('clinic_settings')
+        .select('*')
+        .eq('clinic_id', clinicId)
+        .maybeSingle(),
+      supabase
+        .from('treatment_prices')
+        .select('treatment, estimated_price')
+        .eq('clinic_id', clinicId)
+        .order('treatment', { ascending: true }),
     ]);
 
-    const firstError = leadsResult.error || appointmentsResult.error || tasksResult.error || profilesResult.error;
+    const firstError = leadsResult.error || appointmentsResult.error || tasksResult.error || profilesResult.error || settingsResult.error || pricesResult.error;
     if (firstError) {
       console.error('Error loading clinic data', firstError);
       setError(firstError.message);
@@ -544,6 +642,8 @@ export default function App() {
     setAppointments(appointmentsResult.data || []);
     setTasks(tasksResult.data || []);
     setClinicProfiles(profilesResult.data || []);
+    setClinicSettings(settingsResult.data || null);
+    setTreatmentPrices(pricesResult.data || []);
   }
 
   async function loadLeadEvents(leadId) {
@@ -591,6 +691,27 @@ export default function App() {
       }
 
       openAppointmentModal(before);
+      return;
+    }
+
+    if (statusChanged && patch.status !== 'Tratamiento Iniciado') {
+      const taskConfig = taskConfigForLeadStatus({ ...before, ...leadPatch }, patch.status);
+      const workflowSaved = await saveLeadFollowup(before, {
+        status: patch.status,
+        nextAction: patch.next_action || taskConfig?.title || before?.next_action || 'Definir próximo paso',
+        dueAt: patch.next_followup_at || taskConfig?.due_at || before?.next_followup_at || tomorrowFollowupAsuncion(),
+      });
+
+      if (!workflowSaved) return;
+
+      if (Object.prototype.hasOwnProperty.call(patch, 'notes')) {
+        const { error: notesError } = await supabase
+          .from('leads')
+          .update({ notes: cleanOptionalText(patch.notes) })
+          .eq('id', leadId)
+          .eq('clinic_id', profile.clinic_id);
+        if (notesError) setError(`El flujo se guardó, pero no se pudo actualizar la nota: ${notesError.message}`);
+      }
       return;
     }
 
@@ -740,6 +861,45 @@ export default function App() {
     return { error: null };
   }
 
+  async function saveLeadFollowup(lead, { status = null, nextAction = null, dueAt }) {
+    if (!profile?.clinic_id || !lead?.id || !dueAt) return false;
+
+    setError('');
+    setNotice('');
+    const { error: followupError } = await supabase.rpc('save_lead_followup', {
+      p_lead_id: lead.id,
+      p_status: status,
+      p_next_action: nextAction,
+      p_next_followup_at: dueAt,
+    });
+
+    if (followupError) {
+      console.error('Error saving lead follow-up', followupError);
+      setError(followupError.message || 'No se pudo guardar el seguimiento.');
+      return false;
+    }
+
+    await refreshClinicData();
+    if (selectedLeadId === lead.id) await loadLeadEvents(lead.id);
+    setNotice(status ? 'Contacto registrado y próximo seguimiento creado.' : 'Seguimiento pospuesto sin perder la tarea.');
+    return true;
+  }
+
+  async function markLeadContacted(lead) {
+    await saveLeadFollowup(lead, {
+      status: 'Contactado',
+      nextAction: 'Hacer seguimiento',
+      dueAt: tomorrowFollowupAsuncion(),
+    });
+  }
+
+  async function postponeLeadFollowup(lead, days = 1) {
+    await saveLeadFollowup(lead, {
+      nextAction: lead.next_action || 'Hacer seguimiento',
+      dueAt: addDaysAsuncion(days, 9),
+    });
+  }
+
   function openCreateLeadModal() {
     setError('');
     setLeadModal({ mode: 'create', lead: null });
@@ -762,18 +922,18 @@ export default function App() {
     setArchiveModal(lead);
   }
 
-  async function saveLeadForm(form) {
+  async function saveLeadForm(form, options = {}) {
     if (!leadModal) return;
 
     if (leadModal.mode === 'create') {
-      await createManualLead(form);
+      await createManualLead(form, options);
       return;
     }
 
     await saveLeadEdit(leadModal.lead, form);
   }
 
-  async function createManualLead(form) {
+  async function createManualLead(form, { scheduleAfterSave = false } = {}) {
     if (!profile?.clinic_id) {
       throw new Error('Tu usuario no tiene una clínica activa asignada.');
     }
@@ -825,9 +985,14 @@ export default function App() {
       setSelectedLeadId(createdLead.id);
       await loadLeadEvents(createdLead.id);
       setLeadModal(null);
-      setActiveView('lead-detail');
+      if (scheduleAfterSave) {
+        setActiveView('agenda');
+        openAppointmentModal(createdLead);
+      } else {
+        setActiveView('lead-detail');
+      }
 
-      setNotice('Lead creado manualmente. Evento y tarea registrados.');
+      setNotice(scheduleAfterSave ? 'Lead creado. Elegí un horario para agendarlo.' : 'Lead creado y tarea de seguimiento generada.');
     } finally {
       setLeadFormSaving(false);
     }
@@ -883,6 +1048,38 @@ export default function App() {
 
       setLeadModal(null);
       openAppointmentModal({ ...lead, ...patchWithoutStatus });
+      return;
+    }
+
+    const receptionistWorkflowChanged = statusChanged
+      || patch.next_action !== lead.next_action
+      || patch.next_followup_at !== lead.next_followup_at;
+
+    if (!canAdmin && receptionistWorkflowChanged && (!statusChanged || patch.status !== 'Tratamiento Iniciado')) {
+      setLeadFormSaving(true);
+      try {
+        const taskConfig = statusChanged ? taskConfigForLeadStatus({ ...lead, ...patch }, patch.status) : null;
+        const workflowSaved = await saveLeadFollowup(lead, {
+          status: statusChanged ? patch.status : null,
+          nextAction: patch.next_action || taskConfig?.title || lead.next_action || 'Definir próximo paso',
+          dueAt: patch.next_followup_at || taskConfig?.due_at || lead.next_followup_at || tomorrowFollowupAsuncion(),
+        });
+        if (!workflowSaved) return;
+
+        if (Object.prototype.hasOwnProperty.call(patch, 'notes')) {
+          const { error: notesError } = await supabase
+            .from('leads')
+            .update({ notes: patch.notes })
+            .eq('id', lead.id)
+            .eq('clinic_id', profile.clinic_id);
+          if (notesError) throw new Error(notesError.message);
+          await refreshClinicData();
+        }
+        setLeadModal(null);
+        setNotice('Lead actualizado y seguimiento sincronizado.');
+      } finally {
+        setLeadFormSaving(false);
+      }
       return;
     }
 
@@ -989,13 +1186,13 @@ export default function App() {
     }
   }
 
-  function openCreateTaskModal() {
+  function openCreateTaskModal(lead = null) {
     if (!canAdmin) {
       setError('Solo un admin puede crear tareas manuales.');
       return;
     }
 
-    setTaskModal({ mode: 'create', task: null });
+    setTaskModal({ mode: 'create', task: null, leadId: lead?.id || '' });
   }
 
   function openEditTaskModal(task) {
@@ -1094,7 +1291,7 @@ export default function App() {
       }
 
       setPublicFormConfig(result.data || null);
-      setNotice('Configuracion de landing guardada.');
+      setNotice('Configuración de landing guardada.');
     } finally {
       setPublicFormSaving(false);
     }
@@ -1235,12 +1432,35 @@ export default function App() {
   }
 
   return (
-    <AppLayout activeView={activeView} setActiveView={setActiveView} clinic={clinic} profile={profile} isAdmin={canAdmin} onLogout={handleLogout}>
+    <AppLayout activeView={activeView} setActiveView={setActiveView} clinic={clinic} profile={profile} isAdmin={canAdmin} navCounts={navCounts} onLogout={handleLogout}>
       {error ? <Banner tone="danger" text={error} onClose={() => setError('')} /> : null}
       {notice ? <Banner tone="mint" text={notice} onClose={() => setNotice('')} /> : null}
 
-      {activeView === 'dashboard' ? <Dashboard leads={activeLeads} appointments={appointments} /> : null}
-      {activeView === 'today' ? <TodayPriority leads={activeLeads} onOpenLead={handleLeadSelect} /> : null}
+      {activeView === 'dashboard' ? (
+        <Dashboard
+          leads={activeLeads}
+          appointments={appointments}
+          tasks={tasks}
+          onCreateLead={openCreateLeadModal}
+          onOpenLead={handleLeadSelect}
+          onScheduleAppointment={openAppointmentModal}
+          onCompleteTask={completeTask}
+          onNavigate={setActiveView}
+        />
+      ) : null}
+      {activeView === 'followups' ? (
+        <FollowupsView
+          leads={activeLeads}
+          tasks={tasks}
+          profiles={clinicProfiles}
+          onOpenLead={handleLeadSelect}
+          onEditLead={openEditLeadModal}
+          onMarkContacted={markLeadContacted}
+          onScheduleAppointment={openAppointmentModal}
+          onCompleteTask={completeTask}
+          onPostpone={postponeLeadFollowup}
+        />
+      ) : null}
       {activeView === 'leads' ? (
         <LeadsView
           leads={leads}
@@ -1251,6 +1471,9 @@ export default function App() {
           onOpenLead={handleLeadSelect}
           onUpdateLead={updateLead}
           onScheduleAppointment={openAppointmentModal}
+          onCreateTask={openCreateTaskModal}
+          onMarkContacted={markLeadContacted}
+          profiles={clinicProfiles}
           setNotice={setNotice}
         />
       ) : null}
@@ -1263,15 +1486,26 @@ export default function App() {
           onEditLead={openEditLeadModal}
           onArchiveLead={openArchiveLeadModal}
           onSave={updateLead}
+          onMarkContacted={markLeadContacted}
           onScheduleAppointment={openAppointmentModal}
           setNotice={setNotice}
         />
       ) : null}
       {activeView === 'agenda' ? (
-        <AgendaView appointments={appointments} actionId={appointmentActionId} onOutcome={updateAppointmentOutcome} onReschedule={openRescheduleModal} />
+        <AgendaView
+          appointments={appointments}
+          actionId={appointmentActionId}
+          onOutcome={updateAppointmentOutcome}
+          onReschedule={openRescheduleModal}
+          onOpenLead={handleLeadSelect}
+          onNavigate={setActiveView}
+        />
       ) : null}
       {activeView === 'tasks' ? (
-        <TasksView tasks={tasks} leads={activeLeads} canAdmin={canAdmin} onCreateTask={openCreateTaskModal} onEditTask={openEditTaskModal} onComplete={completeTask} />
+        <TasksView tasks={tasks} leads={activeLeads} canAdmin={canAdmin} onCreateTask={openCreateTaskModal} onEditTask={openEditTaskModal} onComplete={completeTask} onOpenLead={handleLeadSelect} />
+      ) : null}
+      {activeView === 'metrics' && canAdmin ? (
+        <MetricsView leads={activeLeads} appointments={appointments} tasks={tasks} treatmentPrices={treatmentPrices} />
       ) : null}
       {activeView === 'settings' && canAdmin ? (
         <SettingsView clinic={clinic} profile={profile} publicFormConfig={publicFormConfig} savingPublicForm={publicFormSaving} onSavePublicForm={savePublicFormConfig} setNotice={setNotice} />
@@ -1281,6 +1515,9 @@ export default function App() {
           clinic={clinic}
           lead={appointmentModal.lead}
           appointment={appointmentModal.appointment}
+          appointments={appointments}
+          profiles={clinicProfiles}
+          clinicSettings={clinicSettings}
           mode={appointmentModal.mode}
           saving={appointmentSaving}
           onClose={() => setAppointmentModal(null)}
@@ -1294,6 +1531,7 @@ export default function App() {
           canAdmin={canAdmin}
           profiles={clinicProfiles}
           currentUserId={profile?.id}
+          treatmentOptions={getTreatmentOptions(clinicSettings, treatmentPrices)}
           saving={leadFormSaving}
           onClose={() => setLeadModal(null)}
           onSubmit={saveLeadForm}
@@ -1304,6 +1542,7 @@ export default function App() {
         <TaskFormModal
           mode={taskModal.mode}
           task={taskModal.task}
+          initialLeadId={taskModal.leadId}
           leads={activeLeads}
           saving={taskFormSaving}
           onClose={() => setTaskModal(null)}
@@ -1412,13 +1651,13 @@ function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
 
   return (
     <main className="min-h-screen bg-ink px-4 py-6 text-cream">
-      <form className="mx-auto max-w-2xl rounded-lg border border-white/10 bg-panel p-5 shadow-glow" onSubmit={handleSubmit}>
+      <form className="mx-auto max-w-2xl rounded-3xl border border-slate-200 bg-white p-5 shadow-glow" onSubmit={handleSubmit}>
         <div className="mb-5 border-b border-white/10 pb-4">
           <p className="text-xs uppercase tracking-[0.2em] text-mint">{clinicSlug}</p>
           <h1 className="mt-1 text-2xl font-semibold">Solicitar consulta</h1>
         </div>
 
-        {error ? <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-red-100">{error}</div> : null}
+        {error ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
         {success ? <div className="mb-4 rounded-lg border border-mint/40 bg-mint/10 p-3 text-sm text-mint">{success}</div> : null}
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -1445,7 +1684,7 @@ function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
           </p>
         </div>
 
-        <button className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-mint px-4 py-3 font-semibold text-ink hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={sending}>
+        <button className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-mint px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={sending}>
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon />}
           Enviar consulta
         </button>
@@ -1461,141 +1700,273 @@ function SendIcon() {
 function FullScreenLoader({ label }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-ink text-cream">
-      <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-panel px-5 py-4">
-        <Loader2 className="h-5 w-5 animate-spin text-mint" />
-        {label}
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-glow">
+        <div className="flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin text-mint" /><span className="text-sm font-semibold">{label}</span></div>
+        <div className="mt-5 space-y-3" aria-hidden="true"><div className="skeleton h-3 w-2/3 rounded-full" /><div className="skeleton h-16 w-full rounded-xl" /><div className="grid grid-cols-2 gap-3"><div className="skeleton h-14 rounded-xl" /><div className="skeleton h-14 rounded-xl" /></div></div>
       </div>
     </main>
   );
 }
 
 function Banner({ text, tone, onClose }) {
-  const styles = tone === 'danger' ? 'border-danger/40 bg-danger/10 text-red-100' : 'border-mint/40 bg-mint/10 text-mint';
+  const styles = tone === 'danger' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+
+  useEffect(() => {
+    if (tone === 'danger') return undefined;
+    const timeout = window.setTimeout(onClose, 4500);
+    return () => window.clearTimeout(timeout);
+  }, [text, tone, onClose]);
 
   return (
-    <div className={`mb-5 flex items-center justify-between gap-4 rounded-lg border p-3 text-sm ${styles}`}>
-      <span>{text}</span>
-      <button className="text-xs opacity-75 hover:opacity-100" type="button" onClick={onClose}>
-        Cerrar
-      </button>
+    <div className={`modal-enter fixed right-4 top-4 z-[70] flex max-w-md items-center justify-between gap-4 rounded-2xl border p-4 text-sm font-medium shadow-xl ${styles}`} role={tone === 'danger' ? 'alert' : 'status'}>
+      <span className="flex items-center gap-2">{tone === 'danger' ? <Ban className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}{text}</span>
+      <button className="rounded-lg p-1 opacity-70 hover:bg-white/50 hover:opacity-100" type="button" onClick={onClose} aria-label="Cerrar mensaje"><X className="h-4 w-4" /></button>
     </div>
   );
 }
 
-function Dashboard({ leads, appointments }) {
-  const metrics = useMemo(() => {
+function Dashboard({ leads, appointments, tasks, onCreateLead, onOpenLead, onScheduleAppointment, onCompleteTask, onNavigate }) {
+  const data = useMemo(() => {
+    const now = Date.now();
     const today = todayIsoDate();
-    const totalLeads = leads.length;
     const newToday = leads.filter((lead) => toLocalIsoDate(lead.created_at) === today).length;
-    const hotLeads = leads.filter((lead) => lead.classification === 'Lead Caliente').length;
-    const noContact = leads.filter((lead) => ['Nuevo', 'No Contactado'].includes(lead.status) && !lead.last_contact_at).length;
-    const scheduledAppointments = appointments.filter((appointment) => APPOINTMENT_ACTIVE_STATUSES.includes(appointment.status)).length;
-    const pipeline = leads.reduce((sum, lead) => sum + Number(lead.estimated_value || 0), 0);
-    const contacted = leads.filter((lead) => CONTACTED_STATUSES.includes(lead.status) || lead.last_contact_at).length;
-    const scheduledLeads = leads.filter((lead) => SCHEDULED_STATUSES.includes(lead.status)).length;
+    const hotPending = leads.filter((lead) => lead.classification === 'Lead Caliente' && ['Nuevo', 'No Contactado'].includes(lead.status) && !lead.last_contact_at);
+    const overdueFollowups = leads.filter((lead) => lead.next_followup_at && new Date(lead.next_followup_at).getTime() < now && !terminalStatuses.includes(lead.status));
+    const todayAppointments = appointments.filter((appointment) => appointment.appointment_date === today && APPOINTMENT_ACTIVE_STATUSES.includes(appointment.status));
+    const overdueTasks = tasks.filter((task) => isOpenTask(task) && task.due_at && new Date(task.due_at).getTime() < now);
+    const noShows = appointments.filter((appointment) => appointment.status === APPOINTMENT_STATUS.noShow);
+    const unassigned = leads.filter((lead) => !lead.assigned_to && !terminalStatuses.includes(lead.status));
+    const responseTimes = leads
+      .filter((lead) => lead.created_at && lead.last_contact_at)
+      .map((lead) => Math.max(0, new Date(lead.last_contact_at) - new Date(lead.created_at)) / 60000)
+      .filter((minutes) => Number.isFinite(minutes));
+    const averageMinutes = responseTimes.length ? Math.round(responseTimes.reduce((sum, value) => sum + value, 0) / responseTimes.length) : null;
 
-    return {
-      totalLeads,
-      newToday,
-      hotLeads,
-      noContact,
-      scheduledAppointments,
-      pipeline,
-      contactRate: totalLeads ? Math.round((contacted / totalLeads) * 100) : 0,
-      scheduleRate: totalLeads ? Math.round((scheduledLeads / totalLeads) * 100) : 0,
-    };
-  }, [leads, appointments]);
+    const priority = [
+      ...hotPending.map((lead) => ({ id: `hot-${lead.id}`, rank: 1, title: lead.name, detail: `Lead caliente sin contactar · ${lead.treatment || 'Tratamiento sin definir'}`, label: 'Ver lead', icon: Flame, tone: 'red', onClick: () => onOpenLead(lead.id) })),
+      ...overdueFollowups.map((lead) => ({ id: `followup-${lead.id}`, rank: 2, title: lead.name, detail: `${lead.next_action || 'Seguimiento pendiente'} · ${formatDateTime(lead.next_followup_at)}`, label: 'Contactar', icon: AlarmClock, tone: 'amber', onClick: () => onOpenLead(lead.id) })),
+      ...todayAppointments.map((appointment) => ({ id: `appointment-${appointment.id}`, rank: 3, title: appointment.leads?.name || 'Cita de hoy', detail: `${formatTime(appointment.appointment_time)} · ${appointment.doctor_assigned}`, label: 'Ver cita', icon: CalendarCheck2, tone: 'blue', onClick: () => onNavigate('agenda') })),
+      ...noShows.slice(0, 3).map((appointment) => ({ id: `noshow-${appointment.id}`, rank: 4, title: appointment.leads?.name || 'No-show', detail: 'No asistió. Recuperar y ofrecer reprogramación.', label: 'Reagendar', icon: RefreshCw, tone: 'red', onClick: () => onRescheduleSafe(appointment, onOpenLead) })),
+      ...overdueTasks.map((task) => ({ id: `task-${task.id}`, rank: 5, title: task.title, detail: task.leads?.name || 'Tarea sin lead asociado', label: 'Completar tarea', icon: CheckCircle2, tone: 'slate', onClick: () => onCompleteTask(task.id) })),
+    ].sort((a, b) => a.rank - b.rank).slice(0, 10);
+
+    return { newToday, hotPending, overdueFollowups, todayAppointments, overdueTasks, noShows, unassigned, averageMinutes, priority };
+  }, [leads, appointments, tasks, onCompleteTask, onNavigate, onOpenLead]);
 
   return (
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Leads totales" value={metrics.totalLeads} />
-      <StatCard label="Leads nuevos hoy" value={metrics.newToday} tone="gold" />
-      <StatCard label="Leads calientes" value={metrics.hotLeads} tone="danger" />
-      <StatCard label="No contactados" value={metrics.noContact} tone="cream" />
-      <StatCard label="Consultas agendadas" value={metrics.scheduledAppointments} />
-      <StatCard label="Pipeline potencial" value={formatMoney(metrics.pipeline)} tone="gold" />
-      <StatCard label="Tasa de contacto" value={`${metrics.contactRate}%`} />
-      <StatCard label="Tasa de agendamiento" value={`${metrics.scheduleRate}%`} tone="gold" />
+    <section className="space-y-6">
+      <PageHeader
+        eyebrow="Prioridad de hoy"
+        title="¿Qué necesita atención ahora?"
+        subtitle="Estas son las oportunidades y tareas que conviene resolver primero."
+        action={<Button type="button" onClick={onCreateLead}><FilePlus className="h-4 w-4" />Nuevo lead</Button>}
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Leads nuevos hoy" value={data.newToday} icon={UsersRound} detail="Ingresados desde cualquier fuente" />
+        <StatCard label="Calientes pendientes" value={data.hotPending.length} tone="danger" icon={Flame} detail="Sin primer contacto registrado" />
+        <StatCard label="Seguimientos vencidos" value={data.overdueFollowups.length} tone="gold" icon={AlarmClock} detail="Requieren acción inmediata" />
+        <StatCard label="Citas de hoy" value={data.todayAppointments.length} tone="purple" icon={CalendarCheck2} detail="Agendadas, confirmadas o reprogramadas" />
+        <StatCard label="Tareas vencidas" value={data.overdueTasks.length} tone="danger" icon={CheckCircle2} />
+        <StatCard label="No-shows a recuperar" value={data.noShows.length} tone="gold" icon={RefreshCw} />
+        <StatCard label="Respuesta promedio" value={data.averageMinutes === null ? 'Sin datos' : data.averageMinutes < 60 ? `${data.averageMinutes} min` : `${Math.round(data.averageMinutes / 60)} h`} icon={Clock3} detail="Desde creación hasta primer contacto" />
+        <StatCard label="Sin responsable" value={data.unassigned.length} tone="cream" icon={UserRound} />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[1.45fr_0.55fr]">
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+            <div>
+              <h3 className="font-bold text-cream">Prioridad de hoy</h3>
+              <p className="mt-1 text-sm text-slate-500">Resolvé la lista de arriba hacia abajo.</p>
+            </div>
+            <Button variant="ghost" size="sm" type="button" onClick={() => onNavigate('followups')}>Ver seguimientos</Button>
+          </div>
+          {data.priority.length ? (
+            <div className="divide-y divide-slate-100">
+              {data.priority.map((item) => {
+                const Icon = item.icon;
+                const tone = item.tone === 'red' ? 'bg-red-50 text-red-600' : item.tone === 'amber' ? 'bg-amber-50 text-amber-700' : item.tone === 'blue' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600';
+                return (
+                  <div key={item.id} className="flex flex-col gap-3 px-5 py-4 transition hover:bg-slate-50 sm:flex-row sm:items-center">
+                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon className="h-4 w-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-cream">{item.title}</p>
+                      <p className="mt-1 truncate text-sm text-slate-500">{item.detail}</p>
+                    </div>
+                    <Button variant="secondary" size="sm" type="button" onClick={item.onClick}>{item.label}</Button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : <div className="p-5"><EmptyState title="Todo al día" text="No hay prioridades vencidas ni leads calientes esperando contacto." /></div>}
+        </Card>
+
+        <Card className="p-5">
+          <h3 className="font-bold text-cream">Acciones rápidas</h3>
+          <p className="mt-1 text-sm text-slate-500">Los atajos más usados por recepción.</p>
+          <div className="mt-5 grid gap-2">
+            <Button type="button" onClick={onCreateLead}><FilePlus className="h-4 w-4" />Registrar nuevo lead</Button>
+            <Button variant="secondary" type="button" onClick={() => onNavigate('followups')}><AlarmClock className="h-4 w-4" />Trabajar seguimientos</Button>
+            <Button variant="secondary" type="button" onClick={() => onNavigate('agenda')}><CalendarDays className="h-4 w-4" />Revisar agenda</Button>
+          </div>
+          <div className="mt-5 rounded-2xl bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+            <strong>Regla operativa:</strong> ningún lead caliente debería terminar el día sin contacto o próxima acción.
+          </div>
+        </Card>
+      </div>
     </section>
   );
 }
 
-function TodayPriority({ leads, onOpenLead }) {
-  const groups = useMemo(() => {
+function onRescheduleSafe(appointment, onOpenLead) {
+  if (appointment?.lead_id) onOpenLead(appointment.lead_id);
+}
+
+function FollowupsView({ leads, tasks, profiles, onOpenLead, onEditLead, onMarkContacted, onScheduleAppointment, onCompleteTask, onPostpone }) {
+  const [filters, setFilters] = useState({ assigned: '', classification: '', source: '', treatment: '', status: '', window: 'all' });
+  const profileNames = useMemo(() => Object.fromEntries((profiles || []).map((profile) => [profile.id, profile.full_name])), [profiles]);
+  const treatmentOptions = useMemo(() => uniqueStrings(leads.map((lead) => lead.treatment)).sort(), [leads]);
+  const sourceOptions = useMemo(() => uniqueStrings(leads.map((lead) => lead.source)).sort(), [leads]);
+  const items = useMemo(() => {
     const now = Date.now();
     const today = todayIsoDate();
-    const isUncontacted = (lead) => ['Nuevo', 'No Contactado'].includes(lead.status) && !lead.last_contact_at;
-    const byUpdated = (a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at);
-    const hasUrgencyToday = (lead) => normalizeText(`${lead.urgency} ${lead.next_action}`).includes('hoy') || toLocalIsoDate(lead.next_followup_at) === today;
-    const hasPainOrUrgency = (lead) => normalizeText(`${lead.urgency} ${lead.situation} ${lead.consultation_reason}`).match(/dolor|urgencia|molestia/);
-    const hasOverdueFollowup = (lead) => lead.next_followup_at && new Date(lead.next_followup_at).getTime() <= now && !terminalStatuses.includes(lead.status);
+    const inSevenDays = startOfAsuncionDate(7).getTime();
 
-    return [
-      {
-        title: 'Leads calientes no contactados',
-        items: leads.filter((lead) => lead.classification === 'Lead Caliente' && isUncontacted(lead)).sort(byUpdated),
-      },
-      {
-        title: 'Urgencia hoy',
-        items: leads.filter((lead) => hasUrgencyToday(lead) && !terminalStatuses.includes(lead.status)).sort(byUpdated),
-      },
-      {
-        title: 'Dolor o urgencia',
-        items: leads.filter(hasPainOrUrgency).sort(byUpdated),
-      },
-      {
-        title: 'Proximo seguimiento vencido',
-        items: leads.filter(hasOverdueFollowup).sort((a, b) => new Date(a.next_followup_at) - new Date(b.next_followup_at)),
-      },
-      {
-        title: 'Leads de implantes',
-        items: leads.filter((lead) => normalizeText(lead.treatment).includes('implante')).sort(byUpdated),
-      },
-      {
-        title: 'Contactados pero no agendados',
-        items: leads.filter((lead) => ['Contactado', 'Respondió', 'Presupuesto Enviado'].includes(lead.status)).sort(byUpdated),
-      },
-    ];
-  }, [leads]);
+    return leads.flatMap((lead) => {
+      if (terminalStatuses.includes(lead.status)) return [];
+      const leadTasks = tasks.filter((task) => task.lead_id === lead.id && isOpenTask(task));
+      const nextTask = leadTasks.sort((a, b) => new Date(a.due_at || 8640000000000000) - new Date(b.due_at || 8640000000000000))[0] || null;
+      const due = lead.next_followup_at || nextTask?.due_at || null;
+      const dueMs = due ? new Date(due).getTime() : null;
+      const isHotUncontacted = lead.classification === 'Lead Caliente' && ['Nuevo', 'No Contactado'].includes(lead.status) && !lead.last_contact_at;
+      const isNewStale = ['Nuevo', 'No Contactado'].includes(lead.status) && new Date(lead.created_at).getTime() < now - 2 * 3600000;
+      const isContactedUnscheduled = ['Contactado', 'Respondió', 'Presupuesto Enviado', 'No Respondió'].includes(lead.status);
+      const isNoShow = lead.status === LEAD_STATUS.noShow;
+      const isUnassigned = !lead.assigned_to;
+      if (!due && !nextTask && !isHotUncontacted && !isNewStale && !isContactedUnscheduled && !isNoShow && !isUnassigned) return [];
+
+      let bucket = 'Sin respuesta';
+      if (isNoShow) bucket = 'No-shows';
+      else if (dueMs && dueMs < now) bucket = 'Vencidos';
+      else if (due && toLocalIsoDate(due) === today) bucket = 'Para hoy';
+      else if (dueMs && dueMs <= inSevenDays) bucket = 'Próximos 7 días';
+
+      let reason = lead.next_action || 'Definir próxima acción';
+      if (isHotUncontacted) reason = `Lead caliente sin contactar desde hace ${Math.max(1, Math.round((now - new Date(lead.created_at).getTime()) / 3600000))} h.`;
+      else if (isNoShow) reason = 'No asistió. Reagendar y recuperar hoy.';
+      else if (dueMs && dueMs < now) reason = `${lead.next_action || nextTask?.title || 'Seguimiento'} · vencido hace ${daysBetween(due) ? `${daysBetween(due)} d` : 'menos de 1 día'}.`;
+      else if (isContactedUnscheduled) reason = `${lead.status}: falta concretar el próximo paso.`;
+      else if (isUnassigned) reason = 'Oportunidad sin responsable asignado.';
+
+      return [{ lead, task: nextTask, due, bucket, reason, rank: bucket === 'Vencidos' ? 1 : bucket === 'Para hoy' ? 2 : bucket === 'Próximos 7 días' ? 3 : bucket === 'No-shows' ? 4 : 5 }];
+    })
+      .filter((item) => {
+        const { lead, due } = item;
+        if (filters.assigned && lead.assigned_to !== filters.assigned) return false;
+        if (filters.classification && lead.classification !== filters.classification) return false;
+        if (filters.source && lead.source !== filters.source) return false;
+        if (filters.treatment && lead.treatment !== filters.treatment) return false;
+        if (filters.status && lead.status !== filters.status) return false;
+        if (filters.window === 'overdue' && item.bucket !== 'Vencidos') return false;
+        if (filters.window === 'today' && item.bucket !== 'Para hoy') return false;
+        if (filters.window === 'next7' && item.bucket !== 'Próximos 7 días') return false;
+        if (filters.window === 'hot' && lead.classification !== 'Lead Caliente') return false;
+        return Boolean(due || item.reason);
+      })
+      .sort((a, b) => a.rank - b.rank || new Date(a.due || 8640000000000000) - new Date(b.due || 8640000000000000));
+  }, [leads, tasks, filters]);
+
+  const groups = ['Vencidos', 'Para hoy', 'Próximos 7 días', 'No-shows', 'Sin respuesta'];
 
   return (
-    <div className="space-y-5">
-      {groups.map((group) => (
-        <section key={group.title} className="rounded-lg border border-white/10 bg-panel/80 p-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">{group.title}</h2>
-            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-cream/60">{group.items.length}</span>
-          </div>
-          {group.items.length ? (
-            <div className="grid gap-3 xl:grid-cols-2">
-              {group.items.map((lead) => <LeadMiniCard key={`${group.title}-${lead.id}`} lead={lead} onOpenLead={onOpenLead} />)}
+    <section className="space-y-6">
+      <PageHeader eyebrow="Cola de acción" title="Seguimientos" subtitle="Contactá primero estos leads para evitar que se enfríen." />
+      <Card className="p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-600"><Filter className="h-4 w-4" />Filtrar seguimientos</div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <Select label="Responsable" value={filters.assigned} onChange={(value) => setFilters({ ...filters, assigned: value })} options={(profiles || []).map((profile) => ({ value: profile.id, label: profile.full_name }))} placeholder="Todos" />
+          <Select label="Prioridad" value={filters.classification} onChange={(value) => setFilters({ ...filters, classification: value })} options={CLASSIFICATIONS} placeholder="Todas" />
+          <Select label="Fuente" value={filters.source} onChange={(value) => setFilters({ ...filters, source: value })} options={sourceOptions} placeholder="Todas" />
+          <Select label="Tratamiento" value={filters.treatment} onChange={(value) => setFilters({ ...filters, treatment: value })} options={treatmentOptions} placeholder="Todos" />
+          <Select label="Estado" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={LEAD_STATUSES.filter((status) => status !== ARCHIVED_STATUS)} placeholder="Todos" />
+          <Select label="Cuándo" value={filters.window} onChange={(value) => setFilters({ ...filters, window: value })} options={[{ value: 'all', label: 'Todos' }, { value: 'overdue', label: 'Vencidos' }, { value: 'today', label: 'Para hoy' }, { value: 'next7', label: 'Próximos 7 días' }, { value: 'hot', label: 'Sólo calientes' }]} />
+        </div>
+      </Card>
+
+      {items.length ? groups.map((group) => {
+        const groupItems = items.filter((item) => item.bucket === group);
+        if (!groupItems.length) return null;
+        return (
+          <section key={group} className="space-y-3">
+            <div className="flex items-center gap-3">
+              <h3 className="font-bold text-cream">{group}</h3>
+              <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600">{groupItems.length}</span>
             </div>
-          ) : (
-            <EmptyState title="Sin pendientes en esta categoria" />
-          )}
-        </section>
-      ))}
-    </div>
+            <div className="grid gap-3 xl:grid-cols-2">
+              {groupItems.map(({ lead, task, reason, due }) => (
+                <Card key={`${group}-${lead.id}`} as="article" className="card-enter p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <button className="text-left text-lg font-bold text-cream hover:text-mint" type="button" onClick={() => onOpenLead(lead.id)}>{lead.name}</button>
+                      <p className="mt-1 text-sm font-medium text-slate-600">{reason}</p>
+                      <p className="mt-2 text-xs text-slate-500">{lead.treatment || 'Tratamiento sin definir'} · {lead.source || 'Fuente sin definir'} · {profileNames[lead.assigned_to] || 'Sin responsable'}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2"><StatusBadge value={lead.classification} /><StatusBadge value={lead.status} /></div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <Clock3 className="h-4 w-4 text-mint" /> Próximo seguimiento: {due ? formatDateTime(due) : 'Definir ahora'}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                    <Button size="sm" type="button" onClick={() => onOpenLead(lead.id)}>Abrir lead</Button>
+                    {['Nuevo', 'No Contactado', 'No Respondió'].includes(lead.status) ? <Button size="sm" variant="secondary" type="button" onClick={() => onMarkContacted(lead)}><Check className="h-4 w-4" />Marcar contactado</Button> : null}
+                    <Button size="sm" variant="secondary" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button>
+                    {task ? <Button size="sm" variant="secondary" type="button" onClick={() => onCompleteTask(task.id)}><CheckCircle2 className="h-4 w-4" />Completar tarea</Button> : null}
+                    <select className="min-h-9 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600" defaultValue="" aria-label={`Posponer seguimiento de ${lead.name}`} onChange={(event) => { if (event.target.value) onPostpone(lead, Number(event.target.value)); event.target.value = ''; }}>
+                      <option value="" disabled>Posponer…</option>
+                      <option value="1">Mañana</option><option value="3">En 3 días</option><option value="7">En 7 días</option>
+                    </select>
+                    <Button size="sm" variant="ghost" type="button" onClick={() => onEditLead(lead)}><Edit3 className="h-4 w-4" />Crear nota</Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </section>
+        );
+      }) : <EmptyState title="No hay seguimientos con estos filtros" text="Cuando un lead necesite una acción, aparecerá acá con su recomendación." />}
+    </section>
   );
 }
 
-function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, onArchiveLead, onOpenLead, onUpdateLead, onScheduleAppointment, setNotice }) {
-  const [filters, setFilters] = useState({ status: '', classification: '', treatment: '', q: '', showArchived: false });
-  const treatmentOptions = useMemo(() => [...new Set(leads.map((lead) => lead.treatment).filter(Boolean))].sort(), [leads]);
+function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, onArchiveLead, onOpenLead, onUpdateLead, onScheduleAppointment, onCreateTask, onMarkContacted, profiles, setNotice }) {
+  const [filters, setFilters] = useState({ status: '', classification: '', treatment: '', source: '', assigned: '', date: '', q: '', uncontacted: false, hotOnly: false, showArchived: false, sort: 'recent' });
+  const treatmentOptions = useMemo(() => uniqueStrings(leads.map((lead) => lead.treatment)).sort(), [leads]);
+  const sourceOptions = useMemo(() => uniqueStrings(leads.map((lead) => lead.source)).sort(), [leads]);
+  const profileNames = useMemo(() => Object.fromEntries((profiles || []).map((profile) => [profile.id, profile.full_name])), [profiles]);
   const filteredLeads = useMemo(() => {
     const q = normalizeText(filters.q);
+    const today = todayIsoDate();
+    const now = Date.now();
+    const rows = leads.filter((lead) => {
+      if ((!canAdmin || !filters.showArchived) && isArchivedLead(lead)) return false;
+      if (filters.status && lead.status !== filters.status) return false;
+      if (filters.classification && lead.classification !== filters.classification) return false;
+      if (filters.treatment && lead.treatment !== filters.treatment) return false;
+      if (filters.source && lead.source !== filters.source) return false;
+      if (filters.assigned && lead.assigned_to !== filters.assigned) return false;
+      if (filters.uncontacted && (lead.last_contact_at || !['Nuevo', 'No Contactado'].includes(lead.status))) return false;
+      if (filters.hotOnly && lead.classification !== 'Lead Caliente') return false;
+      if (filters.date === 'today' && toLocalIsoDate(lead.created_at) !== today) return false;
+      if (filters.date === '7d' && new Date(lead.created_at).getTime() < now - 7 * 86400000) return false;
+      if (filters.date === 'month' && toLocalIsoDate(lead.created_at).slice(0, 7) !== today.slice(0, 7)) return false;
+      return !q || normalizeText(`${lead.name} ${lead.phone} ${lead.phone_plus} ${lead.consultation_reason}`).includes(q);
+    });
 
-    return leads.filter((lead) => {
-      if (!canAdmin || !filters.showArchived) {
-        if (isArchivedLead(lead)) return false;
-      }
-
-      const matchesStatus = !filters.status || lead.status === filters.status;
-      const matchesClassification = !filters.classification || lead.classification === filters.classification;
-      const matchesTreatment = !filters.treatment || lead.treatment === filters.treatment;
-      const matchesQuery = !q || normalizeText(`${lead.name} ${lead.phone} ${lead.phone_plus} ${lead.consultation_reason}`).includes(q);
-
-      return matchesStatus && matchesClassification && matchesTreatment && matchesQuery;
+    return rows.sort((a, b) => {
+      if (filters.sort === 'hot') return CLASSIFICATIONS.indexOf(a.classification) - CLASSIFICATIONS.indexOf(b.classification) || new Date(b.created_at) - new Date(a.created_at);
+      if (filters.sort === 'followup') return new Date(a.next_followup_at || 8640000000000000) - new Date(b.next_followup_at || 8640000000000000);
+      if (filters.sort === 'overdue') return Number(Boolean(b.next_followup_at && new Date(b.next_followup_at).getTime() < now)) - Number(Boolean(a.next_followup_at && new Date(a.next_followup_at).getTime() < now));
+      return new Date(b.created_at) - new Date(a.created_at);
     });
   }, [leads, filters, canAdmin]);
 
@@ -1605,124 +1976,87 @@ function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, onArchiveLead, o
   }
 
   return (
-    <section className="space-y-5">
-      <div className="rounded-lg border border-white/10 bg-panel/80 p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Select label="Estado" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={LEAD_STATUSES} placeholder="Todos" />
-          <Select label="Clasificacion" value={filters.classification} onChange={(value) => setFilters({ ...filters, classification: value })} options={CLASSIFICATIONS} placeholder="Todas" />
-          <Select label="Tratamiento" value={filters.treatment} onChange={(value) => setFilters({ ...filters, treatment: value })} options={treatmentOptions} placeholder="Todos" />
-          <label className="block">
-            <span className="mb-2 block text-xs text-cream/55">Buscar</span>
-            <span className="flex items-center gap-2 rounded-lg border border-white/10 bg-ink px-3 py-2">
-              <Search className="h-4 w-4 text-mint" />
-              <input className="w-full bg-transparent text-sm outline-none" value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value })} placeholder="Nombre o telefono" />
+    <section className="space-y-6">
+      <PageHeader eyebrow="Oportunidades" title="Leads" subtitle="Buscá, filtrá y mové cada oportunidad hacia su próxima acción." action={<Button type="button" onClick={onCreateLead}><FilePlus className="h-4 w-4" />Nuevo lead</Button>} />
+      <Card className="p-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <label className="block xl:col-span-2">
+            <span className="mb-2 block text-xs font-semibold text-slate-500">Buscar por nombre o teléfono</span>
+            <span className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 transition focus-within:border-mint focus-within:ring-4 focus-within:ring-blue-50">
+              <Search className="h-4 w-4 text-slate-400" />
+              <input className="w-full bg-transparent text-sm text-cream outline-none placeholder:text-slate-400" value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value })} placeholder="Ej. Laura o 0981…" />
             </span>
           </label>
+          <Select label="Estado comercial" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={LEAD_STATUSES} placeholder="Todos" />
+          <Select label="Clasificación" value={filters.classification} onChange={(value) => setFilters({ ...filters, classification: value })} options={CLASSIFICATIONS} placeholder="Todas" />
+          <Select label="Tratamiento" value={filters.treatment} onChange={(value) => setFilters({ ...filters, treatment: value })} options={treatmentOptions} placeholder="Todos" />
+          <Select label="Fuente" value={filters.source} onChange={(value) => setFilters({ ...filters, source: value })} options={sourceOptions} placeholder="Todas" />
+          <Select label="Responsable" value={filters.assigned} onChange={(value) => setFilters({ ...filters, assigned: value })} options={(profiles || []).map((profile) => ({ value: profile.id, label: profile.full_name }))} placeholder="Todos" />
+          <Select label="Fecha de ingreso" value={filters.date} onChange={(value) => setFilters({ ...filters, date: value })} options={[{ value: 'today', label: 'Hoy' }, { value: '7d', label: 'Últimos 7 días' }, { value: 'month', label: 'Este mes' }]} placeholder="Cualquier fecha" />
         </div>
-
-        <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 md:flex-row md:items-center md:justify-between">
-          {canAdmin ? (
-            <label className="inline-flex items-center gap-2 text-sm text-cream/70">
-              <input
-                className="h-4 w-4 accent-mint"
-                type="checkbox"
-                checked={filters.showArchived}
-                onChange={(event) => setFilters({ ...filters, showArchived: event.target.checked })}
-              />
-              Ver archivados
-            </label>
-          ) : (
-            <span className="text-sm text-cream/45">Los leads archivados no se muestran en vistas operativas.</span>
-          )}
-
-          <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-mint px-4 py-2 text-sm font-semibold text-ink hover:bg-mint/90" type="button" onClick={onCreateLead}>
-            <FilePlus className="h-4 w-4" />
-            Nuevo lead
-          </button>
+        <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap gap-2">
+            <QuickFilter active={filters.uncontacted} onClick={() => setFilters({ ...filters, uncontacted: !filters.uncontacted })}>Sólo sin contactar</QuickFilter>
+            <QuickFilter active={filters.hotOnly} onClick={() => setFilters({ ...filters, hotOnly: !filters.hotOnly })}><Flame className="h-3.5 w-3.5" />Sólo calientes</QuickFilter>
+            {canAdmin ? <QuickFilter active={filters.showArchived} onClick={() => setFilters({ ...filters, showArchived: !filters.showArchived })}><Archive className="h-3.5 w-3.5" />Archivados</QuickFilter> : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <ArrowDownUp className="h-4 w-4 text-slate-400" />
+            <select className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })}>
+              <option value="recent">Más recientes</option><option value="hot">Más calientes</option><option value="followup">Seguimiento más próximo</option><option value="overdue">Más atrasados</option>
+            </select>
+            <span className="text-xs font-semibold text-slate-500">{filteredLeads.length} resultados</span>
+          </div>
         </div>
-      </div>
+      </Card>
 
       {filteredLeads.length ? (
         <div className="grid gap-4 xl:grid-cols-2">
           {filteredLeads.map((lead) => (
-            <article key={lead.id} className="rounded-lg border border-white/10 bg-panel/90 p-4 shadow-glow">
-              <button className="w-full text-left" type="button" onClick={() => onOpenLead(lead.id)}>
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-cream">{lead.name}</h3>
-                    <p className="mt-1 flex items-center gap-2 text-sm text-cream/55">
-                      <Phone className="h-4 w-4 text-mint" />
-                      {lead.phone_plus || lead.phone || 'Sin telefono'}
-                    </p>
+            <Card key={lead.id} as="article" className="card-enter overflow-hidden">
+              <button className="w-full p-5 text-left transition hover:bg-slate-50" type="button" onClick={() => onOpenLead(lead.id)}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-bold text-cream">{lead.name}</h3>
+                    <p className="mt-1 flex items-center gap-2 text-sm text-slate-500"><Phone className="h-4 w-4 text-mint" />{lead.phone_plus || lead.phone || 'Sin teléfono'}</p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <StatusBadge value={lead.classification} />
-                    <StatusBadge value={lead.status} />
-                  </div>
+                  <div className="flex flex-wrap gap-2"><StatusBadge value={lead.classification} /><StatusBadge value={lead.status} /></div>
                 </div>
-
-                <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
-                  <Info label="Tratamiento" value={lead.treatment || 'Sin dato'} />
-                  <Info label="Urgencia" value={lead.urgency || 'Sin dato'} />
-                  <Info label="Score" value={lead.score} />
-                  <Info label="Proxima accion" value={lead.next_action || 'Sin definir'} />
-                  <Info label="Valor estimado" value={formatMoney(lead.estimated_value)} />
-                  <Info label="Seguimiento" value={lead.next_followup_at ? formatDateTime(lead.next_followup_at) : 'Sin fecha'} />
+                <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                  <Info label="Tratamiento" value={lead.treatment || 'Sin definir'} />
+                  <Info label="Fuente" value={lead.source || 'Sin definir'} />
+                  <Info label="Responsable" value={profileNames[lead.assigned_to] || 'Sin responsable'} />
+                  <Info label="Próxima acción" value={lead.next_action || 'Definir acción'} />
+                  <Info label="Próximo seguimiento" value={lead.next_followup_at ? formatDateTime(lead.next_followup_at) : 'Sin fecha'} />
+                  <Info label="Último contacto" value={lead.last_contact_at ? formatDateTime(lead.last_contact_at) : 'Todavía no contactado'} />
                 </div>
               </button>
-
-              <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
-                <Info label="Motivo consulta" value={displayConsultationReason(lead)} />
-                <Info label="Situacion" value={lead.situation || 'Sin dato'} />
-                <Info label="Fuente" value={lead.source || 'Sin dato'} />
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4">
-                <a className="inline-flex items-center gap-2 rounded-lg bg-mint px-3 py-2 text-sm font-semibold text-ink hover:bg-mint/90" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                  Abrir WhatsApp
-                </a>
-                <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-cream/80 hover:bg-white/5" type="button" onClick={() => copyMessage(lead)}>
-                  <Clipboard className="h-4 w-4" />
-                  Copiar mensaje
-                </button>
-                <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-cream/80 hover:bg-white/5" type="button" onClick={() => onEditLead(lead)}>
-                  <Edit3 className="h-4 w-4" />
-                  Editar
-                </button>
-                <select
-                  className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream"
-                  value={lead.status}
-                  onChange={(event) => {
-                    const nextStatus = event.target.value;
-                    if (nextStatus === LEAD_STATUS.scheduled && nextStatus !== lead.status) {
-                      onScheduleAppointment(lead);
-                      return;
-                    }
-
-                    onUpdateLead(lead.id, { status: nextStatus });
-                  }}
-                >
+              <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/60 p-4">
+                <Button size="sm" type="button" onClick={() => onOpenLead(lead.id)}>Ver detalle</Button>
+                {['Nuevo', 'No Contactado', 'No Respondió'].includes(lead.status) ? <Button size="sm" variant="secondary" type="button" onClick={() => onMarkContacted(lead)}><Check className="h-4 w-4" />Contactado</Button> : null}
+                <Button size="sm" variant="secondary" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button>
+                <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a>
+                <Button size="sm" variant="ghost" type="button" onClick={() => copyMessage(lead)}><Clipboard className="h-4 w-4" />Copiar mensaje</Button>
+                {canAdmin ? <Button size="sm" variant="ghost" type="button" onClick={() => onCreateTask(lead)}><Plus className="h-4 w-4" />Crear tarea</Button> : null}
+                <Button size="sm" variant="ghost" type="button" onClick={() => onEditLead(lead)}><Edit3 className="h-4 w-4" />Editar</Button>
+                <select className="min-h-9 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600" value={lead.status} aria-label={`Estado comercial de ${lead.name}`} onChange={(event) => { const nextStatus = event.target.value; if (nextStatus === LEAD_STATUS.scheduled && nextStatus !== lead.status) onScheduleAppointment(lead); else onUpdateLead(lead.id, { status: nextStatus }); }}>
                   {LEAD_STATUSES.filter((status) => status !== ARCHIVED_STATUS).map((status) => <option key={status}>{status}</option>)}
                 </select>
-                {canAdmin && !isArchivedLead(lead) ? (
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-danger/40 px-3 py-2 text-sm text-red-100 hover:bg-danger/10" type="button" onClick={() => onArchiveLead(lead)}>
-                    <Archive className="h-4 w-4" />
-                    Archivar
-                  </button>
-                ) : null}
+                {canAdmin && !isArchivedLead(lead) ? <Button size="sm" variant="danger" type="button" onClick={() => onArchiveLead(lead)}><Archive className="h-4 w-4" />Archivar</Button> : null}
               </div>
-            </article>
+            </Card>
           ))}
         </div>
-      ) : (
-        <EmptyState title="No hay leads para estos filtros" text="Ajusta los filtros o verifica que el usuario tenga datos visibles por RLS." />
-      )}
+      ) : <EmptyState title="No hay leads para estos filtros" text="Quitá uno o más filtros o registrá una nueva oportunidad." action={<Button type="button" onClick={onCreateLead}>Nuevo lead</Button>} />}
     </section>
   );
 }
 
-function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchiveLead, onSave, onScheduleAppointment, setNotice }) {
+function QuickFilter({ active, onClick, children }) {
+  return <button className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition ${active ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`} type="button" onClick={onClick}>{children}</button>;
+}
+
+function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchiveLead, onSave, onMarkContacted, onScheduleAppointment, setNotice }) {
   const [form, setForm] = useState(null);
 
   useEffect(() => {
@@ -1765,27 +2099,27 @@ function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchiveLead,
 
   return (
     <section className="grid gap-5 xl:grid-cols-[1fr_380px]">
-      <div className="rounded-lg border border-white/10 bg-panel/90 p-5 shadow-glow">
-        <div className="mb-5 flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-start md:justify-between">
+      <Card className="p-5">
+        <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-5 md:flex-row md:items-start md:justify-between">
           <div>
-            <button className="mb-3 text-sm text-mint hover:text-mint/80" type="button" onClick={onBack}>
-              Volver a leads
+            <button className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-mint hover:text-blue-700" type="button" onClick={onBack}>
+              <ChevronLeft className="h-4 w-4" />Volver a leads
             </button>
             <h2 className="text-2xl font-semibold">{lead.name}</h2>
-            <p className="mt-1 text-cream/55">{lead.phone_plus || lead.phone || 'Sin telefono'}</p>
+            <p className="mt-1 text-slate-500">{lead.phone_plus || lead.phone || 'Sin teléfono'}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge value={lead.classification} />
             <StatusBadge value={lead.status} />
-            <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-cream/80 hover:bg-white/5" type="button" onClick={() => onEditLead(lead)}>
+            <Button size="sm" variant="secondary" type="button" onClick={() => onEditLead(lead)}>
               <Edit3 className="h-4 w-4" />
               Editar
-            </button>
+            </Button>
             {canAdmin && !isArchivedLead(lead) ? (
-              <button className="inline-flex items-center gap-2 rounded-lg border border-danger/40 px-3 py-2 text-sm text-red-100 hover:bg-danger/10" type="button" onClick={() => onArchiveLead(lead)}>
+              <Button size="sm" variant="danger" type="button" onClick={() => onArchiveLead(lead)}>
                 <Archive className="h-4 w-4" />
                 Archivar
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>
@@ -1806,44 +2140,44 @@ function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchiveLead,
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Select label="Estado" value={form.status} onChange={handleStatusChange} options={isArchivedLead(lead) ? LEAD_STATUSES : LEAD_STATUSES.filter((status) => status !== ARCHIVED_STATUS)} />
-          <Field label="Proxima accion" value={form.next_action} onChange={(value) => setForm({ ...form, next_action: value })} />
-          <Field label="Proximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => setForm({ ...form, next_followup_at: value })} />
+          <Select label="Estado comercial" value={form.status} onChange={handleStatusChange} options={isArchivedLead(lead) ? LEAD_STATUSES : LEAD_STATUSES.filter((status) => status !== ARCHIVED_STATUS)} />
+          <Select label="Próxima acción" value={form.next_action} onChange={(value) => setForm({ ...form, next_action: value })} options={NEXT_ACTION_OPTIONS} />
+          <Field label="Próximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => setForm({ ...form, next_followup_at: value })} />
           <label className="block md:col-span-2">
-            <span className="mb-2 block text-xs text-cream/55">Notas</span>
-            <textarea className="min-h-32 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+            <span className="mb-2 block text-xs font-semibold text-slate-500">Notas</span>
+            <textarea className="min-h-32 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none focus:border-mint focus:ring-4 focus:ring-blue-50" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
           </label>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
-          <button className="inline-flex items-center gap-2 rounded-lg bg-mint px-4 py-2 font-semibold text-ink hover:bg-mint/90" type="button" onClick={saveForm}>
+          <Button type="button" onClick={saveForm}>
             <Save className="h-4 w-4" />
             Guardar cambios
-          </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2 text-cream/80 hover:bg-white/5" type="button" onClick={() => onSave(lead.id, { last_contact_at: new Date().toISOString(), contact_attempts: Number(lead.contact_attempts || 0) + 1 })}>
-            <CalendarPlus className="h-4 w-4" />
-            Registrar ultimo contacto
-          </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2 text-cream/80 hover:bg-white/5" type="button" onClick={() => onSave(lead.id, { contact_attempts: Number(lead.contact_attempts || 0) + 1 })}>
+          </Button>
+          <Button variant="secondary" type="button" onClick={() => onMarkContacted(lead)}>
+            <Check className="h-4 w-4" />Registrar contacto
+          </Button>
+          <Button variant="secondary" type="button" onClick={() => onSave(lead.id, { contact_attempts: Number(lead.contact_attempts || 0) + 1 })}>
             <Plus className="h-4 w-4" />
             Aumentar intentos
-          </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2 text-cream/80 hover:bg-white/5" type="button" onClick={copyMessage}>
+          </Button>
+          <Button variant="secondary" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button>
+          <Button variant="ghost" type="button" onClick={copyMessage}>
             <Clipboard className="h-4 w-4" />
             Copiar mensaje
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
-      <aside className="rounded-lg border border-white/10 bg-panel/90 p-5">
+      <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-glow">
         <h3 className="mb-4 text-lg font-semibold">Eventos</h3>
         {events.length ? (
           <div className="space-y-3">
             {events.map((event) => (
-              <div key={event.id} className="rounded-lg border border-white/10 bg-ink/60 p-3">
+              <div key={event.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="font-semibold">{event.title}</p>
-                <p className="mt-1 text-xs text-cream/45">{formatDateTime(event.created_at)}</p>
-                {event.description ? <p className="mt-2 text-sm text-cream/60">{event.description}</p> : null}
+                <p className="mt-1 text-xs text-slate-400">{formatDateTime(event.created_at)}</p>
+                {event.description ? <p className="mt-2 text-sm text-slate-500">{event.description}</p> : null}
               </div>
             ))}
           </div>
@@ -1855,81 +2189,109 @@ function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchiveLead,
   );
 }
 
-function AgendaView({ appointments, actionId, onOutcome, onReschedule }) {
-  return (
-    <section className="rounded-lg border border-white/10 bg-panel/90 p-4 shadow-glow">
-      {appointments.length ? (
-        <div className="overflow-x-auto scrollbar-soft">
-          <table className="min-w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-[0.18em] text-cream/45">
-              <tr>
-                <th className="px-3 py-3">Fecha</th>
-                <th className="px-3 py-3">Hora</th>
-                <th className="px-3 py-3">Paciente</th>
-                <th className="px-3 py-3">Teléfono</th>
-                <th className="px-3 py-3">Doctor</th>
-                <th className="px-3 py-3">Tratamiento</th>
-                <th className="px-3 py-3">Estado</th>
-                <th className="px-3 py-3">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {appointments.map((appointment) => {
-                const lead = appointment.leads || {};
-                const phone = lead.phone_plus || lead.phone || 'Sin telefono';
-                const isBusy = actionId.startsWith(`${appointment.id}:`);
+function AgendaView({ appointments, actionId, onOutcome, onReschedule, onOpenLead, onNavigate }) {
+  const [selectedDate, setSelectedDate] = useState(todayIsoDate());
+  const [calendarOffset, setCalendarOffset] = useState(0);
+  const [mode, setMode] = useState('week');
+  const [status, setStatus] = useState('');
+  const today = todayIsoDate();
+  const calendarDays = useMemo(() => Array.from({ length: 7 }, (_, index) => {
+    const date = startOfAsuncionDate(calendarOffset + index);
+    return { iso: toLocalIsoDate(date), date };
+  }), [calendarOffset]);
+  const visibleAppointments = useMemo(() => appointments.filter((appointment) => {
+    if (status && appointment.status !== status) return false;
+    if (mode === 'day') return appointment.appointment_date === selectedDate;
+    if (mode === 'upcoming') return appointment.appointment_date >= today;
+    if (mode === 'week') {
+      const first = calendarDays[0]?.iso;
+      const last = calendarDays[calendarDays.length - 1]?.iso;
+      return appointment.appointment_date >= first && appointment.appointment_date <= last;
+    }
+    return true;
+  }), [appointments, status, mode, selectedDate, today, calendarDays]);
+  const grouped = useMemo(() => Object.entries(visibleAppointments.reduce((acc, appointment) => {
+    (acc[appointment.appointment_date] ||= []).push(appointment);
+    return acc;
+  }, {})).sort(([a], [b]) => a.localeCompare(b)), [visibleAppointments]);
 
+  return (
+    <section className="space-y-6">
+      <PageHeader eyebrow="Calendario operativo" title="Agenda" subtitle="Revisá turnos, disponibilidad y asistencia sin escribir horarios manualmente." action={<Button type="button" onClick={() => onNavigate('leads')}><CalendarPlus className="h-4 w-4" />Agendar desde Leads</Button>} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Citas de hoy" value={appointments.filter((item) => item.appointment_date === today && APPOINTMENT_ACTIVE_STATUSES.includes(item.status)).length} icon={CalendarDays} />
+        <StatCard label="Confirmadas" value={appointments.filter((item) => item.status === APPOINTMENT_STATUS.confirmed).length} tone="success" icon={CheckCircle2} />
+        <StatCard label="No-shows" value={appointments.filter((item) => item.status === APPOINTMENT_STATUS.noShow).length} tone="danger" icon={Ban} />
+        <StatCard label="Reprogramaciones" value={appointments.filter((item) => item.status === APPOINTMENT_STATUS.rescheduled).length} tone="purple" icon={RefreshCw} />
+      </div>
+
+      <Card className="p-4">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-cream">Semana actual</h3>
+                <p className="mt-1 text-xs text-slate-500">Elegí un día para enfocarte en sus turnos.</p>
+              </div>
+              <div className="flex gap-1">
+                <button className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50" type="button" onClick={() => setCalendarOffset((value) => value - 7)} aria-label="Semana anterior"><ChevronLeft className="h-4 w-4" /></button>
+                <button className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={() => { setCalendarOffset(0); setSelectedDate(today); }}>Hoy</button>
+                <button className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50" type="button" onClick={() => setCalendarOffset((value) => value + 7)} aria-label="Semana siguiente"><ChevronRight className="h-4 w-4" /></button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {calendarDays.map(({ iso, date }) => {
+                const count = appointments.filter((appointment) => appointment.appointment_date === iso && APPOINTMENT_ACTIVE_STATUSES.includes(appointment.status)).length;
+                const selected = selectedDate === iso;
                 return (
-                  <tr key={appointment.id} className="hover:bg-white/[0.03]">
-                    <td className="px-3 py-3">{formatDate(appointment.appointment_date)}</td>
-                    <td className="px-3 py-3">{formatTime(appointment.appointment_time)}</td>
-                    <td className="px-3 py-3 font-semibold">{lead.name || 'Sin lead'}</td>
-                    <td className="px-3 py-3">{phone}</td>
-                    <td className="px-3 py-3">{appointment.doctor_assigned || 'Sin asignar'}</td>
-                    <td className="px-3 py-3">{appointment.treatment_scheduled || lead.treatment || 'Sin dato'}</td>
-                    <td className="px-3 py-3"><StatusBadge value={appointment.status} /></td>
-                    <td className="min-w-[520px] px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <a className="inline-flex items-center gap-2 rounded-lg bg-mint px-3 py-2 text-xs font-semibold text-ink hover:bg-mint/90" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer">
-                          <ExternalLink className="h-4 w-4" />
-                          Abrir WhatsApp
-                        </a>
-                        <AgendaActionButton
-                          icon={Check}
-                          label="Confirmar"
-                          loading={actionId === `${appointment.id}:confirm`}
-                          disabled={isBusy || appointment.status === APPOINTMENT_STATUS.confirmed}
-                          onClick={() => onOutcome(appointment, 'confirm')}
-                        />
-                        <AgendaActionButton
-                          icon={UserCheck}
-                          label="Asistió"
-                          loading={actionId === `${appointment.id}:attended`}
-                          disabled={isBusy || appointment.status === APPOINTMENT_STATUS.attended}
-                          onClick={() => onOutcome(appointment, 'attended')}
-                        />
-                        <AgendaActionButton
-                          icon={Ban}
-                          label="No Asistió"
-                          loading={actionId === `${appointment.id}:noShow`}
-                          disabled={isBusy || appointment.status === APPOINTMENT_STATUS.noShow}
-                          onClick={() => onOutcome(appointment, 'noShow')}
-                        />
-                        <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cream/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45" type="button" onClick={() => onReschedule(appointment)} disabled={isBusy}>
-                          <RefreshCw className="h-4 w-4" />
-                          Reprogramar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                  <button key={iso} className={`min-h-[76px] rounded-xl border px-1 py-2 text-center transition ${selected ? 'border-mint bg-mint text-white shadow-sm' : iso === today ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'}`} type="button" onClick={() => { setSelectedDate(iso); setMode('day'); }}>
+                    <span className="block text-[10px] font-bold uppercase">{new Intl.DateTimeFormat('es-PY', { weekday: 'short', timeZone: 'America/Asuncion' }).format(date).replace('.', '')}</span>
+                    <span className="mt-1 block text-lg font-bold">{new Intl.DateTimeFormat('es-PY', { day: '2-digit', timeZone: 'America/Asuncion' }).format(date)}</span>
+                    <span className={`mt-1 block text-[10px] ${selected ? 'text-white/80' : 'text-slate-400'}`}>{count} {count === 1 ? 'cita' : 'citas'}</span>
+                  </button>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </div>
+          <div className="grid shrink-0 gap-3 sm:grid-cols-2 xl:w-[360px]">
+            <Select label="Vista" value={mode} onChange={setMode} options={[{ value: 'day', label: 'Día seleccionado' }, { value: 'week', label: 'Semana visible' }, { value: 'upcoming', label: 'Próximas citas' }, { value: 'all', label: 'Todas' }]} />
+            <Select label="Estado" value={status} onChange={setStatus} options={['Agendado', 'Confirmado', 'Asistió', 'No Asistió', 'Reprogramado', 'Cancelado']} placeholder="Todos" />
+          </div>
         </div>
-      ) : (
-        <EmptyState title="Sin appointments visibles" text="Verifica RLS, clinic_id y datos de agenda." />
-      )}
+      </Card>
+
+      {grouped.length ? grouped.map(([date, dateAppointments]) => (
+        <section key={date} className="space-y-3">
+          <div className="flex items-center gap-3"><h3 className="font-bold text-cream">{formatDate(date)}</h3><span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600">{dateAppointments.length}</span></div>
+          <div className="grid gap-3">
+            {dateAppointments.map((appointment) => {
+              const lead = appointment.leads || {};
+              const isBusy = actionId.startsWith(`${appointment.id}:`);
+              return (
+                <Card key={appointment.id} as="article" className="card-enter p-4">
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+                    <div className="flex items-center gap-4 xl:w-28">
+                      <div className="rounded-2xl bg-blue-50 px-4 py-3 text-center text-blue-700"><Clock3 className="mx-auto h-4 w-4" /><span className="mt-1 block text-lg font-bold">{formatTime(appointment.appointment_time)}</span></div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <button className="text-left text-lg font-bold text-cream hover:text-mint" type="button" onClick={() => appointment.lead_id && onOpenLead(appointment.lead_id)}>{lead.name || 'Lead asociado'}</button>
+                      <p className="mt-1 text-sm text-slate-500">{appointment.treatment_scheduled || lead.treatment || 'Tratamiento sin definir'} · {appointment.doctor_assigned || 'Sin profesional asignado'}</p>
+                      <div className="mt-2"><StatusBadge value={appointment.status} /></div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-mint px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a>
+                      <AgendaActionButton icon={Check} label="Confirmar" loading={actionId === `${appointment.id}:confirm`} disabled={isBusy || appointment.status === APPOINTMENT_STATUS.confirmed} onClick={() => onOutcome(appointment, 'confirm')} />
+                      <AgendaActionButton icon={UserCheck} label="Asistió" loading={actionId === `${appointment.id}:attended`} disabled={isBusy || appointment.status === APPOINTMENT_STATUS.attended} onClick={() => onOutcome(appointment, 'attended')} />
+                      <AgendaActionButton icon={Ban} label="No asistió" loading={actionId === `${appointment.id}:noShow`} disabled={isBusy || appointment.status === APPOINTMENT_STATUS.noShow} onClick={() => onOutcome(appointment, 'noShow')} />
+                      <Button size="sm" variant="secondary" type="button" onClick={() => onReschedule(appointment)} disabled={isBusy}><RefreshCw className="h-4 w-4" />Reprogramar</Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )) : <EmptyState title="No hay citas en esta vista" text="Cambiá el día o los filtros. Para crear un turno, abrí un lead y elegí Agendar." />}
     </section>
   );
 }
@@ -1937,7 +2299,7 @@ function AgendaView({ appointments, actionId, onOutcome, onReschedule }) {
 function AgendaActionButton({ icon: Icon, label, loading, disabled, onClick }) {
   return (
     <button
-      className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cream/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
+      className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
@@ -1952,16 +2314,50 @@ function getAppointmentFormDefaults({ clinic, lead, appointment }) {
   return {
     appointment_date: appointment?.appointment_date || todayIsoDate(),
     appointment_time: appointment?.appointment_time ? appointment.appointment_time.slice(0, 5) : '',
-    doctor_assigned: appointment?.doctor_assigned || clinic?.doctor_name || '',
+    doctor_assigned: appointment?.doctor_assigned || clinic?.doctor_name || 'Sin asignar',
     treatment_scheduled: appointment?.treatment_scheduled || lead?.treatment || '',
     notes: appointment?.notes || '',
   };
 }
 
-function AppointmentModal({ clinic, lead, appointment, mode, saving, onClose, onSubmit }) {
+function buildTimeSlots() {
+  const periods = [[8, 12], [14, 18]];
+  return periods.flatMap(([start, end]) => {
+    const slots = [];
+    for (let minutes = start * 60; minutes < end * 60; minutes += 30) {
+      slots.push(`${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`);
+    }
+    return slots;
+  });
+}
+
+function AppointmentModal({ clinic, lead, appointment, appointments, profiles, clinicSettings, mode, saving, onClose, onSubmit }) {
   const [form, setForm] = useState(() => getAppointmentFormDefaults({ clinic, lead, appointment }));
   const [formError, setFormError] = useState('');
   const isReschedule = mode === 'reschedule';
+  const timeSlots = useMemo(buildTimeSlots, []);
+  const dateOptions = useMemo(() => Array.from({ length: 14 }, (_, index) => {
+    const date = startOfAsuncionDate(index);
+    return { iso: toLocalIsoDate(date), date };
+  }), []);
+  const doctorOptions = useMemo(() => uniqueStrings([
+    appointment?.doctor_assigned,
+    clinic?.doctor_name,
+    ...(appointments || []).map((item) => item.doctor_assigned),
+    ...(profiles || []).filter((profile) => profile.role !== ROLE.receptionist).map((profile) => profile.full_name),
+    'Sin asignar',
+  ]), [appointment?.doctor_assigned, clinic?.doctor_name, appointments, profiles]);
+  const treatmentOptions = useMemo(() => uniqueStrings([
+    lead?.treatment,
+    ...(Array.isArray(clinicSettings?.treatments) ? clinicSettings.treatments.map((item) => typeof item === 'string' ? item : item?.name || item?.treatment) : []),
+    ...TREATMENT_OPTIONS,
+  ]), [lead?.treatment, clinicSettings]);
+  const occupiedTimes = useMemo(() => new Set((appointments || [])
+    .filter((item) => item.id !== appointment?.id
+      && item.appointment_date === form.appointment_date
+      && normalizeText(item.doctor_assigned) === normalizeText(form.doctor_assigned)
+      && APPOINTMENT_ACTIVE_STATUSES.includes(item.status))
+    .map((item) => String(item.appointment_time).slice(0, 5))), [appointments, appointment?.id, form.appointment_date, form.doctor_assigned]);
 
   useEffect(() => {
     setForm(getAppointmentFormDefaults({ clinic, lead, appointment }));
@@ -1979,7 +2375,17 @@ function AppointmentModal({ clinic, lead, appointment, mode, saving, onClose, on
     }
 
     if (!form.appointment_time) {
-      setFormError('Selecciona la hora de consulta.');
+      setFormError('Elegí un horario disponible.');
+      return;
+    }
+
+    if (!form.doctor_assigned.trim()) {
+      setFormError('Elegí el profesional o responsable del turno.');
+      return;
+    }
+
+    if (occupiedTimes.has(form.appointment_time)) {
+      setFormError('Ese horario ya está ocupado. Elegí otro slot disponible.');
       return;
     }
 
@@ -1999,49 +2405,80 @@ function AppointmentModal({ clinic, lead, appointment, mode, saving, onClose, on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/80 px-4 py-6 backdrop-blur sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
       <form
-        className="w-full max-w-2xl rounded-lg border border-white/10 bg-panel p-5 shadow-glow"
+        className="modal-enter w-full max-w-4xl rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:p-6"
         onSubmit={(event) => {
           event.preventDefault();
           handleSubmit();
         }}
       >
-        <div className="mb-5 flex flex-col gap-3 border-b border-white/10 pb-4 md:flex-row md:items-start md:justify-between">
+        <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-mint">{isReschedule ? 'Reprogramar' : 'Agendar'}</p>
-            <h2 className="mt-1 text-xl font-semibold text-cream">{isReschedule ? 'Reprogramar consulta' : 'Consulta agendada'}</h2>
-            <p className="mt-1 text-sm text-cream/55">{lead?.name || 'Lead asociado'}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-mint">{isReschedule ? 'Reprogramar' : 'Nuevo turno'}</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-cream">{isReschedule ? 'Reprogramar consulta' : 'Agendar consulta'}</h2>
+            <p className="mt-1 text-sm text-slate-500">{lead?.name || 'Lead asociado'} · elegí día, profesional y horario.</p>
           </div>
           <StatusBadge value={LEAD_STATUS.scheduled} />
         </div>
 
-        {formError ? <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-red-100">{formError}</div> : null}
+        {formError ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Fecha de consulta" type="date" value={form.appointment_date} onChange={(value) => updateField('appointment_date', value)} disabled={saving} />
-          <Field label="Hora de consulta" type="time" value={form.appointment_time} onChange={(value) => updateField('appointment_time', value)} disabled={saving} />
-          <Field label="Doctor asignado" value={form.doctor_assigned} onChange={(value) => updateField('doctor_assigned', value)} disabled={saving} />
-          <Field label="Tratamiento agendado" value={form.treatment_scheduled} onChange={(value) => updateField('treatment_scheduled', value)} disabled={saving} />
-          <label className="block md:col-span-2">
-            <span className="mb-2 block text-xs text-cream/55">Notas opcionales</span>
-            <textarea
-              className="min-h-28 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none disabled:cursor-not-allowed disabled:opacity-60"
-              value={form.notes}
-              onChange={(event) => updateField('notes', event.target.value)}
-              disabled={saving}
-            />
-          </label>
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="space-y-5">
+            <div>
+              <div className="flex items-end justify-between gap-3">
+                <div><p className="text-sm font-bold text-cream">1. Elegí el día</p><p className="mt-1 text-xs text-slate-500">Próximos 14 días</p></div>
+                <label className="text-xs font-semibold text-slate-500">Otra fecha <input className="ml-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-700" type="date" min={todayIsoDate()} value={form.appointment_date} onChange={(event) => { updateField('appointment_date', event.target.value); updateField('appointment_time', ''); }} disabled={saving} /></label>
+              </div>
+              <div className="scrollbar-soft mt-3 grid grid-cols-4 gap-2 sm:grid-cols-7">
+                {dateOptions.map(({ iso, date }) => {
+                  const selected = form.appointment_date === iso;
+                  return (
+                    <button key={iso} className={`min-h-[74px] rounded-xl border px-2 py-2 text-center transition ${selected ? 'border-mint bg-mint text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'}`} type="button" onClick={() => { updateField('appointment_date', iso); updateField('appointment_time', ''); }} disabled={saving}>
+                      <span className="block text-[10px] font-bold uppercase">{new Intl.DateTimeFormat('es-PY', { weekday: 'short', timeZone: 'America/Asuncion' }).format(date).replace('.', '')}</span>
+                      <span className="mt-1 block text-lg font-bold">{new Intl.DateTimeFormat('es-PY', { day: '2-digit', timeZone: 'America/Asuncion' }).format(date)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Select label="2. Profesional / responsable" value={form.doctor_assigned} onChange={(value) => { updateField('doctor_assigned', value); updateField('appointment_time', ''); }} options={doctorOptions} disabled={saving} />
+              <Select label="Tratamiento agendado" value={form.treatment_scheduled} onChange={(value) => updateField('treatment_scheduled', value)} options={treatmentOptions} placeholder="Seleccionar tratamiento" disabled={saving} />
+            </div>
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold text-slate-500">Notas opcionales</span>
+              <textarea className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition focus:border-mint focus:ring-4 focus:ring-blue-50" value={form.notes} onChange={(event) => updateField('notes', event.target.value)} disabled={saving} placeholder="Indicaciones comerciales o de coordinación (sin datos clínicos sensibles)." />
+            </label>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-bold text-cream">3. Elegí un horario</p>
+            <p className="mt-1 text-xs text-slate-500">Slots de 30 minutos. Los ocupados están bloqueados.</p>
+            <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-3">
+              {timeSlots.map((time) => {
+                const occupied = occupiedTimes.has(time);
+                const selected = form.appointment_time === time;
+                return (
+                  <button key={time} className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-bold transition ${occupied ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 line-through' : selected ? 'border-mint bg-mint text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'}`} type="button" onClick={() => !occupied && updateField('appointment_time', time)} disabled={saving || occupied} aria-label={`${time}${occupied ? ', ocupado' : ', disponible'}`}>
+                    {time}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-mint" />Seleccionado</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-white ring-1 ring-slate-300" />Disponible</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-slate-300" />Ocupado</span></div>
+            {clinicSettings?.opening_hours ? <p className="mt-4 rounded-xl bg-white p-3 text-xs leading-5 text-slate-500">Horario configurado: {clinicSettings.opening_hours}. Los slots visuales usan 08:00–12:00 y 14:00–18:00; la restricción de base sigue siendo la autoridad final.</p> : null}
+          </div>
         </div>
 
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-cream/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={onClose} disabled={saving}>
-            Cancelar
-          </button>
-          <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-mint px-4 py-2 text-sm font-semibold text-ink hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {isReschedule ? 'Guardar reprogramación' : 'Guardar consulta'}
-          </button>
+        <div className="mt-6 flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+          <Button variant="secondary" type="button" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button type="submit" loading={saving}>
+            {!saving ? <CalendarCheck2 className="h-4 w-4" /> : null}
+            {isReschedule ? 'Guardar reprogramación' : 'Agendar cita'}
+          </Button>
         </div>
       </form>
     </div>
@@ -2053,17 +2490,17 @@ function getLeadFormDefaults(lead, currentUserId = '') {
     name: lead?.name || '',
     phone: lead?.phone || '',
     phone_plus: lead?.phone_plus || '',
-    treatment: lead?.treatment || '',
-    urgency: lead?.urgency || '',
+    treatment: lead?.treatment || 'Consulta general',
+    urgency: lead?.urgency || 'Esta semana',
     classification: lead?.classification || 'Lead Medio',
     score: lead?.score ?? 0,
     status: lead?.status || 'Nuevo',
-    situation: lead?.situation || '',
-    evaluation_previous: lead?.evaluation_previous || '',
+    situation: lead?.situation || 'Quiere agendar una consulta',
+    evaluation_previous: lead?.evaluation_previous || 'No sabe',
     consultation_reason: lead?.consultation_reason || '',
     estimated_value: lead?.estimated_value ?? '',
-    next_action: lead?.next_action || '',
-    next_followup_at: toDatetimeLocalAsuncion(lead?.next_followup_at),
+    next_action: lead?.next_action || 'Enviar WhatsApp',
+    next_followup_at: toDatetimeLocalAsuncion(lead?.next_followup_at || addHoursIso(1)),
     notes: lead?.notes || '',
     source: lead?.source || 'WhatsApp directo',
     consent_contact: Boolean(lead?.consent_contact),
@@ -2071,9 +2508,18 @@ function getLeadFormDefaults(lead, currentUserId = '') {
   };
 }
 
-function LeadFormModal({ mode, lead, canAdmin, profiles, currentUserId, saving, onClose, onSubmit }) {
+function followupPresetValue(preset) {
+  if (preset === 'today') return toDatetimeLocalAsuncion(new Date(Date.now() + 60 * 60 * 1000));
+  if (preset === 'tomorrow') return toDatetimeLocalAsuncion(addDaysAsuncion(1, 9));
+  if (preset === '3d') return toDatetimeLocalAsuncion(addDaysAsuncion(3, 9));
+  if (preset === '7d') return toDatetimeLocalAsuncion(addDaysAsuncion(7, 9));
+  return '';
+}
+
+function LeadFormModal({ mode, lead, canAdmin, profiles, currentUserId, treatmentOptions, saving, onClose, onSubmit }) {
   const [form, setForm] = useState(() => getLeadFormDefaults(lead, currentUserId));
   const [formError, setFormError] = useState('');
+  const [followupPreset, setFollowupPreset] = useState(lead ? 'custom' : 'today');
   const isCreate = mode === 'create';
   const fullEdit = isCreate || canAdmin;
   const statusOptions = useMemo(() => {
@@ -2084,13 +2530,14 @@ function LeadFormModal({ mode, lead, canAdmin, profiles, currentUserId, saving, 
   useEffect(() => {
     setForm(getLeadFormDefaults(lead, currentUserId));
     setFormError('');
+    setFollowupPreset(lead ? 'custom' : 'today');
   }, [lead?.id, mode, currentUserId]);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(scheduleAfterSave = false) {
     if ((isCreate || fullEdit) && !String(form.name || '').trim()) {
       setFormError('El nombre del lead es obligatorio.');
       return;
@@ -2101,74 +2548,112 @@ function LeadFormModal({ mode, lead, canAdmin, profiles, currentUserId, saving, 
       return;
     }
 
+    if (isCreate && !form.source) {
+      setFormError('Elegí cómo llegó el lead.');
+      return;
+    }
+
+    if (isCreate && !form.treatment) {
+      setFormError('Elegí el tratamiento de interés.');
+      return;
+    }
+
     setFormError('');
 
     try {
-      await onSubmit(form);
+      await onSubmit(form, { scheduleAfterSave });
     } catch (submitError) {
       setFormError(submitError.message || 'No se pudo guardar el lead.');
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/80 px-4 py-6 backdrop-blur">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
       <form
-        className="w-full max-w-4xl rounded-lg border border-white/10 bg-panel p-5 shadow-glow"
+        className="modal-enter w-full max-w-4xl rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:p-6"
         onSubmit={(event) => {
           event.preventDefault();
-          handleSubmit();
+          handleSubmit(false);
         }}
       >
-        <ModalHeader title={isCreate ? 'Nuevo lead' : 'Editar lead'} subtitle={isCreate ? 'Carga manual segura' : lead?.name || 'Lead'} onClose={onClose} disabled={saving} />
+        <ModalHeader title={isCreate ? 'Nuevo lead' : 'Editar lead'} subtitle={isCreate ? 'Carga rápida · menos de 45 segundos' : lead?.name || 'Lead'} onClose={onClose} disabled={saving} />
 
-        {formError ? <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-red-100">{formError}</div> : null}
+        {formError ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
 
         {fullEdit ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Field label="Nombre" value={form.name} onChange={(value) => updateField('name', value)} disabled={saving} />
-            <Field label={isCreate ? 'Telefono *' : 'Telefono'} value={form.phone} onChange={(value) => updateField('phone', value)} disabled={saving} />
-            <Field label="Telefono internacional" value={form.phone_plus} onChange={(value) => updateField('phone_plus', value)} disabled={saving} />
-            <Field label="Tratamiento" value={form.treatment} onChange={(value) => updateField('treatment', value)} disabled={saving} />
-            <Field label="Urgencia" value={form.urgency} onChange={(value) => updateField('urgency', value)} disabled={saving} />
-            <Select label="Clasificacion" value={form.classification} onChange={(value) => updateField('classification', value)} options={CLASSIFICATIONS} disabled={saving} />
-            <Field label="Score" type="number" value={form.score} onChange={(value) => updateField('score', value)} disabled={saving} />
-            <Field label="Valor estimado" type="number" value={form.estimated_value} onChange={(value) => updateField('estimated_value', value)} disabled={saving} />
-            {isCreate ? <Select label="Fuente" value={form.source} onChange={(value) => updateField('source', value)} options={MANUAL_LEAD_SOURCES} disabled={saving} /> : null}
-            {isCreate ? (
-              <label className="block">
-                <span className="mb-2 block text-xs text-cream/55">Responsable</span>
-                <select className="w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none disabled:cursor-not-allowed disabled:opacity-60" value={form.assigned_to} onChange={(event) => updateField('assigned_to', event.target.value)} disabled={saving}>
-                  {(profiles || []).map((clinicProfile) => (
-                    <option key={clinicProfile.id} value={clinicProfile.id}>{clinicProfile.full_name} · {clinicProfile.role}</option>
-                  ))}
-                </select>
-              </label>
-            ) : <Select label="Estado" value={form.status} onChange={(value) => updateField('status', value)} options={statusOptions} disabled={saving} />}
-            <TextArea label="Situacion" value={form.situation} onChange={(value) => updateField('situation', value)} disabled={saving} />
-            <TextArea label="Evaluacion previa" value={form.evaluation_previous} onChange={(value) => updateField('evaluation_previous', value)} disabled={saving} />
-            <TextArea label="Motivo de consulta" value={form.consultation_reason} onChange={(value) => updateField('consultation_reason', value)} disabled={saving} />
-            <Field label="Proxima accion" value={form.next_action} onChange={(value) => updateField('next_action', value)} disabled={saving} />
-            <Field label="Proximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} />
-            <TextArea label={isCreate ? 'Nota interna' : 'Notas'} value={form.notes} onChange={(value) => updateField('notes', value)} disabled={saving} className="xl:col-span-3" />
-            {isCreate ? (
-              <label className="inline-flex items-start gap-3 rounded-lg border border-white/10 bg-ink/60 p-3 text-sm text-cream/75 xl:col-span-3">
-                <input className="mt-0.5 h-4 w-4 accent-mint" type="checkbox" checked={form.consent_contact} onChange={(event) => updateField('consent_contact', event.target.checked)} disabled={saving} />
-                <span>El paciente autorizó que la clínica lo contacte por los datos registrados.</span>
-              </label>
-            ) : null}
+          <div className="space-y-5">
+            <FormSection number="1" title="Datos básicos" description="Sólo nombre y teléfono requieren escritura.">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <Field label="Nombre *" value={form.name} onChange={(value) => updateField('name', value)} disabled={saving} placeholder="Nombre y apellido" />
+                <Field label="Teléfono *" value={form.phone} onChange={(value) => updateField('phone', value)} disabled={saving} placeholder="0981 000 000" />
+                {isCreate ? <Select label="Fuente *" value={form.source} onChange={(value) => updateField('source', value)} options={MANUAL_LEAD_SOURCES} disabled={saving} /> : <Field label="Teléfono internacional" value={form.phone_plus} onChange={(value) => updateField('phone_plus', value)} disabled={saving} />}
+              </div>
+            </FormSection>
+
+            <FormSection number="2" title="Interés" description="Elegí opciones para mantener datos comparables.">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <Select label="Tratamiento *" value={form.treatment} onChange={(value) => updateField('treatment', value)} options={treatmentOptions || TREATMENT_OPTIONS} disabled={saving} />
+                <Select label="Urgencia" value={form.urgency} onChange={(value) => updateField('urgency', value)} options={URGENCY_OPTIONS} disabled={saving} />
+                <Select label="Evaluación previa" value={form.evaluation_previous} onChange={(value) => updateField('evaluation_previous', value)} options={EVALUATION_OPTIONS} disabled={saving} />
+                <Select label="Situación" value={form.situation} onChange={(value) => updateField('situation', value)} options={SITUATION_OPTIONS} disabled={saving} />
+                <Select label="Clasificación" value={form.classification} onChange={(value) => updateField('classification', value)} options={CLASSIFICATIONS} disabled={saving} />
+                {!isCreate ? <Select label="Estado comercial" value={form.status} onChange={(value) => updateField('status', value)} options={statusOptions} disabled={saving} /> : null}
+                <TextArea label="Motivo o nota breve (opcional)" value={form.consultation_reason} onChange={(value) => updateField('consultation_reason', value)} disabled={saving} className="md:col-span-2 xl:col-span-3" placeholder="Contexto comercial mínimo, sin información clínica sensible." />
+              </div>
+            </FormSection>
+
+            <FormSection number="3" title="Seguimiento" description="Al guardar se genera o actualiza una tarea sin duplicados.">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold text-slate-500">Responsable</span>
+                  <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition focus:border-mint focus:ring-4 focus:ring-blue-50 disabled:opacity-60" value={form.assigned_to} onChange={(event) => updateField('assigned_to', event.target.value)} disabled={saving || !isCreate}>
+                    {(profiles || []).map((clinicProfile) => <option key={clinicProfile.id} value={clinicProfile.id}>{clinicProfile.full_name} · {clinicProfile.role}</option>)}
+                  </select>
+                </label>
+                <Select label="Próxima acción" value={form.next_action} onChange={(value) => updateField('next_action', value)} options={NEXT_ACTION_OPTIONS} disabled={saving} />
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold text-slate-500">Próximo seguimiento</span>
+                  <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition focus:border-mint focus:ring-4 focus:ring-blue-50" value={followupPreset} onChange={(event) => { const preset = event.target.value; setFollowupPreset(preset); const value = followupPresetValue(preset); if (value) updateField('next_followup_at', value); }} disabled={saving}>
+                    <option value="today">Hoy</option><option value="tomorrow">Mañana</option><option value="3d">En 3 días</option><option value="7d">En 7 días</option><option value="custom">Fecha personalizada</option>
+                  </select>
+                </label>
+                {followupPreset === 'custom' ? <Field label="Fecha y hora personalizada" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} /> : <div className="rounded-xl bg-blue-50 p-3 text-sm text-blue-800 md:col-span-2 xl:col-span-3">Seguimiento programado para {formatDateTime(fromDatetimeLocalAsuncion(form.next_followup_at))}.</div>}
+                <TextArea label={isCreate ? 'Nota interna (opcional)' : 'Notas'} value={form.notes} onChange={(value) => updateField('notes', value)} disabled={saving} className="md:col-span-2 xl:col-span-3" />
+                {canAdmin && !isCreate ? <><Field label="Score" type="number" value={form.score} onChange={(value) => updateField('score', value)} disabled={saving} /><Field label="Valor potencial estimado" type="number" value={form.estimated_value} onChange={(value) => updateField('estimated_value', value)} disabled={saving} /></> : null}
+              </div>
+              {isCreate ? <label className="mt-4 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600"><input className="mt-0.5 h-4 w-4 accent-mint" type="checkbox" checked={form.consent_contact} onChange={(event) => updateField('consent_contact', event.target.checked)} disabled={saving} /><span>La persona autorizó a la clínica a contactarla por estos datos.</span></label> : null}
+            </FormSection>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            <Select label="Estado" value={form.status} onChange={(value) => updateField('status', value)} options={statusOptions} disabled={saving} />
-            <Field label="Proxima accion" value={form.next_action} onChange={(value) => updateField('next_action', value)} disabled={saving} />
-            <Field label="Proximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} />
+            <Select label="Estado comercial" value={form.status} onChange={(value) => updateField('status', value)} options={statusOptions} disabled={saving} />
+            <Select label="Próxima acción" value={form.next_action} onChange={(value) => updateField('next_action', value)} options={NEXT_ACTION_OPTIONS} disabled={saving} />
+            <Field label="Próximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} />
             <TextArea label="Notas" value={form.notes} onChange={(value) => updateField('notes', value)} disabled={saving} className="md:col-span-2" />
           </div>
         )}
 
-        <ModalActions saving={saving} onClose={onClose} submitLabel={isCreate ? 'Crear nuevo lead' : 'Guardar cambios'} />
+        {isCreate ? (
+          <div className="mt-5 flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+            <Button variant="ghost" type="button" onClick={onClose} disabled={saving}>Cancelar</Button>
+            <Button variant="secondary" type="button" onClick={() => handleSubmit(true)} disabled={saving}><CalendarPlus className="h-4 w-4" />Guardar y agendar</Button>
+            <Button type="submit" loading={saving}>{!saving ? <Save className="h-4 w-4" /> : null}Guardar lead</Button>
+          </div>
+        ) : <ModalActions saving={saving} onClose={onClose} submitLabel="Guardar cambios" />}
       </form>
     </div>
+  );
+}
+
+function FormSection({ number, title, description, children }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 p-4 sm:p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">{number}</span>
+        <div><h3 className="font-bold text-cream">{title}</h3><p className="mt-1 text-xs text-slate-500">{description}</p></div>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -2192,16 +2677,16 @@ function ArchiveLeadModal({ lead, saving, onClose, onSubmit }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/80 px-4 py-6 backdrop-blur sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 px-4 py-6 backdrop-blur-sm sm:items-center">
       <form
-        className="w-full max-w-xl rounded-lg border border-white/10 bg-panel p-5 shadow-glow"
+        className="modal-enter w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl"
         onSubmit={(event) => {
           event.preventDefault();
           handleSubmit();
         }}
       >
         <ModalHeader title="Archivar lead" subtitle={lead?.name || 'Lead'} onClose={onClose} disabled={saving} />
-        {formError ? <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-red-100">{formError}</div> : null}
+        {formError ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
         <TextArea label="Motivo obligatorio" value={reason} onChange={setReason} disabled={saving} />
         <ModalActions saving={saving} onClose={onClose} submitLabel="Archivar" danger />
       </form>
@@ -2209,9 +2694,9 @@ function ArchiveLeadModal({ lead, saving, onClose, onSubmit }) {
   );
 }
 
-function getTaskFormDefaults(task) {
+function getTaskFormDefaults(task, initialLeadId = '') {
   return {
-    lead_id: task?.lead_id || '',
+    lead_id: task?.lead_id || initialLeadId,
     title: task?.title || '',
     description: task?.description || '',
     due_at: toDatetimeLocalAsuncion(task?.due_at),
@@ -2220,15 +2705,15 @@ function getTaskFormDefaults(task) {
   };
 }
 
-function TaskFormModal({ mode, task, leads, saving, onClose, onSubmit }) {
-  const [form, setForm] = useState(() => getTaskFormDefaults(task));
+function TaskFormModal({ mode, task, initialLeadId, leads, saving, onClose, onSubmit }) {
+  const [form, setForm] = useState(() => getTaskFormDefaults(task, initialLeadId));
   const [formError, setFormError] = useState('');
   const isCreate = mode === 'create';
 
   useEffect(() => {
-    setForm(getTaskFormDefaults(task));
+    setForm(getTaskFormDefaults(task, initialLeadId));
     setFormError('');
-  }, [task?.id, mode]);
+  }, [task?.id, mode, initialLeadId]);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -2250,22 +2735,22 @@ function TaskFormModal({ mode, task, leads, saving, onClose, onSubmit }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/80 px-4 py-6 backdrop-blur sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 px-4 py-6 backdrop-blur-sm sm:items-center">
       <form
-        className="w-full max-w-2xl rounded-lg border border-white/10 bg-panel p-5 shadow-glow"
+        className="modal-enter w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl"
         onSubmit={(event) => {
           event.preventDefault();
           handleSubmit();
         }}
       >
         <ModalHeader title={isCreate ? 'Crear tarea' : 'Editar tarea'} subtitle="Tareas CRM" onClose={onClose} disabled={saving} />
-        {formError ? <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-red-100">{formError}</div> : null}
+        {formError ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Titulo" value={form.title} onChange={(value) => updateField('title', value)} disabled={saving} />
           <label className="block">
             <span className="mb-2 block text-xs text-cream/55">Lead asociado</span>
-            <select className="w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none" value={form.lead_id} onChange={(event) => updateField('lead_id', event.target.value)} disabled={saving}>
+            <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none" value={form.lead_id} onChange={(event) => updateField('lead_id', event.target.value)} disabled={saving}>
               <option value="">Sin lead</option>
               {leads.map((lead) => (
                 <option key={lead.id} value={lead.id}>
@@ -2288,12 +2773,12 @@ function TaskFormModal({ mode, task, leads, saving, onClose, onSubmit }) {
 
 function ModalHeader({ title, subtitle, onClose, disabled }) {
   return (
-    <div className="mb-5 flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+    <div className="mb-5 flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
       <div>
-        <p className="text-xs uppercase tracking-[0.2em] text-mint">{subtitle}</p>
-        <h2 className="mt-1 text-xl font-semibold text-cream">{title}</h2>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-mint">{subtitle}</p>
+        <h2 className="mt-1 text-2xl font-bold tracking-tight text-cream">{title}</h2>
       </div>
-      <button className="rounded-lg border border-white/10 p-2 text-cream/70 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={onClose} disabled={disabled} aria-label="Cerrar">
+      <button className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={onClose} disabled={disabled} aria-label="Cerrar">
         <X className="h-4 w-4" />
       </button>
     </div>
@@ -2302,25 +2787,14 @@ function ModalHeader({ title, subtitle, onClose, disabled }) {
 
 function ModalActions({ saving, onClose, submitLabel, danger = false }) {
   return (
-    <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-      <button className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-cream/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={onClose} disabled={saving}>
-        Cancelar
-      </button>
-      <button
-        className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
-          danger ? 'bg-danger text-white hover:bg-danger/90' : 'bg-mint text-ink hover:bg-mint/90'
-        }`}
-        type="submit"
-        disabled={saving}
-      >
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-        {submitLabel}
-      </button>
+    <div className="mt-5 flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+      <Button variant="ghost" type="button" onClick={onClose} disabled={saving}>Cancelar</Button>
+      <Button variant={danger ? 'danger' : 'primary'} type="submit" loading={saving}>{!saving ? <Save className="h-4 w-4" /> : null}{submitLabel}</Button>
     </div>
   );
 }
 
-function TasksView({ tasks, leads, canAdmin, onCreateTask, onEditTask, onComplete }) {
+function TasksView({ tasks, leads, canAdmin, onCreateTask, onEditTask, onComplete, onOpenLead }) {
   const [filter, setFilter] = useState('pendientes');
   const now = Date.now();
   const filteredTasks = useMemo(() => {
@@ -2335,8 +2809,9 @@ function TasksView({ tasks, leads, canAdmin, onCreateTask, onEditTask, onComplet
   }, [tasks, filter, now]);
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-panel/80 p-4 md:flex-row md:items-center md:justify-between">
+    <section className="space-y-6">
+      <PageHeader eyebrow="Trabajo operativo" title="Tareas" subtitle="Completá lo pendiente y resolvé primero lo vencido." action={canAdmin ? <Button type="button" onClick={() => onCreateTask()}><FilePlus className="h-4 w-4" />Nueva tarea</Button> : null} />
+      <Card className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap gap-2">
           {[
             ['pendientes', 'Pendientes'],
@@ -2345,7 +2820,7 @@ function TasksView({ tasks, leads, canAdmin, onCreateTask, onEditTask, onComplet
           ].map(([id, label]) => (
             <button
               key={id}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold ${filter === id ? 'bg-mint text-ink' : 'border border-white/10 text-cream/70 hover:bg-white/5'}`}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${filter === id ? 'bg-mint text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               type="button"
               onClick={() => setFilter(id)}
             >
@@ -2354,13 +2829,8 @@ function TasksView({ tasks, leads, canAdmin, onCreateTask, onEditTask, onComplet
           ))}
         </div>
 
-        {canAdmin ? (
-          <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-mint px-4 py-2 text-sm font-semibold text-ink hover:bg-mint/90" type="button" onClick={onCreateTask}>
-            <FilePlus className="h-4 w-4" />
-            Crear tarea
-          </button>
-        ) : null}
-      </div>
+        <span className="text-xs font-semibold text-slate-500">{filteredTasks.length} tareas</span>
+      </Card>
 
       {filteredTasks.length ? (
         filteredTasks.map((task) => {
@@ -2370,44 +2840,45 @@ function TasksView({ tasks, leads, canAdmin, onCreateTask, onEditTask, onComplet
           const displayStatus = isOverdue ? 'vencido' : task.status;
 
           return (
-            <article key={task.id} className="flex flex-col gap-4 rounded-lg border border-white/10 bg-panel/90 p-4 md:flex-row md:items-center md:justify-between">
+            <Card key={task.id} as="article" className="card-enter flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-semibold">{task.title}</h3>
                   <StatusBadge value={task.priority} />
                   <StatusBadge value={displayStatus} />
                 </div>
-                {task.description ? <p className="mt-2 text-sm text-cream/60">{task.description}</p> : null}
-                <div className="mt-3 grid gap-2 text-xs text-cream/50 md:grid-cols-2">
+                {task.description ? <p className="mt-2 text-sm text-slate-500">{task.description}</p> : null}
+                <div className="mt-3 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
                   <span>Vence: {task.due_at ? formatDateTime(task.due_at) : 'Sin vencimiento'}</span>
                   <span>Paciente: {lead?.name || 'Sin lead asociado'}</span>
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
+                {lead ? <Button size="sm" variant="ghost" type="button" onClick={() => onOpenLead(lead.id)}>Abrir lead</Button> : null}
                 {lead ? (
-                  <a className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-cream/80 hover:bg-white/5" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer">
+                  <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer">
                     <ExternalLink className="h-4 w-4" />
                     WhatsApp
                   </a>
                 ) : null}
                 {canAdmin ? (
-                  <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-cream/80 hover:bg-white/5" type="button" onClick={() => onEditTask(task)}>
+                  <Button size="sm" variant="secondary" type="button" onClick={() => onEditTask(task)}>
                     <Edit3 className="h-4 w-4" />
                     Editar
-                  </button>
+                  </Button>
                 ) : null}
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-mint px-4 py-2 font-semibold text-ink hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-50"
+                <Button
+                  size="sm"
                   type="button"
                   onClick={() => onComplete(task.id)}
                   disabled={isDone}
                 >
                   <Check className="h-4 w-4" />
                   Marcar hecha
-                </button>
+                </Button>
               </div>
-            </article>
+            </Card>
           );
         })
       ) : (
@@ -2417,12 +2888,159 @@ function TasksView({ tasks, leads, canAdmin, onCreateTask, onEditTask, onComplet
   );
 }
 
+function MetricsView({ leads, appointments, tasks, treatmentPrices }) {
+  const [period, setPeriod] = useState('30d');
+  const data = useMemo(() => {
+    const now = new Date();
+    const today = todayIsoDate();
+    const starts = {
+      week: new Date(now.getTime() - 7 * 86400000),
+      month: new Date(`${today.slice(0, 7)}-01T00:00:00`),
+      '30d': new Date(now.getTime() - 30 * 86400000),
+      '90d': new Date(now.getTime() - 90 * 86400000),
+      year: new Date(`${today.slice(0, 4)}-01-01T00:00:00`),
+    };
+    const start = starts[period] || starts['30d'];
+    const periodLeads = leads.filter((lead) => new Date(lead.created_at) >= start);
+    const periodAppointments = appointments.filter((item) => new Date(`${item.appointment_date}T12:00:00`) >= start);
+    const periodTasks = tasks.filter((task) => new Date(task.created_at || task.due_at || 0) >= start);
+    const contacted = periodLeads.filter((lead) => lead.last_contact_at || CONTACTED_STATUSES.includes(lead.status));
+    const uncontacted = periodLeads.filter((lead) => !lead.last_contact_at && ['Nuevo', 'No Contactado'].includes(lead.status));
+    const responseTimes = periodLeads.filter((lead) => lead.created_at && lead.last_contact_at).map((lead) => Math.max(0, new Date(lead.last_contact_at) - new Date(lead.created_at)) / 60000);
+    const avgResponse = responseTimes.length ? Math.round(responseTimes.reduce((sum, value) => sum + value, 0) / responseTimes.length) : null;
+    const attended = periodAppointments.filter((item) => item.status === APPOINTMENT_STATUS.attended);
+    const noShows = periodAppointments.filter((item) => item.status === APPOINTMENT_STATUS.noShow);
+    const attendanceBase = attended.length + noShows.length;
+    const scheduledLeadIds = new Set(periodAppointments.map((item) => item.lead_id));
+    const attendedLeadIds = new Set(attended.map((item) => item.lead_id));
+    const recoveredNoShows = new Set(noShows.filter((noShow) => appointments.some((item) => item.lead_id === noShow.lead_id && item.id !== noShow.id && item.appointment_date > noShow.appointment_date && APPOINTMENT_ACTIVE_STATUSES.includes(item.status))).map((item) => item.lead_id));
+    const priceByTreatment = Object.fromEntries((treatmentPrices || []).map((item) => [normalizeText(item.treatment), Number(item.estimated_price || 0)]));
+    const underFollowup = periodLeads.filter((lead) => !terminalStatuses.includes(lead.status));
+    const potential = underFollowup.reduce((sum, lead) => sum + Number(lead.estimated_value || priceByTreatment[normalizeText(lead.treatment)] || 0), 0);
+    const sourceCounts = countBy(periodLeads, (lead) => lead.source || 'Sin fuente');
+    const treatmentCounts = countBy(periodLeads, (lead) => lead.treatment || 'Sin tratamiento');
+    const classificationCounts = countBy(periodLeads, (lead) => lead.classification || 'Sin clasificación');
+    const funnel = [
+      ['Leads nuevos', periodLeads.length],
+      ['Contactados', contacted.length],
+      ['Agendados', periodLeads.filter((lead) => scheduledLeadIds.has(lead.id) || SCHEDULED_STATUSES.includes(lead.status)).length],
+      ['Asistieron', periodLeads.filter((lead) => attendedLeadIds.has(lead.id) || lead.status === LEAD_STATUS.attended).length],
+      ['Tratamiento iniciado', periodLeads.filter((lead) => lead.status === 'Tratamiento Iniciado').length],
+    ];
+
+    return {
+      periodLeads,
+      contacted,
+      uncontacted,
+      avgResponse,
+      hotUncontacted: uncontacted.filter((lead) => lead.classification === 'Lead Caliente').length,
+      overdueTasks: periodTasks.filter((task) => isOpenTask(task) && task.due_at && new Date(task.due_at) < now).length,
+      periodAppointments,
+      attended,
+      noShows,
+      confirmed: periodAppointments.filter((item) => item.status === APPOINTMENT_STATUS.confirmed).length,
+      rescheduled: periodAppointments.filter((item) => item.status === APPOINTMENT_STATUS.rescheduled).length,
+      attendanceRate: attendanceBase ? Math.round((attended.length / attendanceBase) * 100) : 0,
+      lost: periodLeads.filter((lead) => lead.status === 'Perdido').length,
+      completedFollowups: periodTasks.filter((task) => task.status === 'hecho' && ['followup', 'contact', 'no_show_recovery'].includes(task.type)).length,
+      overdueFollowups: periodTasks.filter((task) => isOpenTask(task) && ['followup', 'contact', 'no_show_recovery'].includes(task.type) && task.due_at && new Date(task.due_at) < now).length,
+      recoveredNoShows: recoveredNoShows.size,
+      reactivated: periodLeads.filter((lead) => lead.status === 'Reactivar 30d').length,
+      protected: underFollowup.filter((lead) => lead.next_followup_at || tasks.some((task) => task.lead_id === lead.id && isOpenTask(task))).length,
+      potential,
+      sourceCounts,
+      treatmentCounts,
+      classificationCounts,
+      funnel,
+    };
+  }, [leads, appointments, tasks, treatmentPrices, period]);
+
+  return (
+    <section className="space-y-6">
+      <PageHeader eyebrow="Control comercial" title="Métricas" subtitle="Medí captación, velocidad y seguimiento. Las estimaciones no representan ingresos confirmados." action={<div className="min-w-48"><Select label="Período" value={period} onChange={setPeriod} options={[{ value: 'week', label: 'Esta semana' }, { value: 'month', label: 'Este mes' }, { value: '30d', label: 'Últimos 30 días' }, { value: '90d', label: 'Últimos 90 días' }, { value: 'year', label: 'Este año' }]} /></div>} />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Leads captados" value={data.periodLeads.length} icon={UsersRound} detail="Oportunidades nuevas del período" />
+        <StatCard label="Leads contactados" value={data.contacted.length} tone="success" icon={CheckCircle2} />
+        <StatCard label="Sin contactar" value={data.uncontacted.length} tone="gold" icon={AlarmClock} />
+        <StatCard label="Respuesta promedio" value={data.avgResponse === null ? 'Sin datos' : data.avgResponse < 60 ? `${data.avgResponse} min` : `${Math.round(data.avgResponse / 60)} h`} icon={Clock3} />
+        <StatCard label="Citas agendadas" value={data.periodAppointments.length} tone="purple" icon={CalendarCheck2} />
+        <StatCard label="Tasa de asistencia" value={`${data.attendanceRate}%`} tone="success" icon={TrendingUp} detail={`${data.attended.length} asistencias · ${data.noShows.length} no-shows`} />
+        <StatCard label="Tareas vencidas" value={data.overdueTasks} tone="danger" icon={CheckCircle2} />
+        <StatCard label="Calientes sin contacto" value={data.hotUncontacted} tone="danger" icon={Flame} />
+      </div>
+
+      <Card className="overflow-hidden">
+        <div className="border-b border-slate-200 p-5"><h3 className="font-bold text-cream">Embudo comercial</h3><p className="mt-1 text-sm text-slate-500">Conversión observada por etapa dentro del período.</p></div>
+        <div className="grid gap-3 p-5 lg:grid-cols-5">
+          {data.funnel.map(([label, value], index) => {
+            const previous = index ? data.funnel[index - 1][1] : value;
+            const rate = previous ? Math.round((value / previous) * 100) : 0;
+            return <div key={label} className="relative rounded-2xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-cream">{value}</p>{index ? <p className="mt-2 text-xs font-bold text-mint">{rate}% desde etapa anterior</p> : <p className="mt-2 text-xs text-slate-400">Base del período</p>}</div>;
+          })}
+        </div>
+      </Card>
+
+      <div className="grid gap-5 xl:grid-cols-3">
+        <MetricBreakdown title="Leads por fuente" entries={data.sourceCounts} total={data.periodLeads.length} />
+        <MetricBreakdown title="Leads por tratamiento" entries={data.treatmentCounts} total={data.periodLeads.length} />
+        <MetricBreakdown title="Clasificación" entries={data.classificationCounts} total={data.periodLeads.length} />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="p-5">
+          <div className="flex items-start justify-between gap-4"><div><h3 className="font-bold text-cream">Valor comercial protegido</h3><p className="mt-1 text-sm text-slate-500">Señales operativas del sistema, sin prometer resultados.</p></div><CircleDollarSign className="h-6 w-6 text-violet-600" /></div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <ValueSignal label="Oportunidades bajo seguimiento" value={data.protected} />
+            <ValueSignal label="Leads calientes priorizados" value={data.periodLeads.filter((lead) => lead.classification === 'Lead Caliente').length} />
+            <ValueSignal label="No-shows con recuperación" value={data.noShows.length} />
+            <ValueSignal label="No-shows recuperados" value={data.recoveredNoShows} />
+            <ValueSignal label="Seguimientos completados" value={data.completedFollowups} />
+            <ValueSignal label="Seguimientos vencidos" value={data.overdueFollowups} />
+          </div>
+        </Card>
+        <Card className="bg-gradient-to-br from-violet-600 to-blue-700 p-6 text-white">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/70">Estimación interna</p>
+          <h3 className="mt-2 text-lg font-semibold text-white/90">Valor potencial estimado en seguimiento</h3>
+          <p className="mt-4 text-4xl font-bold tracking-tight">{formatMoney(data.potential)}</p>
+          <p className="mt-4 text-sm leading-6 text-white/75">Calculado con el valor del lead o el precio conservador configurado por tratamiento. No es ingreso confirmado.</p>
+          <div className="mt-5 border-t border-white/20 pt-4 text-sm text-white/80">{data.lost} oportunidades marcadas como perdidas · {data.reactivated} en reactivación</div>
+        </Card>
+      </div>
+    </section>
+  );
+}
+
+function countBy(items, selector) {
+  return Object.entries(items.reduce((acc, item) => {
+    const key = selector(item);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]).slice(0, 7);
+}
+
+function MetricBreakdown({ title, entries, total }) {
+  return (
+    <Card className="p-5">
+      <h3 className="font-bold text-cream">{title}</h3>
+      <div className="mt-5 space-y-4">
+        {entries.length ? entries.map(([label, value]) => <div key={label}><div className="mb-1.5 flex items-center justify-between gap-3 text-xs"><span className="truncate font-semibold text-slate-600">{label}</span><span className="font-bold text-cream">{value}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-mint transition-all" style={{ width: `${total ? Math.max(4, Math.round((value / total) * 100)) : 0}%` }} /></div></div>) : <p className="text-sm text-slate-500">Sin datos en este período.</p>}
+      </div>
+    </Card>
+  );
+}
+
+function ValueSignal({ label, value }) {
+  return <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-cream">{value}</p></div>;
+}
+
 function SettingsView({ clinic, profile, publicFormConfig, savingPublicForm, onSavePublicForm, setNotice }) {
   return (
-    <section className="space-y-4">
+    <section className="space-y-6">
+      <PageHeader eyebrow="Administración" title="Configuración" subtitle="Datos de la clínica y conexión segura del formulario público. Sólo visible para owner/admin." />
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-white/10 bg-panel/90 p-5 shadow-glow">
-          <h2 className="mb-4 text-lg font-semibold">Datos de la clinica</h2>
+        <Card className="p-5">
+          <h2 className="mb-4 text-lg font-semibold">Datos de la clínica</h2>
           <div className="grid gap-4">
             <Info label="Nombre" value={clinic?.name || 'Sin dato'} />
             <Info label="Doctor" value={clinic?.doctor_name || 'Sin dato'} />
@@ -2431,16 +3049,16 @@ function SettingsView({ clinic, profile, publicFormConfig, savingPublicForm, onS
             <Info label="Direccion" value={clinic?.address_link || 'Sin dato'} />
             <Info label="Color principal" value={clinic?.primary_color || 'Sin dato'} />
           </div>
-        </div>
+        </Card>
 
-        <div className="rounded-lg border border-white/10 bg-panel/90 p-5">
+        <Card className="p-5">
           <h2 className="mb-4 text-lg font-semibold">Usuario actual</h2>
           <div className="grid gap-4">
             <Info label="Nombre" value={profile?.full_name || 'Sin dato'} />
             <Info label="Email" value={profile?.email || 'Sin dato'} />
             <Info label="Rol" value={profile?.role || 'Sin dato'} />
           </div>
-        </div>
+        </Card>
       </div>
 
       <PublicFormSettings clinic={clinic} config={publicFormConfig} saving={savingPublicForm} onSave={onSavePublicForm} setNotice={setNotice} />
@@ -2495,7 +3113,7 @@ function PublicFormSettings({ clinic, config, saving, onSave, setNotice }) {
   const fetchSnippet = publicFormFetchSnippet(currentConfig);
 
   return (
-    <section className="rounded-lg border border-white/10 bg-panel/90 p-5 shadow-glow">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-glow">
       <div className="mb-5 flex flex-col gap-3 border-b border-white/10 pb-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Landing / Formulario</h2>
@@ -2504,7 +3122,7 @@ function PublicFormSettings({ clinic, config, saving, onSave, setNotice }) {
         <StatusBadge value={form.is_active ? 'Activo' : 'Inactivo'} />
       </div>
 
-      {formError ? <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-red-100">{formError}</div> : null}
+      {formError ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="clinic_slug" value={form.clinic_slug} onChange={(value) => updateField('clinic_slug', slugify(value))} disabled={saving} />
@@ -2523,7 +3141,7 @@ function PublicFormSettings({ clinic, config, saving, onSave, setNotice }) {
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <button className="inline-flex items-center gap-2 rounded-lg bg-mint px-4 py-2 text-sm font-semibold text-ink hover:bg-mint/90 disabled:cursor-not-allowed disabled:opacity-60" type="button" onClick={handleSave} disabled={saving}>
+        <button className="inline-flex items-center gap-2 rounded-xl bg-mint px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" type="button" onClick={handleSave} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Guardar configuracion
         </button>
@@ -2580,8 +3198,8 @@ function LeadMiniCard({ lead, onOpenLead }) {
 function Info({ label, value }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs uppercase tracking-[0.16em] text-cream/40">{label}</p>
-      <p className="mt-1 break-words text-sm text-cream/85">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium leading-5 text-slate-700">{value === null || value === undefined || value === '' ? 'Sin dato' : value}</p>
     </div>
   );
 }
@@ -2589,29 +3207,33 @@ function Info({ label, value }) {
 function Select({ label, value, onChange, options, placeholder, disabled = false }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-xs text-cream/55">{label}</span>
-      <select className="w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none disabled:cursor-not-allowed disabled:opacity-60" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
-        {placeholder ? <option value="">{placeholder}</option> : null}
-        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      <span className="mb-2 block text-xs font-semibold text-slate-500">{label}</span>
+      <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition focus:border-mint focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+        {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
+        {(options || []).map((option) => {
+          const optionValue = typeof option === 'object' ? option.value : option;
+          const optionLabel = typeof option === 'object' ? option.label : option;
+          return <option key={optionValue} value={optionValue}>{optionLabel}</option>;
+        })}
       </select>
     </label>
   );
 }
 
-function Field({ label, value, onChange, type = 'text', disabled = false }) {
+function Field({ label, value, onChange, type = 'text', disabled = false, placeholder = '' }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-xs text-cream/55">{label}</span>
-      <input className="w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none disabled:cursor-not-allowed disabled:opacity-60" type={type} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+      <span className="mb-2 block text-xs font-semibold text-slate-500">{label}</span>
+      <input className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition placeholder:text-slate-400 focus:border-mint focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60" type={type} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} />
     </label>
   );
 }
 
-function TextArea({ label, value, onChange, disabled = false, className = '' }) {
+function TextArea({ label, value, onChange, disabled = false, className = '', placeholder = '' }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-2 block text-xs text-cream/55">{label}</span>
-      <textarea className="min-h-28 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none disabled:cursor-not-allowed disabled:opacity-60" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+      <span className="mb-2 block text-xs font-semibold text-slate-500">{label}</span>
+      <textarea className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition placeholder:text-slate-400 focus:border-mint focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:opacity-60" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} />
     </label>
   );
 }

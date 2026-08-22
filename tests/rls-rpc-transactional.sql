@@ -24,6 +24,7 @@ declare
   scheduled public.appointments;
   no_show public.appointments;
   recovery_task public.tasks;
+  manual_lead public.leads;
   booking_blocked boolean := false;
 begin
   if (select count(*) from public.clinics) <> 1 then
@@ -34,6 +35,37 @@ begin
   end if;
   if (select count(*) from public.clinic_public_forms) <> 1 then
     raise exception 'DentalPro owner no puede ver exactamente su public form';
+  end if;
+
+  select * into manual_lead
+  from public.create_manual_lead(
+    'Lead Presencial Transactional', '0981000999', null,
+    'Consulta general', 'Esta semana', 'Prueba de fuente presencial',
+    'Presencial', true, null, 'Enviar WhatsApp', now() + interval '1 hour',
+    null, 'Lead Medio', 50, 'Quiere agendar una consulta', 'No sabe', null
+  );
+
+  if manual_lead.clinic_id <> '00000000-0000-0000-0000-000000000101'
+     or manual_lead.source <> 'Presencial'
+     or not exists (
+       select 1 from public.tasks
+       where lead_id = manual_lead.id and type = 'contact' and status = 'pendiente'
+     ) then
+    raise exception 'create_manual_lead no guardo fuente presencial y tarea atomica';
+  end if;
+
+  perform public.save_lead_followup(
+    manual_lead.id,
+    'Contactado',
+    'Hacer seguimiento',
+    now() + interval '1 day'
+  );
+
+  if not exists (
+    select 1 from public.tasks
+    where lead_id = manual_lead.id and type = 'followup' and status = 'pendiente'
+  ) then
+    raise exception 'save_lead_followup no creo tarea sin duplicar el flujo';
   end if;
 
   update public.leads
@@ -181,6 +213,21 @@ begin
       contact_attempts = contact_attempts + 1
   where id = '00000000-0000-0000-0000-000000000202';
 
+  perform public.save_lead_followup(
+    '00000000-0000-0000-0000-000000000202',
+    'Contactado',
+    'Hacer seguimiento desde recepción',
+    now() + interval '1 day'
+  );
+
+  if not exists (
+    select 1 from public.tasks
+    where lead_id = '00000000-0000-0000-0000-000000000202'
+      and type = 'followup' and status = 'pendiente'
+  ) then
+    raise exception 'Receptionist no pudo guardar seguimiento atomico';
+  end if;
+
   select * into scheduled
   from public.schedule_lead_appointment(
     '00000000-0000-0000-0000-000000000202',
@@ -210,12 +257,29 @@ select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000003
 set local role authenticated;
 
 do $$
+declare
+  cross_clinic_followup_blocked boolean := false;
 begin
   if (select count(*) from public.clinics) <> 1 then
     raise exception 'QA B owner no ve exactamente una clinica';
   end if;
   if exists (select 1 from public.leads where clinic_id <> '00000000-0000-0000-0000-000000000102') then
     raise exception 'QA B owner ve DentalPro';
+  end if;
+
+  begin
+    perform public.save_lead_followup(
+      '00000000-0000-0000-0000-000000000201',
+      'Contactado',
+      'Debe fallar cross-clinic',
+      now() + interval '1 day'
+    );
+  exception when sqlstate '42501' then
+    cross_clinic_followup_blocked := true;
+  end;
+
+  if not cross_clinic_followup_blocked then
+    raise exception 'QA B pudo modificar seguimiento de DentalPro';
   end if;
 end
 $$;

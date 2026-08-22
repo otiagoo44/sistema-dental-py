@@ -29,12 +29,18 @@ Objetivo: validar el relato y el flujo operativo con el equipo interno. No es un
 
 ## Guion de 12–15 minutos
 
+### 0. Qué necesita atención ahora
+
+Abrir Dashboard y explicar que la pantalla prioriza leads calientes sin contactar, seguimientos vencidos, citas de hoy, no-shows y tareas atrasadas. Entrar a `Seguimientos` para mostrar la cola agrupada por vencimiento y no por simple fecha de creación.
+
 ### 1. Entrada del lead
 
 Mostrar una de estas entradas:
 
 - formulario `/form/dentalpro` con consentimiento, o
 - `Nuevo lead` con fuente `WhatsApp directo`.
+
+En carga manual, mostrar que recepción elige fuente, tratamiento, urgencia, situación, responsable, próxima acción y fecha desde menús. Usar `Guardar lead` o `Guardar y agendar`; el objetivo operativo es completar el registro en menos de 45 segundos.
 
 Explicar claramente la diferencia:
 
@@ -45,7 +51,7 @@ No mostrar tokens completos ni paneles con secret/service role.
 
 ### 2. Score y prioridad
 
-Abrir el lead y mostrar tratamiento, urgencia, score, clasificación y próxima acción. En formulario público, el intake calcula score/clasificación. En carga manual, recepción selecciona estos valores según el criterio operativo; no presentarlo como cálculo automático.
+Abrir el lead y mostrar tratamiento, urgencia, clasificación y próxima acción. En formulario público, el intake calcula score/clasificación. En carga manual, recepción elige la clasificación; el score queda con el valor interno por defecto hasta que un admin lo ajuste. No presentarlo como cálculo automático.
 
 ### 3. Task
 
@@ -53,7 +59,7 @@ Mostrar la task inicial y su responsable. Completarla y abrir eventos para ver `
 
 ### 4. Agenda
 
-Agendar fecha/hora y doctor. Mostrar que se sincronizan appointment, lead, event y task. Intentar la misma reserva activa para otro lead y mostrar el bloqueo.
+Elegir día en el calendario, profesional y un slot disponible de 30 minutos. Mostrar los ocupados deshabilitados y que se sincronizan appointment, lead, event y task. Intentar la misma reserva activa para otro lead y mostrar el bloqueo de la RPC/DB.
 
 ### 5. No-show
 
@@ -66,12 +72,14 @@ Marcar un appointment `No Asistió`. Mostrar:
 
 Reprogramar para cerrar el relato de recuperación.
 
-### 6. Roles
+### 6. Métricas y roles
 
-Con owner/admin, mostrar Configuración y Archivado. Cambiar a receptionist y mostrar:
+Con owner/admin, abrir Métricas y mostrar embudo, fuentes, tratamientos, asistencia, seguimientos y `Valor potencial estimado`. Decir explícitamente que es una estimación interna y no ingreso confirmado.
 
-- `Nuevo lead`, Agenda y completar task disponibles;
-- Configuración y Archivado ausentes;
+Mostrar también Configuración y Archivado. Cambiar a receptionist y mostrar:
+
+- `Nuevo lead`, Seguimientos, Agenda y completar task disponibles;
+- Métricas, Configuración y Archivado ausentes;
 - public forms/tokens no visibles.
 
 ### 7. Multi-clínica
@@ -95,6 +103,7 @@ El lead y la tarea existen antes de cualquier procesamiento n8n. No presentar au
 - La clínica puede trabajar formularios y entradas directas desde el primer día.
 - La recepción no puede elegir otra clínica ni acceder a configuración crítica.
 - Agenda, no-show y completar tasks usan RPCs transaccionales.
+- Marcar contacto y posponer seguimiento usa `save_lead_followup`, con event y tarea anti-duplicado.
 - No hay hard delete operativo.
 - El formulario público no envía `clinic_id` ni secretos.
 - El piloto no es historia clínica ni integración automática con mensajería.

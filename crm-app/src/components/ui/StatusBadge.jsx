@@ -1,29 +1,36 @@
 const statusStyles = {
-  'Lead Caliente': 'border-danger/50 bg-danger/10 text-red-100',
-  'Lead Medio': 'border-gold/50 bg-gold/10 text-yellow-100',
-  'Lead Frío': 'border-slate-500/50 bg-slate-500/10 text-slate-100',
-  Nuevo: 'border-mint/50 bg-mint/10 text-mint',
-  'Consulta Agendada': 'border-gold/60 bg-gold/10 text-yellow-100',
-  Confirmado: 'border-mint/60 bg-mint/10 text-mint',
-  Perdido: 'border-danger/60 bg-danger/10 text-red-100',
-  Archivado: 'border-slate-500/60 bg-slate-500/10 text-slate-100',
-  baja: 'border-slate-500/50 bg-slate-500/10 text-slate-100',
-  media: 'border-gold/50 bg-gold/10 text-yellow-100',
-  alta: 'border-danger/50 bg-danger/10 text-red-100',
-  urgente: 'border-danger/70 bg-danger/20 text-red-100',
-  pendiente: 'border-gold/50 bg-gold/10 text-yellow-100',
-  vencido: 'border-danger/60 bg-danger/10 text-red-100',
-  hecho: 'border-mint/60 bg-mint/10 text-mint',
-  cancelado: 'border-slate-500/60 bg-slate-500/10 text-slate-100',
-  Activo: 'border-mint/60 bg-mint/10 text-mint',
-  Inactivo: 'border-slate-500/60 bg-slate-500/10 text-slate-100',
+  'Lead Caliente': 'border-red-200 bg-red-50 text-red-700',
+  'Lead Medio': 'border-amber-200 bg-amber-50 text-amber-700',
+  'Lead Frío': 'border-slate-200 bg-slate-100 text-slate-600',
+  Nuevo: 'border-blue-200 bg-blue-50 text-blue-700',
+  'No Contactado': 'border-amber-200 bg-amber-50 text-amber-700',
+  Contactado: 'border-sky-200 bg-sky-50 text-sky-700',
+  Respondió: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+  'Consulta Agendada': 'border-violet-200 bg-violet-50 text-violet-700',
+  Agendado: 'border-violet-200 bg-violet-50 text-violet-700',
+  Reprogramado: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
+  Confirmado: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  Asistió: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  'No Asistió': 'border-red-200 bg-red-50 text-red-700',
+  Perdido: 'border-red-200 bg-red-50 text-red-700',
+  Archivado: 'border-slate-200 bg-slate-100 text-slate-600',
+  baja: 'border-slate-200 bg-slate-100 text-slate-600',
+  media: 'border-amber-200 bg-amber-50 text-amber-700',
+  alta: 'border-orange-200 bg-orange-50 text-orange-700',
+  urgente: 'border-red-200 bg-red-50 text-red-700',
+  pendiente: 'border-amber-200 bg-amber-50 text-amber-700',
+  vencido: 'border-red-200 bg-red-50 text-red-700',
+  hecho: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  cancelado: 'border-slate-200 bg-slate-100 text-slate-600',
+  Activo: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  Inactivo: 'border-slate-200 bg-slate-100 text-slate-600',
 };
 
 export default function StatusBadge({ value }) {
   if (!value) return null;
 
   return (
-    <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyles[value] || 'border-white/10 bg-white/5 text-cream/80'}`}>
+    <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyles[value] || 'border-slate-200 bg-slate-50 text-slate-600'}`}>
       {value}
     </span>
   );

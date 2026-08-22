@@ -46,6 +46,7 @@ Realizar desde un entorno administrativo controlado o SQL Editor, nunca desde el
 5. Crear `public.profiles` para cada usuario, con el mismo `clinic_id`, `active = true` y rol `owner`, `admin` o `receptionist`.
 6. Comprobar que al menos un owner/admin puede recuperar acceso antes de entregar recepción.
 7. Configurar tratamientos, horarios, responsables y mensajes. Si aún no hay UI para un ajuste, hacerlo mediante el proceso SQL versionado y revisado.
+   La Agenda muestra por defecto slots cada 30 minutos, 08:00–12:00 y 14:00–18:00; documentar cualquier diferencia entre esa ayuda visual y `opening_hours` hasta parametrizar completamente los slots.
 8. Configurar Auth Site URL y Redirect URLs del dominio CRM final o staging.
 9. Activar MFA para owner/admin cuando el plan y el flujo operativo lo permitan.
 10. Ejecutar la verificación SQL/RLS y registrar fecha/commit, sin exportar secretos.
@@ -194,15 +195,16 @@ Primero ejecutar un caso sintético con teléfono único. Sólo después usar un
 
 Sesión práctica de 45–60 minutos:
 
-1. Dashboard y Hoy / Prioridad.
-2. `Nuevo lead` desde WhatsApp/Instagram/llamada.
-3. Fuente, clasificación, responsable y tarea.
-4. Respuesta por WhatsApp y registro de intento.
-5. Agenda y doble reserva.
-6. Confirmado, Asistió, No Asistió y reprogramación.
-7. Completar tareas y dejar notas comerciales breves.
-8. Qué no puede tocar: tokens, origins, usuarios, archivado y datos de otra clínica.
-9. Cierre de sesión y manejo de incidentes.
+1. Dashboard y `Prioridad de hoy`.
+2. `Nuevo lead` desde WhatsApp/Instagram/llamada/presencial en menos de 45 segundos.
+3. Elegir fuente, tratamiento, urgencia, situación, responsable y próxima acción desde menús.
+4. Usar `Guardar lead` o `Guardar y agendar`.
+5. Trabajar `Seguimientos`: contactar, posponer, agendar, completar tarea y dejar nota.
+6. Agenda visual: día, profesional, slots disponibles/ocupados y doble reserva.
+7. Confirmado, Asistió, No Asistió y reprogramación.
+8. Completar tareas y dejar notas comerciales breves.
+9. Qué no puede tocar: Métricas, tokens, origins, usuarios, archivado y datos de otra clínica.
+10. Cierre de sesión y manejo de incidentes.
 
 La capacitación se aprueba cuando la recepcionista completa un caso de punta a punta sin ayuda.
 

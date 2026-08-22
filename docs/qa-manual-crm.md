@@ -1,8 +1,26 @@
 # QA manual visual de la CRM
 
-Fecha de preparación: 2026-08-21. Proyecto Supabase: `unybqqzhgqxhrwucrofm`.
+Fecha de actualización UX: 2026-08-22. Proyecto Supabase: `unybqqzhgqxhrwucrofm`.
 
 Estado de este documento: checklist preparada, no ejecutada. La revisión de código y las pruebas automáticas no reemplazan esta pasada visual. No declarar la CRM lista para demo externa o prospección mientras queden casos obligatorios sin evidencia.
+
+## Checklist obligatoria del rediseño
+
+- [ ] 1. Login owner/admin: ve Dashboard, Leads, Seguimientos, Agenda, Tareas, Métricas y Configuración.
+- [ ] 2. Login receptionist: ve Dashboard, Leads, Seguimientos, Agenda y Tareas; no ve Métricas ni Configuración crítica.
+- [ ] 3. Login QA Clinic B: no ve conteos, leads, responsables, citas ni tareas de DentalPro.
+- [ ] 4. Dashboard intuitivo: permite identificar qué atender primero sin explicación externa.
+- [ ] 5. Leads: búsqueda, estado, clasificación, tratamiento, fuente, responsable, fecha, atajos y ordenamiento funcionan juntos.
+- [ ] 6. Seguimientos: grupos Vencidos, Para hoy, Próximos 7 días, No-shows y Sin respuesta muestran motivos y acciones correctas.
+- [ ] 7. Nuevo lead: una recepcionista lo completa en menos de 45 segundos con nombre, teléfono y nota como únicos campos libres.
+- [ ] 8. Agenda: calendario visual, profesional y slots disponibles/ocupados se entienden sin escribir la hora.
+- [ ] 9. Doble reserva: el slot ocupado queda deshabilitado y la RPC/DB vuelve a bloquear una carrera concurrente.
+- [ ] 10. No-show: crea seguimiento para mañana 09:00 `America/Asuncion` y tarea de recuperación.
+- [ ] 11. Tareas automáticas: lead manual, agenda, contacto, posposición, no-show y completar tarea no dejan duplicados abiertos del mismo tipo.
+- [ ] 12. Métricas: sólo owner/admin; valores, tasas, embudo y estimación potencial coinciden con los datos visibles.
+- [ ] 13. Responsive: probar 320 px, 375 px, tablet y notebook; navegación, filtros, cards y modales sin scroll horizontal.
+- [ ] 14. Console/Network: cero errores no explicados; requests de agenda y seguimiento salen por RPC.
+- [ ] 15. No hay datos cruzados entre clínicas después de crear, contactar, posponer, agendar y completar.
 
 ## Evidencia tecnica de release 2026-08-21
 
@@ -16,6 +34,15 @@ Esta evidencia permite iniciar la pasada visual, pero no marca ninguno de sus ca
 - HTTP `lead-intake`: 29 passed, 0 failed. SQL verification, RLS real-users y RLS/RPC transaccional: PASS. Build: OK. Audit: 0 vulnerabilidades.
 - La landing de produccion `https://sistema-dental-py.vercel.app` no fue promovida y sigue pendiente de QA visual.
 - Supabase Auth Site URL y Redirect URLs del CRM Preview siguen pendientes de configuracion manual.
+
+## Evidencia técnica del rediseño 2026-08-22
+
+- Migración `20260822120000_secure_followup_workflow.sql` aplicada al proyecto enlazado.
+- Build Vite: OK. `npm audit`: 0 vulnerabilidades.
+- SQL verification, RLS real-users y RLS/RPC transaccional: PASS.
+- `lead-intake`: 29 passed, 0 failed.
+- Búsquedas de proyecto viejo, `dangerouslySetInnerHTML`, `.delete(` y sourcemaps: sin hallazgos.
+- El navegador integrado no estuvo disponible; ninguna casilla visual de este documento se considera aprobada por esa razón.
 
 ## 1. Preparación y evidencia
 
@@ -53,7 +80,7 @@ Matriz mínima de evidencia:
 
 - [ ] Iniciar sesión con el owner/admin QA de DentalPro.
 - [ ] Ver nombre de DentalPro y rol `admin` u `owner` en el layout.
-- [ ] Ver Dashboard, Hoy / Prioridad, Leads, Agenda, Tareas y Configuración.
+- [ ] Ver Dashboard, Leads, Seguimientos, Agenda, Tareas, Métricas y Configuración.
 - [ ] Confirmar que no aparecen clínica, leads, turnos, tareas ni responsables de QA Clinic B.
 - [ ] Confirmar que puede abrir Configuración, crear `Nuevo lead` y archivar con motivo.
 - [ ] Recargar la página; la sesión y la clínica deben restaurarse sin error.
@@ -61,8 +88,8 @@ Matriz mínima de evidencia:
 ### DentalPro receptionist
 
 - [ ] Iniciar sesión con el usuario QA de recepción de DentalPro.
-- [ ] Ver Dashboard, Hoy / Prioridad, Leads, Agenda y Tareas.
-- [ ] Confirmar que Configuración no aparece en desktop ni mobile.
+- [ ] Ver Dashboard, Leads, Seguimientos, Agenda y Tareas.
+- [ ] Confirmar que Métricas y Configuración no aparecen en desktop ni mobile.
 - [ ] Confirmar que no aparecen public forms, audit logs, tokens ni datos de QA Clinic B.
 - [ ] Confirmar que `Nuevo lead` sí aparece.
 - [ ] Confirmar que Archivar no aparece y que no existe hard delete.
@@ -86,23 +113,23 @@ Prueba segura: crear en Supabase Auth un usuario QA temporal con email de domini
 
 Falla crítica: cualquier dato visible antes de resolver un profile activo.
 
-## 3. Dashboard y Hoy / Prioridad
+## 3. Dashboard y Seguimientos
 
 - [ ] Cargar Dashboard sin errores visuales, de Console, Auth, CORS, REST o RLS.
-- [ ] Comparar `Leads totales` con la lista activa, excluyendo archivados.
 - [ ] Comparar `Leads nuevos hoy` usando la fecha de Asunción.
-- [ ] Comparar `Leads calientes` con filtro `Lead Caliente`.
-- [ ] Comparar `No contactados`, consultas activas, pipeline, tasa de contacto y tasa de agendamiento con los datos visibles.
-- [ ] En Leads, filtrar cada estado presente y comprobar sus filas. La UI actual no presenta gráfico de distribución por estado; validar mediante este filtro y registrar esa ausencia como observación, no como dato aprobado del Dashboard.
-- [ ] En Hoy / Prioridad, validar `Leads calientes no contactados` y `Próximo seguimiento vencido`.
+- [ ] Comparar calientes pendientes, seguimientos vencidos, citas de hoy, tareas vencidas, no-shows y leads sin responsable.
+- [ ] Validar respuesta promedio sólo con leads que tengan `created_at` y `last_contact_at`.
+- [ ] Ejecutar una acción desde `Prioridad de hoy` y confirmar que abre el destino correcto.
+- [ ] En Seguimientos, validar filtros por responsable, prioridad, fuente, tratamiento, estado y ventana temporal.
+- [ ] Posponer un seguimiento y confirmar una sola tarea abierta actualizada y event `followup_postponed`.
 - [ ] Repetir como DentalPro y QA Clinic B; ningún conteo debe mezclar clínicas.
 
 ## 4. Leads
 
 - [ ] Ver la lista y abrir el detalle de un lead.
 - [ ] Buscar por nombre o teléfono.
-- [ ] Filtrar por estado, tratamiento y clasificación.
-- [ ] El filtro de fecha no existe en la UI actual: marcar `N/A — no implementado`, porque el requisito lo pide sólo si existe.
+- [ ] Filtrar por estado, tratamiento, clasificación, fuente, responsable y fecha.
+- [ ] Probar `Sólo sin contactar`, `Sólo calientes`, archivados para admin y los cuatro ordenamientos.
 - [ ] Editar nota interna, próxima acción y próximo seguimiento; recargar y comprobar persistencia.
 - [ ] Cambiar un estado permitido.
 - [ ] Intentar cambiar desde Leads a `Consulta Agendada`; debe abrir Agenda, no desincronizar el lead.
@@ -113,11 +140,12 @@ Falla crítica: cualquier dato visible antes de resolver un profile activo.
 Ejecutar una vez con cada rol y con teléfonos sintéticos únicos.
 
 - [ ] Abrir `Nuevo lead`.
-- [ ] Confirmar campos: nombre, teléfono, tratamiento, urgencia, motivo, fuente, consentimiento, nota interna, próxima acción, próximo seguimiento, responsable, clasificación y score.
-- [ ] Confirmar fuentes: WhatsApp directo, Instagram DM, Llamada, Recomendación, Formulario externo, Meta Ads manual, Formulario web y Otro.
+- [ ] Confirmar secciones Datos básicos, Interés y Seguimiento, con jerarquía y labels claros.
+- [ ] Confirmar fuentes: WhatsApp directo, Instagram DM, Llamada, Recomendación, Formulario externo, Meta Ads manual, Formulario web, Presencial y Otro.
 - [ ] Guardar sin nombre: debe bloquear.
 - [ ] Guardar sin teléfono: el servidor debe bloquear.
 - [ ] Elegir un responsable de la misma clínica y crear.
+- [ ] Probar `Guardar lead` y, con otro teléfono, `Guardar y agendar`.
 - [ ] Confirmar lead con `status = Nuevo`, fuente seleccionada y `page = crm_manual`.
 - [ ] Confirmar event `lead_created_manual` y una task `contact` pendiente.
 - [ ] Confirmar que responsable y `clinic_id` coinciden en lead y task.
@@ -133,6 +161,9 @@ Falla crítica: lead creado sin task/event, escritura parcial o posibilidad de a
 Todas estas acciones deben salir por `schedule_lead_appointment` o `update_appointment_outcome`. En Network no debe existir INSERT/UPDATE directo a `appointments`.
 
 - [ ] Desde un lead, abrir Agendar.
+- [ ] Elegir uno de los 14 días visibles y un profesional desde menú.
+- [ ] Confirmar slots cada 30 minutos en 08:00–12:00 y 14:00–18:00.
+- [ ] Confirmar que slots activos del mismo profesional/día aparecen ocupados y deshabilitados.
 - [ ] Guardar sin fecha: bloqueado.
 - [ ] Guardar sin hora: bloqueado.
 - [ ] Guardar con fecha, hora y doctor: crea appointment y sincroniza lead, event, task y audit.
@@ -153,6 +184,13 @@ Todas estas acciones deben salir por `schedule_lead_appointment` o `update_appoi
 - [ ] Abrir el lead asociado y comprobar event `task_completed`.
 - [ ] En Network, confirmar RPC `complete_task`, no UPDATE directo.
 - [ ] No debe existir ninguna task sin `clinic_id` al verificar la base.
+
+## 6.1 Métricas owner/admin
+
+- [ ] Probar Esta semana, Este mes, Últimos 30 días, Últimos 90 días y Este año.
+- [ ] Validar captación, contacto, agenda, asistencia, no-shows, embudo y seguimiento con filas visibles.
+- [ ] Confirmar que `Valor potencial estimado` usa `estimated_value` o `treatment_prices` y muestra el aviso `no ingreso confirmado`.
+- [ ] Receptionist no ve ni puede forzar la pestaña.
 
 ## 7. Archivado
 
