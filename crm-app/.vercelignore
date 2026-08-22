@@ -1,0 +1,10 @@
+.env
+.env.*
+.agents/
+.codex/
+.vercel/
+node_modules/
+dist/
+supabase/
+*.log
+*.map

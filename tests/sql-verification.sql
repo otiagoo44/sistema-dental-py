@@ -39,7 +39,7 @@ begin
 
   select array_agg(name order by name)
   into missing_rpcs
-  from unnest(array['schedule_lead_appointment','update_appointment_outcome','complete_task']) as name
+  from unnest(array['create_manual_lead','schedule_lead_appointment','update_appointment_outcome','complete_task']) as name
   where not exists (
     select 1
     from pg_proc p
@@ -126,6 +126,29 @@ begin
     'EXECUTE'
   ) then
     raise exception 'anon puede ejecutar schedule_lead_appointment';
+  end if;
+
+  if has_function_privilege(
+    'anon',
+    'public.create_manual_lead(text,text,text,text,text,text,text,boolean,text,text,timestamp with time zone,uuid,text,integer,text,text,numeric)',
+    'EXECUTE'
+  ) then
+    raise exception 'anon puede ejecutar create_manual_lead';
+  end if;
+
+  if has_function_privilege('anon', 'public.rls_auto_enable()', 'EXECUTE') then
+    raise exception 'anon puede ejecutar rls_auto_enable';
+  end if;
+
+  if exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'create_manual_lead'
+      and pg_get_function_arguments(p.oid) ilike '%clinic_id%'
+  ) then
+    raise exception 'create_manual_lead acepta clinic_id desde el cliente';
   end if;
 end
 $$;

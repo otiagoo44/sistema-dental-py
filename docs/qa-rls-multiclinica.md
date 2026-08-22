@@ -33,11 +33,11 @@ on conflict (id) do update set
 
 | Usuario | Debe poder | Debe fallar |
 | --- | --- | --- |
-| DentalPro owner | Ver/editar/archivar DentalPro; forms/settings; agendar y completar task | Ver QA Clinic B; DELETE |
-| DentalPro receptionist | Ver/editar campos permitidos; agendar/completar por RPC | Archivar; forms/settings; ver QA Clinic B; INSERT/UPDATE appointment directo |
-| QA Clinic B owner | Ver/editar QA Clinic B | Ver DentalPro; DELETE |
+| DentalPro owner | Ver/editar/archivar DentalPro; `Nuevo lead`; forms/settings; agendar y completar task | Ver QA Clinic B; DELETE |
+| DentalPro receptionist | `Nuevo lead`; ver/editar campos permitidos; agendar/completar por RPC | Archivar; forms/settings; ver QA Clinic B; INSERT directo de lead/appointment |
+| QA Clinic B owner | Ver/editar QA Clinic B; `Nuevo lead` | Ver DentalPro; DELETE |
 
-Para cada usuario iniciar sesion en una ventana privada distinta y registrar captura/resultados. Las operaciones de agenda deben usar `schedule_lead_appointment`, `update_appointment_outcome` y `complete_task`.
+Para cada usuario iniciar sesion en una ventana privada distinta y registrar captura/resultados. La carga manual debe usar `create_manual_lead`; agenda y tareas deben usar `schedule_lead_appointment`, `update_appointment_outcome` y `complete_task`.
 
 Casos obligatorios: doble reserva devuelve `Ese horario ya esta ocupado para este doctor.`; No Asistio deja seguimiento manana 09:00 en `America/Asuncion`; usuario sin profile recibe pantalla de acceso no configurado.
 

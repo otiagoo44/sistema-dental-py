@@ -51,6 +51,16 @@ const TASK_PRIORITY_BY_CLASSIFICATION = {
   'Lead Medio': 'media',
   'Lead Frío': 'baja',
 };
+const MANUAL_LEAD_SOURCES = [
+  'WhatsApp directo',
+  'Instagram DM',
+  'Llamada',
+  'Recomendación',
+  'Formulario externo',
+  'Meta Ads manual',
+  'Formulario web',
+  'Otro',
+];
 const LEAD_ADMIN_EDIT_FIELDS = [
   'name',
   'phone',
@@ -355,6 +365,7 @@ export default function App() {
   const [taskFormSaving, setTaskFormSaving] = useState(false);
   const [publicFormConfig, setPublicFormConfig] = useState(null);
   const [publicFormSaving, setPublicFormSaving] = useState(false);
+  const [clinicProfiles, setClinicProfiles] = useState([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -398,6 +409,7 @@ export default function App() {
         setTaskFormSaving(false);
         setPublicFormConfig(null);
         setPublicFormSaving(false);
+        setClinicProfiles([]);
       }
     });
 
@@ -496,7 +508,7 @@ export default function App() {
     if (!clinicId) return;
     setError('');
 
-    const [leadsResult, appointmentsResult, tasksResult] = await Promise.all([
+    const [leadsResult, appointmentsResult, tasksResult, profilesResult] = await Promise.all([
       supabase
         .from('leads')
         .select('*')
@@ -513,9 +525,15 @@ export default function App() {
         .select('*, leads(id, name, phone, phone_plus, whatsapp_link)')
         .eq('clinic_id', clinicId)
         .order('due_at', { ascending: true, nullsFirst: false }),
+      supabase
+        .from('profiles')
+        .select('id, full_name, email, role, active')
+        .eq('clinic_id', clinicId)
+        .eq('active', true)
+        .order('full_name', { ascending: true }),
     ]);
 
-    const firstError = leadsResult.error || appointmentsResult.error || tasksResult.error;
+    const firstError = leadsResult.error || appointmentsResult.error || tasksResult.error || profilesResult.error;
     if (firstError) {
       console.error('Error loading clinic data', firstError);
       setError(firstError.message);
@@ -525,6 +543,7 @@ export default function App() {
     setLeads(leadsResult.data || []);
     setAppointments(appointmentsResult.data || []);
     setTasks(tasksResult.data || []);
+    setClinicProfiles(profilesResult.data || []);
   }
 
   async function loadLeadEvents(leadId) {
@@ -722,11 +741,6 @@ export default function App() {
   }
 
   function openCreateLeadModal() {
-    if (!canAdmin) {
-      setError('Solo un admin puede crear leads manuales.');
-      return;
-    }
-
     setError('');
     setLeadModal({ mode: 'create', lead: null });
   }
@@ -760,42 +774,52 @@ export default function App() {
   }
 
   async function createManualLead(form) {
-    if (!profile?.clinic_id || !canAdmin) {
-      throw new Error('Solo un admin puede crear leads manuales.');
+    if (!profile?.clinic_id) {
+      throw new Error('Tu usuario no tiene una clínica activa asignada.');
     }
 
-    const payload = buildLeadFormPatch({ ...form, status: 'Nuevo' }, LEAD_ADMIN_EDIT_FIELDS);
-    if (!payload.name) {
+    const name = String(form.name || '').trim();
+    if (!name) {
       throw new Error('El nombre del lead es obligatorio.');
     }
 
-    payload.clinic_id = profile.clinic_id;
-    payload.status = 'Nuevo';
-    payload.source = 'CRM manual';
-    payload.page = 'crm';
-    payload.whatsapp_link = payload.phone_plus || payload.phone ? buildWhatsappUrl(payload) : null;
+    if (!MANUAL_LEAD_SOURCES.includes(form.source)) {
+      throw new Error('Seleccioná una fuente válida.');
+    }
 
     setLeadFormSaving(true);
     setError('');
     setNotice('');
 
     try {
-      const { data: createdLead, error: insertError } = await supabase
-        .from('leads')
-        .insert(payload)
-        .select('*')
-        .single();
+      const { data, error: insertError } = await supabase.rpc('create_manual_lead', {
+        p_name: name,
+        p_phone: cleanOptionalText(form.phone),
+        p_phone_plus: cleanOptionalText(form.phone_plus),
+        p_treatment: cleanOptionalText(form.treatment),
+        p_urgency: cleanOptionalText(form.urgency),
+        p_consultation_reason: cleanOptionalText(form.consultation_reason),
+        p_source: form.source,
+        p_consent_contact: Boolean(form.consent_contact),
+        p_notes: cleanOptionalText(form.notes),
+        p_next_action: cleanOptionalText(form.next_action),
+        p_next_followup_at: fromDatetimeLocalAsuncion(form.next_followup_at),
+        p_assigned_to: form.assigned_to || null,
+        p_classification: form.classification || 'Lead Medio',
+        p_score: integerOrZero(form.score),
+        p_situation: cleanOptionalText(form.situation),
+        p_evaluation_previous: cleanOptionalText(form.evaluation_previous),
+        p_estimated_value: numberOrNull(form.estimated_value),
+      });
 
       if (insertError) {
         throw new Error(insertError.message);
       }
 
-      const { error: eventError } = await createLeadEvent(createdLead.id, {
-        event_type: 'lead_created_manual',
-        title: 'Lead creado manualmente',
-      });
-
-      const { error: taskError } = await syncTasksForLeadStatus(createdLead, createdLead.status);
+      const createdLead = Array.isArray(data) ? data[0] : data;
+      if (!createdLead?.id) {
+        throw new Error('La RPC no devolvió el lead creado.');
+      }
 
       await refreshClinicData();
       setSelectedLeadId(createdLead.id);
@@ -803,17 +827,7 @@ export default function App() {
       setLeadModal(null);
       setActiveView('lead-detail');
 
-      if (eventError) {
-        setError(`El lead fue creado, pero no se pudo registrar el evento: ${eventError.message}`);
-        return;
-      }
-
-      if (taskError) {
-        setError(`El lead fue creado, pero no se pudo crear la tarea automatica: ${taskError.message}`);
-        return;
-      }
-
-      setNotice('Lead creado manualmente.');
+      setNotice('Lead creado manualmente. Evento y tarea registrados.');
     } finally {
       setLeadFormSaving(false);
     }
@@ -1278,6 +1292,8 @@ export default function App() {
           mode={leadModal.mode}
           lead={leadModal.lead}
           canAdmin={canAdmin}
+          profiles={clinicProfiles}
+          currentUserId={profile?.id}
           saving={leadFormSaving}
           onClose={() => setLeadModal(null)}
           onSubmit={saveLeadForm}
@@ -1619,12 +1635,10 @@ function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, onArchiveLead, o
             <span className="text-sm text-cream/45">Los leads archivados no se muestran en vistas operativas.</span>
           )}
 
-          {canAdmin ? (
-            <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-mint px-4 py-2 text-sm font-semibold text-ink hover:bg-mint/90" type="button" onClick={onCreateLead}>
-              <FilePlus className="h-4 w-4" />
-              Crear lead
-            </button>
-          ) : null}
+          <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-mint px-4 py-2 text-sm font-semibold text-ink hover:bg-mint/90" type="button" onClick={onCreateLead}>
+            <FilePlus className="h-4 w-4" />
+            Nuevo lead
+          </button>
         </div>
       </div>
 
@@ -2034,7 +2048,7 @@ function AppointmentModal({ clinic, lead, appointment, mode, saving, onClose, on
   );
 }
 
-function getLeadFormDefaults(lead) {
+function getLeadFormDefaults(lead, currentUserId = '') {
   return {
     name: lead?.name || '',
     phone: lead?.phone || '',
@@ -2051,23 +2065,26 @@ function getLeadFormDefaults(lead) {
     next_action: lead?.next_action || '',
     next_followup_at: toDatetimeLocalAsuncion(lead?.next_followup_at),
     notes: lead?.notes || '',
+    source: lead?.source || 'WhatsApp directo',
+    consent_contact: Boolean(lead?.consent_contact),
+    assigned_to: lead?.assigned_to || currentUserId,
   };
 }
 
-function LeadFormModal({ mode, lead, canAdmin, saving, onClose, onSubmit }) {
-  const [form, setForm] = useState(() => getLeadFormDefaults(lead));
+function LeadFormModal({ mode, lead, canAdmin, profiles, currentUserId, saving, onClose, onSubmit }) {
+  const [form, setForm] = useState(() => getLeadFormDefaults(lead, currentUserId));
   const [formError, setFormError] = useState('');
   const isCreate = mode === 'create';
-  const fullEdit = canAdmin;
+  const fullEdit = isCreate || canAdmin;
   const statusOptions = useMemo(() => {
     const options = LEAD_STATUSES.filter((status) => status !== ARCHIVED_STATUS);
     return isArchivedLead(lead) ? [...options, ARCHIVED_STATUS] : options;
   }, [lead]);
 
   useEffect(() => {
-    setForm(getLeadFormDefaults(lead));
+    setForm(getLeadFormDefaults(lead, currentUserId));
     setFormError('');
-  }, [lead?.id, mode]);
+  }, [lead?.id, mode, currentUserId]);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -2076,6 +2093,11 @@ function LeadFormModal({ mode, lead, canAdmin, saving, onClose, onSubmit }) {
   async function handleSubmit() {
     if ((isCreate || fullEdit) && !String(form.name || '').trim()) {
       setFormError('El nombre del lead es obligatorio.');
+      return;
+    }
+
+    if (isCreate && !String(form.phone || '').trim() && !String(form.phone_plus || '').trim()) {
+      setFormError('El teléfono del lead es obligatorio.');
       return;
     }
 
@@ -2097,27 +2119,43 @@ function LeadFormModal({ mode, lead, canAdmin, saving, onClose, onSubmit }) {
           handleSubmit();
         }}
       >
-        <ModalHeader title={isCreate ? 'Crear lead' : 'Editar lead'} subtitle={isCreate ? 'CRM manual' : lead?.name || 'Lead'} onClose={onClose} disabled={saving} />
+        <ModalHeader title={isCreate ? 'Nuevo lead' : 'Editar lead'} subtitle={isCreate ? 'Carga manual segura' : lead?.name || 'Lead'} onClose={onClose} disabled={saving} />
 
         {formError ? <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-red-100">{formError}</div> : null}
 
         {fullEdit ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <Field label="Nombre" value={form.name} onChange={(value) => updateField('name', value)} disabled={saving} />
-            <Field label="Telefono" value={form.phone} onChange={(value) => updateField('phone', value)} disabled={saving} />
+            <Field label={isCreate ? 'Telefono *' : 'Telefono'} value={form.phone} onChange={(value) => updateField('phone', value)} disabled={saving} />
             <Field label="Telefono internacional" value={form.phone_plus} onChange={(value) => updateField('phone_plus', value)} disabled={saving} />
             <Field label="Tratamiento" value={form.treatment} onChange={(value) => updateField('treatment', value)} disabled={saving} />
             <Field label="Urgencia" value={form.urgency} onChange={(value) => updateField('urgency', value)} disabled={saving} />
             <Select label="Clasificacion" value={form.classification} onChange={(value) => updateField('classification', value)} options={CLASSIFICATIONS} disabled={saving} />
             <Field label="Score" type="number" value={form.score} onChange={(value) => updateField('score', value)} disabled={saving} />
             <Field label="Valor estimado" type="number" value={form.estimated_value} onChange={(value) => updateField('estimated_value', value)} disabled={saving} />
-            {!isCreate ? <Select label="Estado" value={form.status} onChange={(value) => updateField('status', value)} options={statusOptions} disabled={saving} /> : null}
+            {isCreate ? <Select label="Fuente" value={form.source} onChange={(value) => updateField('source', value)} options={MANUAL_LEAD_SOURCES} disabled={saving} /> : null}
+            {isCreate ? (
+              <label className="block">
+                <span className="mb-2 block text-xs text-cream/55">Responsable</span>
+                <select className="w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm text-cream outline-none disabled:cursor-not-allowed disabled:opacity-60" value={form.assigned_to} onChange={(event) => updateField('assigned_to', event.target.value)} disabled={saving}>
+                  {(profiles || []).map((clinicProfile) => (
+                    <option key={clinicProfile.id} value={clinicProfile.id}>{clinicProfile.full_name} · {clinicProfile.role}</option>
+                  ))}
+                </select>
+              </label>
+            ) : <Select label="Estado" value={form.status} onChange={(value) => updateField('status', value)} options={statusOptions} disabled={saving} />}
             <TextArea label="Situacion" value={form.situation} onChange={(value) => updateField('situation', value)} disabled={saving} />
             <TextArea label="Evaluacion previa" value={form.evaluation_previous} onChange={(value) => updateField('evaluation_previous', value)} disabled={saving} />
             <TextArea label="Motivo de consulta" value={form.consultation_reason} onChange={(value) => updateField('consultation_reason', value)} disabled={saving} />
-            {!isCreate ? <Field label="Proxima accion" value={form.next_action} onChange={(value) => updateField('next_action', value)} disabled={saving} /> : null}
-            {!isCreate ? <Field label="Proximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} /> : null}
-            <TextArea label="Notas" value={form.notes} onChange={(value) => updateField('notes', value)} disabled={saving} className="xl:col-span-3" />
+            <Field label="Proxima accion" value={form.next_action} onChange={(value) => updateField('next_action', value)} disabled={saving} />
+            <Field label="Proximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} />
+            <TextArea label={isCreate ? 'Nota interna' : 'Notas'} value={form.notes} onChange={(value) => updateField('notes', value)} disabled={saving} className="xl:col-span-3" />
+            {isCreate ? (
+              <label className="inline-flex items-start gap-3 rounded-lg border border-white/10 bg-ink/60 p-3 text-sm text-cream/75 xl:col-span-3">
+                <input className="mt-0.5 h-4 w-4 accent-mint" type="checkbox" checked={form.consent_contact} onChange={(event) => updateField('consent_contact', event.target.checked)} disabled={saving} />
+                <span>El paciente autorizó que la clínica lo contacte por los datos registrados.</span>
+              </label>
+            ) : null}
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
@@ -2128,7 +2166,7 @@ function LeadFormModal({ mode, lead, canAdmin, saving, onClose, onSubmit }) {
           </div>
         )}
 
-        <ModalActions saving={saving} onClose={onClose} submitLabel={isCreate ? 'Crear lead' : 'Guardar cambios'} />
+        <ModalActions saving={saving} onClose={onClose} submitLabel={isCreate ? 'Crear nuevo lead' : 'Guardar cambios'} />
       </form>
     </div>
   );

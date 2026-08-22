@@ -44,6 +44,7 @@ La landing real `https://sistema-dental-py.vercel.app` es el origin publico del 
 - Todas las queries filtran por `profile.clinic_id`.
 - RLS en Postgres es la barrera real entre clinicas.
 - Admin/owner pueden configurar landing y archivar.
+- Admin/owner y receptionist pueden usar `Nuevo lead`; la RPC deriva la clínica y crea lead, event y task en una transacción.
 - Receptionist no ve settings, no archiva y no edita tokens.
 - Build Vite esta configurado con `sourcemap: false`.
 - `vercel.json` no usa `X-Frame-Options: DENY` global porque `/form/:slug` puede embeberse como iframe autorizado por `allowed_origins`.

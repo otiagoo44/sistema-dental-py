@@ -118,8 +118,10 @@ values (
 
 Roles:
 
-- `admin` / `owner`: configura landing, archiva leads, crea/edita leads, agenda y tareas.
-- `receptionist`: ve leads, actualiza estado/notas/seguimiento, agenda, confirma/no-show y completa tareas.
+- `admin` / `owner`: configura landing, archiva y edita leads, crea `Nuevo lead`, agenda y tareas.
+- `receptionist`: crea `Nuevo lead` por RPC, ve leads, actualiza estado/notas/seguimiento, agenda, confirma/no-show y completa tareas.
+
+`create_manual_lead` crea lead, event y task en una transacción. La RPC deriva `clinic_id` del profile autenticado y no acepta ese campo desde el cliente.
 
 ## Verificar RLS
 

@@ -1,0 +1,111 @@
+# Demo interna del CRM odontológico
+
+Objetivo: validar el relato y el flujo operativo con el equipo interno. No es una demo a prospectos y no sustituye `docs/qa-manual-crm.md`.
+
+## Estado del release 2026-08-21
+
+- CRM Preview disponible: `https://crm-odontologia-staging-hsghneld5-ortegatiago733-2656s-projects.vercel.app`.
+- Landing Preview validada por HTTP: `https://sistema-dental-n0vygq1wm-ortegatiago733-2656s-projects.vercel.app`.
+- La landing de produccion no fue promovida.
+- Auth URLs y QA visual por roles siguen pendientes; por lo tanto, la demo interna todavia no esta aprobada.
+
+## Condiciones para hacerla
+
+- Build y migraciones del mismo commit desplegados en staging.
+- SQL verification y RLS real-users en PASS.
+- Usuarios QA de DentalPro owner/admin, receptionist y QA Clinic B disponibles por canal seguro.
+- Teléfonos y nombres exclusivamente sintéticos.
+- Landing pública sólo se muestra si su deploy real ya pasó el bloque correspondiente de QA.
+- Consola/Network abiertas para detectar errores, con tokens y datos sensibles redactados.
+
+## Datos preparados
+
+- Un teléfono único para formulario.
+- Un teléfono único para `Nuevo lead`.
+- Dos leads para probar doble reserva.
+- Un appointment que pueda marcarse No Asistió.
+- Una task pendiente.
+- Una ventana privada adicional para QA Clinic B.
+
+## Guion de 12–15 minutos
+
+### 1. Entrada del lead
+
+Mostrar una de estas entradas:
+
+- formulario `/form/dentalpro` con consentimiento, o
+- `Nuevo lead` con fuente `WhatsApp directo`.
+
+Explicar claramente la diferencia:
+
+- formulario: crea lead, event, task, jobs y log de intake;
+- manual: crea lead, event y task en transacción, sin jobs críticos.
+
+No mostrar tokens completos ni paneles con secret/service role.
+
+### 2. Score y prioridad
+
+Abrir el lead y mostrar tratamiento, urgencia, score, clasificación y próxima acción. En formulario público, el intake calcula score/clasificación. En carga manual, recepción selecciona estos valores según el criterio operativo; no presentarlo como cálculo automático.
+
+### 3. Task
+
+Mostrar la task inicial y su responsable. Completarla y abrir eventos para ver `task_completed`.
+
+### 4. Agenda
+
+Agendar fecha/hora y doctor. Mostrar que se sincronizan appointment, lead, event y task. Intentar la misma reserva activa para otro lead y mostrar el bloqueo.
+
+### 5. No-show
+
+Marcar un appointment `No Asistió`. Mostrar:
+
+- estado del turno y lead;
+- event `appointment_no_show`;
+- próxima acción;
+- task de recuperación para mañana 09:00 `America/Asuncion`.
+
+Reprogramar para cerrar el relato de recuperación.
+
+### 6. Roles
+
+Con owner/admin, mostrar Configuración y Archivado. Cambiar a receptionist y mostrar:
+
+- `Nuevo lead`, Agenda y completar task disponibles;
+- Configuración y Archivado ausentes;
+- public forms/tokens no visibles.
+
+### 7. Multi-clínica
+
+Abrir QA Clinic B en otra ventana privada. Mostrar que sus dashboard, leads, agenda, tareas, responsables y configuración no contienen DentalPro. Crear un lead sintético en Clinic B y confirmar que no cambia DentalPro.
+
+### 8. n8n no requerido
+
+Cerrar con la arquitectura:
+
+```text
+Formulario -> lead-intake -> Postgres -> lead/event/task/jobs
+Nuevo lead -> RPC autenticada -> Postgres -> lead/event/task
+n8n futuro -> consume jobs después del guardado
+```
+
+El lead y la tarea existen antes de cualquier procesamiento n8n. No presentar automatizaciones de WhatsApp/Instagram como activas.
+
+## Mensajes clave
+
+- La clínica puede trabajar formularios y entradas directas desde el primer día.
+- La recepción no puede elegir otra clínica ni acceder a configuración crítica.
+- Agenda, no-show y completar tasks usan RPCs transaccionales.
+- No hay hard delete operativo.
+- El formulario público no envía `clinic_id` ni secretos.
+- El piloto no es historia clínica ni integración automática con mensajería.
+
+## Criterio de cierre
+
+- [ ] El guion se completó sin errores de Console/Network.
+- [ ] Cada transición quedó visible después de recargar.
+- [ ] Los roles coincidieron con la matriz.
+- [ ] El aislamiento multi-clínica quedó demostrado.
+- [ ] No se expusieron credenciales, tokens completos ni PII real.
+- [ ] Las dudas o defectos se registraron con pasos reproducibles.
+
+Si la QA visual y el redeploy aún están pendientes, la decisión sigue siendo `A) Listo para QA manual visual`, no listo para prospectar.
