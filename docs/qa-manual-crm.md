@@ -38,9 +38,13 @@ Esta evidencia permite iniciar la pasada visual, pero no marca ninguno de sus ca
 ## Evidencia técnica del rediseño 2026-08-22
 
 - Migración `20260822120000_secure_followup_workflow.sql` aplicada al proyecto enlazado.
+- Landing Preview actual: `https://sistema-dental-py-preview.vercel.app`; CRM Preview actual: `https://crm-odontologia-staging-preview.vercel.app`.
+- El origin del Preview anterior y los aliases actuales quedaron registrados sin slash final en `clinic_public_forms.allowed_origins`.
+- CORS verificado por HTTP: preview, producción y localhost permitidos; origin desconocido y ausencia de `Origin` rechazados sin reflejo. Consentimiento ausente devuelve un error JSON legible con CORS y consentimiento presente crea todos los derivados esperados.
+- La landing usa Tailwind compilado localmente y `/favicon.ico` responde 200; no usa `cdn.tailwindcss.com`.
 - Build Vite: OK. `npm audit`: 0 vulnerabilidades.
 - SQL verification, RLS real-users y RLS/RPC transaccional: PASS.
-- `lead-intake`: 29 passed, 0 failed.
+- `lead-intake`: 49 passed, 0 failed.
 - Búsquedas de proyecto viejo, `dangerouslySetInnerHTML`, `.delete(` y sourcemaps: sin hallazgos.
 - El navegador integrado no estuvo disponible; ninguna casilla visual de este documento se considera aprobada por esa razón.
 

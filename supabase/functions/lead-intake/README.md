@@ -24,6 +24,8 @@ npx.cmd supabase functions deploy lead-intake --no-verify-jwt --project-ref unyb
 
 `verify_jwt=false` es intencional: el endpoint recibe formularios publicos sin sesion Supabase. La compensacion obligatoria es validar `clinic_slug` + `landing_token`, resolver `clinic_id` solo desde `clinic_public_forms`, aplicar `allowed_origins`, honeypot, validacion de inputs y rate limit por IP/telefono. Nunca confiar en `clinic_id` enviado por el navegador.
 
+La funcion no refleja origins arbitrarios: antes de responder un preflight consulta formularios activos y solo devuelve `Access-Control-Allow-Origin` cuando el origin esta registrado. `OPTIONS`, errores funcionales y respuestas exitosas mantienen CORS para origins permitidos; origins desconocidos o requests sin `Origin` reciben `403` sin ese header.
+
 ## Payload Publico
 
 ```json
@@ -67,4 +69,4 @@ $env:SLUG = "dentalpro"
 
 Verificar resultados con `tests/sql-verification.sql`.
 
-En produccion, los POST sin `Origin` se bloquean. Solo se habilitan deliberadamente para pruebas server-to-server con el secret `ALLOW_NO_ORIGIN_TESTS=true`, que no debe usarse en el deploy normal.
+Los POST sin `Origin` se bloquean siempre. No existe una excepcion de runtime para saltear esta validacion en el deploy publico.

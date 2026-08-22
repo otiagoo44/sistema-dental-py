@@ -19,5 +19,7 @@ n8n-universal-workflow.md
 dental-lead-supabase-upsert-v1.n8n.json
 package.json
 package-lock.json
+tailwind.landing.config.js
+css/tailwind-input.css
 *.log
 *.map

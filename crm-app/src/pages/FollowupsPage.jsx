@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarPlus, Check, CheckCircle2, Clock3, Edit3, Filter } from 'lucide-react';
+import { CalendarPlus, Check, CheckCircle2, Clock3, Edit3 } from 'lucide-react';
 import { CLASSIFICATIONS, LEAD_STATUSES } from '../lib/constants';
 import { formatDateTime, todayIsoDate, toLocalIsoDate } from '../lib/formatters';
 import { ARCHIVED_STATUS, terminalStatuses, LEAD_STATUS, uniqueStrings, isOpenTask, startOfAsuncionDate, daysBetween } from '../lib/crmDomain';
@@ -7,6 +7,7 @@ import { Select } from '../components/crm/CrmPrimitives';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import FilterPanel from '../components/ui/FilterPanel';
 import PageHeader from '../components/ui/PageHeader';
 import StatusBadge from '../components/ui/StatusBadge';
 
@@ -69,8 +70,7 @@ export default function FollowupsView({ leads, tasks, profiles, onOpenLead, onEd
   return (
     <section className="space-y-6">
       <PageHeader eyebrow="Cola de acción" title="Seguimientos" subtitle="Contactá primero estos leads para evitar que se enfríen." />
-      <Card className="p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-600"><Filter className="h-4 w-4" />Filtrar seguimientos</div>
+      <FilterPanel title="Filtrar seguimientos" description="Reducí la cola por responsable, prioridad o momento de contacto.">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <Select label="Responsable" value={filters.assigned} onChange={(value) => setFilters({ ...filters, assigned: value })} options={(profiles || []).map((profile) => ({ value: profile.id, label: profile.full_name }))} placeholder="Todos" />
           <Select label="Prioridad" value={filters.classification} onChange={(value) => setFilters({ ...filters, classification: value })} options={CLASSIFICATIONS} placeholder="Todas" />
@@ -79,7 +79,7 @@ export default function FollowupsView({ leads, tasks, profiles, onOpenLead, onEd
           <Select label="Estado" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={LEAD_STATUSES.filter((status) => status !== ARCHIVED_STATUS)} placeholder="Todos" />
           <Select label="Cuándo" value={filters.window} onChange={(value) => setFilters({ ...filters, window: value })} options={[{ value: 'all', label: 'Todos' }, { value: 'overdue', label: 'Vencidos' }, { value: 'today', label: 'Para hoy' }, { value: 'next7', label: 'Próximos 7 días' }, { value: 'hot', label: 'Sólo calientes' }]} />
         </div>
-      </Card>
+      </FilterPanel>
 
       {items.length ? groups.map((group) => {
         const groupItems = items.filter((item) => item.bucket === group);
@@ -124,4 +124,3 @@ export default function FollowupsView({ leads, tasks, profiles, onOpenLead, onEd
     </section>
   );
 }
-

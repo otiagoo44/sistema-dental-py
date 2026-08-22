@@ -68,7 +68,13 @@ values
     'dentalpro',
     'lf_FPBOEl9YF_dTGRm6tv3WKBzQgjpmwp__ImBx7pCyHAY',
     'https://sistema-dental-py.vercel.app',
-    array['https://sistema-dental-py.vercel.app', 'http://localhost:5173'],
+    array[
+      'https://sistema-dental-n0vygq1wm-ortegatiago733-2656s-projects.vercel.app',
+      'https://sistema-dental-559mik7rg-ortegatiago733-2656s-projects.vercel.app',
+      'https://sistema-dental-py-preview.vercel.app',
+      'https://sistema-dental-py.vercel.app',
+      'http://localhost:5173'
+    ],
     true
   ),
   (

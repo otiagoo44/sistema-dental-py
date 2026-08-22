@@ -6,13 +6,13 @@ No promover a produccion hasta completar QA manual con usuarios reales.
 
 Proyecto creado: `crm-odontologia-staging`.
 
-Preview verificado a nivel de deploy/configuracion:
+Alias estable del Preview UX actual:
 
 ```text
-https://crm-odontologia-staging-hsghneld5-ortegatiago733-2656s-projects.vercel.app
+https://crm-odontologia-staging-preview.vercel.app
 ```
 
-Este Preview tiene Deployment Protection y todavia requiere QA visual. No usar el primer deployment estable del proyecto para QA: Vercel lo asigno automaticamente al target production del proyecto nuevo antes de que existiera un Preview, aunque no se ejecuto `--prod`.
+Deployment inmutable asociado: `https://crm-odontologia-staging-3j5vgivqk-ortegatiago733-2656s-projects.vercel.app`. Este Preview tiene Deployment Protection y todavia requiere QA visual. No usar el primer deployment estable del proyecto para QA: Vercel lo asigno automaticamente al target production del proyecto nuevo antes de que existiera un Preview, aunque no se ejecuto `--prod`.
 
 - Root Directory: `crm-app`
 - Framework: Vite
@@ -31,24 +31,26 @@ No agregar `SUPABASE_SERVICE_ROLE_KEY` ni `FORM_HASH_SALT` a Vercel.
 
 ## Supabase Auth
 
-Configuracion manual pendiente para el Preview actual:
+Configuracion a validar antes del QA de autenticacion por enlaces:
 
 ```text
 Site URL:
-https://crm-odontologia-staging-hsghneld5-ortegatiago733-2656s-projects.vercel.app
+https://crm-odontologia-staging-preview.vercel.app
 
 Redirect URLs:
 http://localhost:5173/**
-https://crm-odontologia-staging-hsghneld5-ortegatiago733-2656s-projects.vercel.app/**
+https://crm-odontologia-staging-preview.vercel.app/**
 ```
 
 ## Landing
 
-El archivo local y el Preview de landing apuntan al proyecto nuevo y exigen consentimiento. Preview probado:
+El archivo local y el Preview de landing apuntan al proyecto nuevo y exigen consentimiento. Alias estable del build actual:
 
 ```text
-https://sistema-dental-n0vygq1wm-ortegatiago733-2656s-projects.vercel.app
+https://sistema-dental-py-preview.vercel.app
 ```
+
+Deployment inmutable asociado: `https://sistema-dental-559mik7rg-ortegatiago733-2656s-projects.vercel.app`. El Preview anterior `https://sistema-dental-n0vygq1wm-ortegatiago733-2656s-projects.vercel.app` se conserva como reproduccion del origin que fallo; ya esta autorizado por CORS, pero por ser inmutable no contiene el build nuevo sin CDN.
 
 La produccion `https://sistema-dental-py.vercel.app` sigue sirviendo la version anterior porque no se promovio sin QA visual. Comprobar despues de una promocion autorizada:
 
@@ -56,4 +58,4 @@ La produccion `https://sistema-dental-py.vercel.app` sigue sirviendo la version 
 curl.exe -sS https://sistema-dental-py.vercel.app/js/lead-intake-form.js | Select-String "unybqqzhgqxhrwucrofm|consentimiento_contacto"
 ```
 
-La prueba HTTP del Preview ya verifico rechazo sin consentimiento y creacion con consentimiento de lead, event, task, dos jobs y accepted log. Sigue pendiente repetirlo desde navegador y verlo con un usuario CRM real.
+La prueba HTTP del alias estable verifico rechazo sin consentimiento y creacion con consentimiento de lead, event, task, dos jobs y accepted log. `OPTIONS` y `POST` validan el origin contra `allowed_origins`; un origin desconocido o ausente recibe 403 sin reflejo CORS. Sigue pendiente repetir el flujo visual desde navegador y verlo con un usuario CRM real.

@@ -214,22 +214,81 @@ function taskFor(classification: string) {
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const hashSalt = Deno.env.get("FORM_HASH_SALT");
+
+  if (!supabaseUrl || !serviceRoleKey || !hashSalt) {
+    return jsonResponse(null, 500, {
+      success: false,
+      message: "Error interno",
+    });
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  let responseOrigin: string | null = null;
+  if (origin) {
+    const { data: originConfig, error: originError } = await supabase
+      .from("clinic_public_forms")
+      .select("id")
+      .eq("is_active", true)
+      .contains("allowed_origins", [origin])
+      .limit(1)
+      .maybeSingle();
+
+    if (originError) {
+      console.error("lead-intake origin lookup failed", dbErrorMessage(originError));
+      return jsonResponse(null, 500, {
+        success: false,
+        message: "Error interno",
+      });
+    }
+
+    if (originConfig) responseOrigin = origin;
+  }
 
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders(origin) });
+    if (!responseOrigin) {
+      return jsonResponse(null, 403, {
+        success: false,
+        message: "Origin no permitido",
+      });
+    }
+
+    return new Response(null, { status: 200, headers: corsHeaders(responseOrigin) });
   }
 
   if (req.method !== "POST") {
-    return jsonResponse(origin, 405, {
+    return jsonResponse(responseOrigin, 405, {
       success: false,
       message: "Metodo no permitido",
+    });
+  }
+
+  if (!origin) {
+    return jsonResponse(null, 403, {
+      success: false,
+      message: "Origin requerido",
+    });
+  }
+
+  if (!responseOrigin) {
+    return jsonResponse(null, 403, {
+      success: false,
+      message: "Origin no permitido",
     });
   }
 
   try {
     const contentLength = Number(req.headers.get("content-length") || "0");
     if (contentLength > MAX_BODY_BYTES) {
-      return jsonResponse(origin, 400, {
+      return jsonResponse(responseOrigin, 400, {
         success: false,
         message: "Payload invalido",
       });
@@ -237,7 +296,7 @@ Deno.serve(async (req) => {
 
     const rawBody = await req.text();
     if (rawBody.length > MAX_BODY_BYTES) {
-      return jsonResponse(origin, 400, {
+      return jsonResponse(responseOrigin, 400, {
         success: false,
         message: "Payload invalido",
       });
@@ -247,21 +306,9 @@ Deno.serve(async (req) => {
     try {
       body = JSON.parse(rawBody || "{}");
     } catch {
-      return jsonResponse(origin, 400, {
+      return jsonResponse(responseOrigin, 400, {
         success: false,
         message: "JSON invalido",
-      });
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const hashSalt = Deno.env.get("FORM_HASH_SALT");
-    const allowNoOriginTests = Deno.env.get("ALLOW_NO_ORIGIN_TESTS") === "true";
-
-    if (!supabaseUrl || !serviceRoleKey || !hashSalt) {
-      return jsonResponse(origin, 500, {
-        success: false,
-        message: "Error interno",
       });
     }
 
@@ -269,18 +316,11 @@ Deno.serve(async (req) => {
     const landingToken = sanitizeText(body.landing_token, 160);
 
     if (!clinicSlug || !landingToken) {
-      return jsonResponse(origin, 400, {
+      return jsonResponse(responseOrigin, 400, {
         success: false,
         message: "Datos incompletos",
       });
     }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
 
     const { data: publicForm, error: formError } = await supabase
       .from("clinic_public_forms")
@@ -293,7 +333,7 @@ Deno.serve(async (req) => {
     if (formError) throw formError;
 
     if (!publicForm) {
-      return jsonResponse(origin, 403, {
+      return jsonResponse(responseOrigin, 403, {
         success: false,
         message: "Formulario no autorizado",
       });
@@ -329,17 +369,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!origin && !allowNoOriginTests) {
-      await insertSubmissionLog("error");
-      return jsonResponse(null, 403, {
-        success: false,
-        message: "Origin requerido",
-      });
-    }
-
     if (isHoneypotFilled(body)) {
       await insertSubmissionLog("spam");
-      return jsonResponse(origin, 403, {
+      return jsonResponse(responseOrigin, 403, {
         success: false,
         message: "Formulario no autorizado",
       });
@@ -348,7 +380,7 @@ Deno.serve(async (req) => {
     const consentContact = body.consentimiento_contacto === true || body.consent_contact === true;
     if (!consentContact) {
       await insertSubmissionLog("error");
-      return jsonResponse(origin, 400, {
+      return jsonResponse(responseOrigin, 400, {
         success: false,
         message: "Debés aceptar el consentimiento de contacto",
       });
@@ -357,7 +389,7 @@ Deno.serve(async (req) => {
     const phoneResult = normalizeParaguayPhone(body.telefono);
     if (!phoneResult.ok) {
       await insertSubmissionLog("error");
-      return jsonResponse(origin, 400, {
+      return jsonResponse(responseOrigin, 400, {
         success: false,
         message: "Tel\u00e9fono inv\u00e1lido",
       });
@@ -368,7 +400,7 @@ Deno.serve(async (req) => {
     const name = sanitizeText(body.nombre, 120);
     if (name.length < 2) {
       await insertSubmissionLog("error");
-      return jsonResponse(origin, 400, {
+      return jsonResponse(responseOrigin, 400, {
         success: false,
         message: "Datos incompletos",
       });
@@ -396,7 +428,7 @@ Deno.serve(async (req) => {
 
     if (recentIpCount >= MAX_IP_SUBMISSIONS || recentPhoneCount >= MAX_PHONE_SUBMISSIONS) {
       await insertSubmissionLog("rate_limited");
-      return jsonResponse(origin, 429, {
+      return jsonResponse(responseOrigin, 429, {
         success: false,
         message: "Demasiados intentos. Prob\u00e1 de nuevo m\u00e1s tarde.",
       });
@@ -625,7 +657,7 @@ Deno.serve(async (req) => {
 
     await insertSubmissionLog("accepted");
 
-    return jsonResponse(origin, 200, {
+    return jsonResponse(responseOrigin, 200, {
       success: true,
       message: "Datos enviados correctamente",
       classification,
@@ -635,7 +667,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("lead-intake internal error", error instanceof Error ? error.message : "unknown");
-    return jsonResponse(origin, 500, {
+    return jsonResponse(responseOrigin, 500, {
       success: false,
       message: "Error interno",
     });

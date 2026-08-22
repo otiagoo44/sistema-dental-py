@@ -2,7 +2,9 @@ param(
   [string]$EDGE_URL = $(if ($env:EDGE_URL) { $env:EDGE_URL } else { "https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake" }),
   [string]$SLUG = $(if ($env:SLUG) { $env:SLUG } else { "dentalpro" }),
   [string]$TOKEN = $(if ($env:TOKEN) { $env:TOKEN } else { "TOKEN_PUBLICO" }),
-  [string]$LANDING_ORIGIN = $(if ($env:LANDING_ORIGIN) { $env:LANDING_ORIGIN } elseif ($env:ORIGIN) { $env:ORIGIN } else { "https://sistema-dental-py.vercel.app" }),
+  [string]$LANDING_ORIGIN = $(if ($env:LANDING_ORIGIN) { $env:LANDING_ORIGIN } elseif ($env:ORIGIN) { $env:ORIGIN } else { "https://sistema-dental-n0vygq1wm-ortegatiago733-2656s-projects.vercel.app" }),
+  [string]$PRODUCTION_ORIGIN = $(if ($env:PRODUCTION_ORIGIN) { $env:PRODUCTION_ORIGIN } else { "https://sistema-dental-py.vercel.app" }),
+  [string]$LOCAL_ORIGIN = $(if ($env:LOCAL_ORIGIN) { $env:LOCAL_ORIGIN } else { "http://localhost:5173" }),
   [string]$OLD_NETLIFY_ORIGIN = $(if ($env:OLD_NETLIFY_ORIGIN) { $env:OLD_NETLIFY_ORIGIN } else { "https://sistema-dentalpro-py.netlify.app" }),
   [string]$INVALID_ORIGIN = $(if ($env:INVALID_ORIGIN) { $env:INVALID_ORIGIN } else { "https://invalid-origin.example" })
 )
@@ -46,6 +48,7 @@ function Convert-HttpResult {
     StatusCode = [int]$Response.StatusCode
     Data = $data
     Raw = $Response.Content
+    Headers = $Response.Headers
   }
 }
 
@@ -58,6 +61,7 @@ function Convert-HttpError {
       StatusCode = 0
       Data = $null
       Raw = $ErrorRecord.Exception.Message
+      Headers = $null
     }
   }
 
@@ -83,6 +87,7 @@ function Convert-HttpError {
     StatusCode = $statusCode
     Data = $data
     Raw = $content
+    Headers = $response.Headers
   }
 }
 
@@ -160,6 +165,17 @@ function Assert-Status {
   Assert-True -Name $Name -Condition ($Result.StatusCode -eq $Expected) -Detail "Esperado $Expected, obtuvo $($Result.StatusCode): $($Result.Raw)"
 }
 
+function Assert-CorsOrigin {
+  param(
+    [string]$Name,
+    [object]$Result,
+    [string]$Expected
+  )
+
+  $actual = if ($Result.Headers) { [string]$Result.Headers["Access-Control-Allow-Origin"] } else { "" }
+  Assert-True -Name $Name -Condition ($actual -eq $Expected) -Detail "Esperado '$Expected', obtuvo '$actual'"
+}
+
 function New-BaseLead {
   param(
     [string]$Phone = $(New-TestPhone),
@@ -195,6 +211,17 @@ $ok = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Vercel Origin Correcto") -
 Assert-Status "origin Vercel devuelve 200" $ok 200
 Assert-True "origin Vercel success true" ($ok.Data.success -eq $true)
 Assert-True "origin Vercel lead_id presente" ([string]::IsNullOrWhiteSpace($ok.Data.lead_id) -eq $false)
+Assert-CorsOrigin "origin preview devuelve ACAO exacto" $ok $LANDING_ORIGIN
+
+Write-Host "1b. Origin produccion"
+$production = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Produccion Origin Correcto") -Origin $PRODUCTION_ORIGIN
+Assert-Status "origin produccion devuelve 200" $production 200
+Assert-CorsOrigin "origin produccion devuelve ACAO exacto" $production $PRODUCTION_ORIGIN
+
+Write-Host "1c. Origin localhost"
+$localhost = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Localhost Origin Correcto") -Origin $LOCAL_ORIGIN
+Assert-Status "origin localhost devuelve 200" $localhost 200
+Assert-CorsOrigin "origin localhost devuelve ACAO exacto" $localhost $LOCAL_ORIGIN
 
 Write-Host "2. Origin viejo Netlify"
 $oldOrigin = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Origin Viejo Netlify") -Origin $OLD_NETLIFY_ORIGIN
@@ -203,18 +230,22 @@ Assert-Status "origin viejo Netlify devuelve 403" $oldOrigin 403
 Write-Host "3. Origin invalido"
 $invalidOrigin = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Origin Invalido") -Origin $INVALID_ORIGIN
 Assert-Status "origin invalido devuelve 403" $invalidOrigin 403
+Assert-CorsOrigin "origin invalido no se refleja" $invalidOrigin ""
 
 Write-Host "3b. Request sin Origin"
 $missingOrigin = Invoke-LeadIntake -Body (New-BaseLead -Name "QA Sin Origin") -Origin ""
 Assert-Status "request sin Origin devuelve 403" $missingOrigin 403
+Assert-CorsOrigin "request sin Origin no recibe ACAO" $missingOrigin ""
 
 Write-Host "4. GET no permitido"
 $getResult = Invoke-EdgeRequest -Method "Get" -Origin $LANDING_ORIGIN
 Assert-Status "GET devuelve 405" $getResult 405
+Assert-CorsOrigin "GET permitido conserva ACAO" $getResult $LANDING_ORIGIN
 
 Write-Host "5. Clinica inexistente"
 $missingClinic = Invoke-LeadIntake -Body (New-BaseLead -ClinicSlug "clinica-inexistente-qa" -Name "QA Clinica Inexistente")
 Assert-Status "clinica inexistente devuelve 403" $missingClinic 403
+Assert-CorsOrigin "clinica inexistente conserva ACAO permitido" $missingClinic $LANDING_ORIGIN
 
 Write-Host "6. XSS controlado"
 $xss = Invoke-LeadIntake -Body (New-BaseLead -Name "<script>alert(1)</script>")
@@ -232,12 +263,14 @@ $honeypot = New-BaseLead -Name "QA Honeypot"
 $honeypot.website = "https://spam.example"
 $honeypotResult = Invoke-LeadIntake -Body $honeypot
 Assert-Status "honeypot devuelve 403" $honeypotResult 403
+Assert-CorsOrigin "honeypot conserva ACAO permitido" $honeypotResult $LANDING_ORIGIN
 
 Write-Host "9. Token falso"
 $badToken = New-BaseLead -Name "QA Token Falso"
 $badToken.landing_token = "lf_TOKEN_FALSO_000000000000000000000000"
 $badTokenResult = Invoke-LeadIntake -Body $badToken
 Assert-Status "token falso devuelve 403" $badTokenResult 403
+Assert-CorsOrigin "token falso conserva ACAO permitido" $badTokenResult $LANDING_ORIGIN
 
 Write-Host "10. clinic_id manipulado se ignora"
 $manipulated = New-BaseLead -Name "QA Clinic Id Manipulado"
@@ -250,6 +283,7 @@ Write-Host "11. Telefono invalido"
 $badPhone = New-BaseLead -Phone "123" -Name "QA Telefono Invalido"
 $badPhoneResult = Invoke-LeadIntake -Body $badPhone
 Assert-Status "telefono invalido devuelve 400" $badPhoneResult 400
+Assert-CorsOrigin "telefono invalido conserva ACAO permitido" $badPhoneResult $LANDING_ORIGIN
 
 Write-Host "12. Formulario incompleto"
 $incomplete = New-BaseLead
@@ -262,6 +296,7 @@ $missingConsent = New-BaseLead -Name "QA Sin Consentimiento"
 $missingConsent.Remove("consentimiento_contacto")
 $missingConsentResult = Invoke-LeadIntake -Body $missingConsent
 Assert-Status "consentimiento faltante devuelve 400" $missingConsentResult 400
+Assert-CorsOrigin "consentimiento faltante conserva ACAO permitido" $missingConsentResult $LANDING_ORIGIN
 
 Write-Host "13. Duplicado"
 $duplicate = New-BaseLead -Name "QA Duplicado"
@@ -301,7 +336,20 @@ Assert-Status "rate limit IP envio sesenta y uno devuelve 429" $ipRateResults[-1
 
 Write-Host "18. CORS OPTIONS"
 $options = Invoke-EdgeRequest -Method "Options" -Origin $LANDING_ORIGIN
-Assert-True "OPTIONS devuelve 200" ($options.StatusCode -eq 200) "Obtuvo $($options.StatusCode): $($options.Raw)"
+Assert-Status "OPTIONS preview devuelve 200" $options 200
+Assert-CorsOrigin "OPTIONS preview devuelve ACAO exacto" $options $LANDING_ORIGIN
+
+$productionOptions = Invoke-EdgeRequest -Method "Options" -Origin $PRODUCTION_ORIGIN
+Assert-Status "OPTIONS produccion devuelve 200" $productionOptions 200
+Assert-CorsOrigin "OPTIONS produccion devuelve ACAO exacto" $productionOptions $PRODUCTION_ORIGIN
+
+$localOptions = Invoke-EdgeRequest -Method "Options" -Origin $LOCAL_ORIGIN
+Assert-Status "OPTIONS localhost devuelve 200" $localOptions 200
+Assert-CorsOrigin "OPTIONS localhost devuelve ACAO exacto" $localOptions $LOCAL_ORIGIN
+
+$invalidOptions = Invoke-EdgeRequest -Method "Options" -Origin $INVALID_ORIGIN
+Assert-Status "OPTIONS invalido devuelve 403" $invalidOptions 403
+Assert-CorsOrigin "OPTIONS invalido no refleja origin" $invalidOptions ""
 
 Write-Host "Resultado: $script:Passed passed, $script:Failed failed"
 if ($script:Failed -gt 0) {

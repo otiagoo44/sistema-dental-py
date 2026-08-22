@@ -5,7 +5,7 @@
  */
 
 // Configuracion multi-clinica editable.
-// Estos valores son publicos y reemplazan cualquier clinic_id hardcodeado en frontend.
+// Estos valores publicos evitan hardcodear identificadores internos de la clinica.
 const CLINIC_SLUG = "dentalpro";
 const LANDING_TOKEN = "lf_FPBOEl9YF_dTGRm6tv3WKBzQgjpmwp__ImBx7pCyHAY";
 const WEBHOOK_URL = "https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake";

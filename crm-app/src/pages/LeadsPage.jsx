@@ -8,6 +8,7 @@ import { Info, Select, Field } from '../components/crm/CrmPrimitives';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import FilterPanel from '../components/ui/FilterPanel';
 import PageHeader from '../components/ui/PageHeader';
 import StatusBadge from '../components/ui/StatusBadge';
 
@@ -51,15 +52,20 @@ export default function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, o
   return (
     <section className="space-y-6">
       <PageHeader eyebrow="Oportunidades" title="Leads" subtitle="Buscá, filtrá y mové cada oportunidad hacia su próxima acción." action={<Button type="button" onClick={onCreateLead}><FilePlus className="h-4 w-4" />Nuevo lead</Button>} />
-      <Card className="p-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <label className="block xl:col-span-2">
+      <FilterPanel
+        title="Encontrá la oportunidad correcta"
+        description="La búsqueda queda siempre visible; abrí los filtros avanzados cuando los necesites."
+        alwaysContent={(
+          <label className="block">
             <span className="mb-2 block text-xs font-semibold text-slate-500">Buscar por nombre o teléfono</span>
             <span className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 transition focus-within:border-mint focus-within:ring-4 focus-within:ring-blue-50">
               <Search className="h-4 w-4 text-slate-400" />
               <input className="w-full bg-transparent text-sm text-cream outline-none placeholder:text-slate-400" value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value })} placeholder="Ej. Laura o 0981…" />
             </span>
           </label>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Select label="Estado comercial" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={LEAD_STATUSES} placeholder="Todos" />
           <Select label="Clasificación" value={filters.classification} onChange={(value) => setFilters({ ...filters, classification: value })} options={CLASSIFICATIONS} placeholder="Todas" />
           <Select label="Tratamiento" value={filters.treatment} onChange={(value) => setFilters({ ...filters, treatment: value })} options={treatmentOptions} placeholder="Todos" />
@@ -81,7 +87,7 @@ export default function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, o
             <span className="text-xs font-semibold text-slate-500">{filteredLeads.length} resultados</span>
           </div>
         </div>
-      </Card>
+      </FilterPanel>
 
       {filteredLeads.length ? (
         <div className="grid gap-4 xl:grid-cols-2">
@@ -261,4 +267,3 @@ export function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchi
     </section>
   );
 }
-

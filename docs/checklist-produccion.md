@@ -36,14 +36,14 @@ Leyenda: `[x]` verificado, `[!]` parcial/riesgo o requiere accion manual, `[ ]` 
 - [x] `lead-intake` deployada y `ACTIVE`, `verify_jwt=false` intencional.
 - [x] `FORM_HASH_SALT` aleatorio configurado; variables reservadas del runtime presentes.
 - [x] POST/OPTIONS y GET 405 probados.
-- [x] Origin Vercel permitido; origin invalido/viejo y POST sin Origin rechazados.
+- [x] Origins de Preview, produccion y localhost permitidos con ACAO exacto; origin invalido/viejo y POST sin Origin rechazados sin reflejo.
 - [x] Token correcto/falso, `clinic_id` manipulado, telefono invalido y body incompleto probados.
 - [x] Consentimiento faltante rechazado y consentimiento presente aceptado.
 - [x] Honeypot, XSS y payload grande probados.
 - [x] Duplicado conserva el mismo lead.
 - [x] Lead caliente, medio y frio probados.
 - [x] Rate limit: 3/h por telefono y 60/h por IP/form.
-- [x] Suite HTTP remota repetida después de `Nuevo lead`/hardening: 29 passed, 0 failed.
+- [x] Suite HTTP remota ampliada despues del hardening CORS: 49 passed, 0 failed.
 - [x] Intake posterior al fix crea lead, event, task, 2 jobs y log accepted.
 - [x] Logs sin columnas de IP/telefono crudos; accepted logs con `phone_hash`.
 - [x] n8n no participa del guardado inicial; jobs quedan `pending`.
@@ -79,19 +79,20 @@ Leyenda: `[x]` verificado, `[!]` parcial/riesgo o requiere accion manual, `[ ]` 
 - [x] `/form/:slug` existe en el CRM e incluye consentimiento y aviso de privacidad.
 - [x] Build Vite 7.3.6 posterior a `Nuevo lead`: OK.
 - [x] `npm audit`: 0 vulnerabilidades.
-- [x] Suite 2026-08-22: SQL verification, RLS real-users, RLS/RPC transaccional y `lead-intake` 29/29 PASS.
+- [x] Suite 2026-08-22: SQL verification, RLS real-users, RLS/RPC transaccional y `lead-intake` 49/49 PASS.
 - [x] `dist`: 0 sourcemaps, 0 proyecto viejo, 0 marcadores de secrets server-side.
 - [x] Landing local apunta al endpoint nuevo y no envia key ni `clinic_id`.
-- [x] Preview de landing creado y verificado: `https://sistema-dental-n0vygq1wm-ortegatiago733-2656s-projects.vercel.app`.
+- [x] Preview estable de landing creado y verificado: `https://sistema-dental-py-preview.vercel.app`; el origin anterior que reproducia CORS tambien permanece autorizado.
+- [x] Tailwind CDN reemplazado por CSS compilado con Tailwind CLI y `/favicon.ico` responde HTTP 200.
 - [x] Preview de landing sirve el proyecto nuevo, consentimiento y mensajes de error/exito; no contiene proyecto viejo, `clinic_id`, anon key ni `service_role`.
 - [x] Prueba HTTP desde el origin preview: sin consentimiento 400 y cero leads; con consentimiento 200, `Lead Caliente`, 1 event, 1 task, 2 jobs y log `accepted` con hashes.
 - [x] Packaging de landing reducido con `.vercelignore`; `.env`, CRM, Supabase, tests y docs devuelven 404 en el preview.
-- [x] Proyecto Vercel `crm-odontologia-staging` creado; segundo deployment confirmado como Preview en `https://crm-odontologia-staging-hsghneld5-ortegatiago733-2656s-projects.vercel.app`.
+- [x] Proyecto Vercel `crm-odontologia-staging` publicado como Preview estable en `https://crm-odontologia-staging-preview.vercel.app`.
 - [x] CRM Preview construida como Vite con `npm run build`, salida `dist` y variables Preview; bundle usa Supabase/webhook nuevos y no contiene `service_role`.
 - [!] Chrome headless local no devolvio DOM; flujo de navegador queda manual.
 - [!] El navegador integrado no estuvo disponible en la sesión 2026-08-22; el rediseño compiló pero la checklist visual por roles y responsive sigue pendiente.
 - [!] Landing Vercel de produccion no promovida: `https://sistema-dental-py.vercel.app` sigue sirviendo el deploy anterior hasta QA visual y aprobacion de produccion.
-- [!] El primer deployment del proyecto CRM staging fue asignado automaticamente por Vercel al target production del proyecto nuevo; no se uso `--prod`. La URL aprobada para estas pruebas es exclusivamente el segundo Preview indicado arriba.
+- [!] El primer deployment del proyecto CRM staging fue asignado automaticamente por Vercel al target production del proyecto nuevo; no se uso `--prod`. La URL aprobada para QA es exclusivamente el alias Preview estable indicado arriba.
 - [ ] Supabase Auth Site URL/Redirect URLs configuradas para el dominio CRM final.
 - [ ] QA visual en navegador del CRM Preview con owner/admin, receptionist, QA Clinic B y usuario sin profile.
 - [ ] Lead enviado desde la landing real de produccion y visto visualmente en CRM con usuario real.
