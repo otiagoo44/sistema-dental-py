@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 export function FullScreenLoader({ label }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-ink text-cream">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-glow">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-card p-5 text-cream shadow-glow">
         <div className="flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin text-mint" /><span className="text-sm font-semibold">{label}</span></div>
         <div className="mt-5 space-y-3" aria-hidden="true"><div className="skeleton h-3 w-2/3 rounded-full" /><div className="skeleton h-16 w-full rounded-xl" /><div className="grid grid-cols-2 gap-3"><div className="skeleton h-14 rounded-xl" /><div className="skeleton h-14 rounded-xl" /></div></div>
       </div>
@@ -49,7 +49,7 @@ export function Banner({ text, tone, onClose }) {
       role={tone === 'danger' ? 'alert' : 'status'}
     >
       <span className="flex items-center gap-2">{tone === 'danger' ? <Ban className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}{text}</span>
-      <button className="rounded-lg p-1 opacity-80 transition hover:bg-white/10 hover:opacity-100" type="button" onClick={onClose} aria-label="Cerrar mensaje"><X className="h-4 w-4" /></button>
+      <button className="rounded-lg p-1 opacity-80 transition hover:bg-hover hover:opacity-100" type="button" onClick={onClose} aria-label="Cerrar mensaje"><X className="h-4 w-4" /></button>
     </motion.div>,
     document.body,
   );

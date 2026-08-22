@@ -109,7 +109,7 @@ export default function FollowupsView({ leads, tasks, profiles, onOpenLead, onEd
                     {['Nuevo', 'No Contactado', 'No Respondió'].includes(lead.status) ? <Button size="sm" variant="secondary" type="button" onClick={() => onMarkContacted(lead)}><Check className="h-4 w-4" />Marcar contactado</Button> : null}
                     <Button size="sm" variant="secondary" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button>
                     {task ? <Button size="sm" variant="secondary" type="button" onClick={() => onCompleteTask(task.id)}><CheckCircle2 className="h-4 w-4" />Completar tarea</Button> : null}
-                    <select className="min-h-9 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600" defaultValue="" aria-label={`Posponer seguimiento de ${lead.name}`} onChange={(event) => { if (event.target.value) onPostpone(lead, Number(event.target.value)); event.target.value = ''; }}>
+                    <select className="min-h-9 rounded-xl border border-slate-200 bg-input px-3 py-2 text-xs font-semibold text-textSoft outline-none focus:border-mint" defaultValue="" aria-label={`Posponer seguimiento de ${lead.name}`} onChange={(event) => { if (event.target.value) onPostpone(lead, Number(event.target.value)); event.target.value = ''; }}>
                       <option value="" disabled>Posponer…</option>
                       <option value="1">Mañana</option><option value="3">En 3 días</option><option value="7">En 7 días</option>
                     </select>

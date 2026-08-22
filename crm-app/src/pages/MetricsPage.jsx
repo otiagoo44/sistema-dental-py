@@ -52,7 +52,7 @@ export default function MetricsView({ leads, appointments, tasks, treatmentPrice
         )}
       />
 
-      <Card className="overflow-hidden border-mint/20 bg-gradient-to-r from-[#1c1913] via-panel to-[#14151d] p-5 sm:p-6">
+      <Card className="overflow-hidden border-mint/30 bg-gradient-to-br from-card via-elevated to-hover p-5 sm:p-6">
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-mint">Vista ejecutiva</p>
@@ -160,7 +160,7 @@ export default function MetricsView({ leads, appointments, tasks, treatmentPrice
             </div>
           </Card>
 
-          <Card className="border-mint/25 bg-gradient-to-br from-[#211c13] via-[#161923] to-[#17131f] p-6">
+          <Card className="border-mint/30 bg-gradient-to-br from-card via-elevated to-hover p-6">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-mint">Estimación interna</p>
             <h3 className="mt-2 text-lg font-semibold text-cream">Valor potencial estimado bajo seguimiento</h3>
             <p className="mt-5 text-4xl font-bold tracking-tight text-mint">{data.hasPotentialConfig ? formatMoney(data.potential) : 'No configurado'}</p>

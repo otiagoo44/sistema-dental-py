@@ -60,7 +60,7 @@ export default function TaskFormModal({ mode, task, initialLeadId, leads, saving
           <Field label="Titulo" value={form.title} onChange={(value) => updateField('title', value)} disabled={saving} />
           <label className="block">
             <span className="mb-2 block text-xs text-cream/55">Lead asociado</span>
-            <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none" value={form.lead_id} onChange={(event) => updateField('lead_id', event.target.value)} disabled={saving}>
+            <select className="input-premium" value={form.lead_id} onChange={(event) => updateField('lead_id', event.target.value)} disabled={saving}>
               <option value="">Sin lead</option>
               {leads.map((lead) => (
                 <option key={lead.id} value={lead.id}>

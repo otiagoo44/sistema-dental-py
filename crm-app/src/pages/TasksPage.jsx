@@ -34,7 +34,7 @@ export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEdit
           ].map(([id, label]) => (
             <button
               key={id}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${filter === id ? 'bg-mint text-ink' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${filter === id ? 'bg-mint text-inverse' : 'border border-slate-200 bg-card text-textSoft hover:border-mint/30 hover:bg-elevated'}`}
               type="button"
               onClick={() => setFilter(id)}
             >
@@ -71,7 +71,7 @@ export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEdit
               <div className="flex flex-wrap gap-2">
                 {lead ? <Button size="sm" variant="ghost" type="button" onClick={() => onOpenLead(lead.id)}>Abrir lead</Button> : null}
                 {lead ? (
-                  <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer">
+                  <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-card px-3 py-2 text-xs font-semibold text-textSoft transition hover:border-mint/30 hover:bg-elevated hover:text-cream" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer">
                     <ExternalLink className="h-4 w-4" />
                     WhatsApp
                   </a>

@@ -56,9 +56,9 @@ export default function AgendaView({ appointments, actionId, onOutcome, onResche
                 <p className="mt-1 text-xs text-slate-500">Elegí un día para enfocarte en sus turnos.</p>
               </div>
               <div className="flex gap-1">
-                <button className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50" type="button" onClick={() => setCalendarOffset((value) => value - 7)} aria-label="Semana anterior"><ChevronLeft className="h-4 w-4" /></button>
-                <button className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="button" onClick={() => { setCalendarOffset(0); setSelectedDate(today); }}>Hoy</button>
-                <button className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50" type="button" onClick={() => setCalendarOffset((value) => value + 7)} aria-label="Semana siguiente"><ChevronRight className="h-4 w-4" /></button>
+                <button className="rounded-xl border border-slate-200 bg-card p-2 text-textSoft transition hover:border-mint/30 hover:bg-elevated" type="button" onClick={() => setCalendarOffset((value) => value - 7)} aria-label="Semana anterior"><ChevronLeft className="h-4 w-4" /></button>
+                <button className="rounded-xl border border-slate-200 bg-card px-3 py-2 text-xs font-semibold text-textSoft transition hover:border-mint/30 hover:bg-elevated" type="button" onClick={() => { setCalendarOffset(0); setSelectedDate(today); }}>Hoy</button>
+                <button className="rounded-xl border border-slate-200 bg-card p-2 text-textSoft transition hover:border-mint/30 hover:bg-elevated" type="button" onClick={() => setCalendarOffset((value) => value + 7)} aria-label="Semana siguiente"><ChevronRight className="h-4 w-4" /></button>
               </div>
             </div>
             <div className="grid grid-cols-7 gap-1.5">
@@ -66,10 +66,10 @@ export default function AgendaView({ appointments, actionId, onOutcome, onResche
                 const count = appointments.filter((appointment) => appointment.appointment_date === iso && APPOINTMENT_ACTIVE_STATUSES.includes(appointment.status)).length;
                 const selected = selectedDate === iso;
                 return (
-                  <button key={iso} className={`min-h-[76px] rounded-xl border px-1 py-2 text-center transition ${selected ? 'border-mint bg-mint text-ink shadow-sm' : iso === today ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'}`} type="button" onClick={() => { setSelectedDate(iso); setMode('day'); }}>
+                  <button key={iso} className={`min-h-[76px] rounded-xl border px-1 py-2 text-center transition ${selected ? 'border-mint bg-mint text-inverse shadow-sm' : iso === today ? 'border-mint/45 bg-mint/10 text-mint' : 'border-slate-200 bg-card text-textSoft hover:border-mint/35 hover:bg-elevated'}`} type="button" onClick={() => { setSelectedDate(iso); setMode('day'); }}>
                     <span className="block text-[10px] font-bold uppercase">{new Intl.DateTimeFormat('es-PY', { weekday: 'short', timeZone: 'America/Asuncion' }).format(date).replace('.', '')}</span>
                     <span className="mt-1 block text-lg font-bold">{new Intl.DateTimeFormat('es-PY', { day: '2-digit', timeZone: 'America/Asuncion' }).format(date)}</span>
-                    <span className={`mt-1 block text-[10px] font-semibold ${selected ? 'text-ink/70' : 'text-slate-400'}`}>{count} {count === 1 ? 'cita' : 'citas'}</span>
+                    <span className={`mt-1 block text-[10px] font-semibold ${selected ? 'text-inverse/70' : 'text-slate-400'}`}>{count} {count === 1 ? 'cita' : 'citas'}</span>
                   </button>
                 );
               })}
@@ -93,7 +93,7 @@ export default function AgendaView({ appointments, actionId, onOutcome, onResche
                 <Card key={appointment.id} as="article" className="card-enter p-4">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
                     <div className="flex items-center gap-4 xl:w-28">
-                      <div className="rounded-2xl bg-blue-50 px-4 py-3 text-center text-blue-700"><Clock3 className="mx-auto h-4 w-4" /><span className="mt-1 block text-lg font-bold">{formatTime(appointment.appointment_time)}</span></div>
+                      <div className="rounded-2xl border border-mint/20 bg-mint/10 px-4 py-3 text-center text-mint"><Clock3 className="mx-auto h-4 w-4" /><span className="mt-1 block text-lg font-bold">{formatTime(appointment.appointment_time)}</span></div>
                     </div>
                     <div className="min-w-0 flex-1">
                       <button className="text-left text-lg font-bold text-cream hover:text-mint" type="button" onClick={() => appointment.lead_id && onOpenLead(appointment.lead_id)}>{lead.name || 'Lead asociado'}</button>
@@ -101,7 +101,7 @@ export default function AgendaView({ appointments, actionId, onOutcome, onResche
                       <div className="mt-2"><StatusBadge value={appointment.status} /></div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-mint px-3 py-2 text-xs font-semibold text-ink transition hover:bg-blue-700" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a>
+                      <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-mint/70 bg-mint px-3 py-2 text-xs font-bold text-inverse transition hover:border-goldHover hover:bg-goldHover" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a>
                       <AgendaActionButton icon={Check} label="Confirmar" loading={actionId === `${appointment.id}:confirm`} disabled={isBusy || appointment.status === APPOINTMENT_STATUS.confirmed} onClick={() => onOutcome(appointment, 'confirm')} />
                       <AgendaActionButton icon={UserCheck} label="Asistió" loading={actionId === `${appointment.id}:attended`} disabled={isBusy || appointment.status === APPOINTMENT_STATUS.attended} onClick={() => onOutcome(appointment, 'attended')} />
                       <AgendaActionButton icon={Ban} label="No asistió" loading={actionId === `${appointment.id}:noShow`} disabled={isBusy || appointment.status === APPOINTMENT_STATUS.noShow} onClick={() => onOutcome(appointment, 'noShow')} />
@@ -121,7 +121,7 @@ export default function AgendaView({ appointments, actionId, onOutcome, onResche
 function AgendaActionButton({ icon: Icon, label, loading, disabled, onClick }) {
   return (
     <button
-      className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500"
+      className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-slate-200 bg-card px-3 py-2 text-xs font-semibold text-textSoft transition hover:border-mint/30 hover:bg-elevated disabled:cursor-not-allowed disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500"
       type="button"
       onClick={onClick}
       disabled={disabled || loading}

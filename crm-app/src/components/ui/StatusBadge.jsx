@@ -1,10 +1,10 @@
 const statusStyles = {
   'Lead Caliente': 'border-rose-400/25 bg-rose-400/10 text-rose-300',
   'Lead Medio': 'border-amber-400/25 bg-amber-400/10 text-amber-300',
-  'Lead Frío': 'border-cyan-400/20 bg-cyan-400/[0.08] text-cyan-300',
-  Nuevo: 'border-slate-400/20 bg-slate-400/[0.08] text-slate-600',
+  'Lead Frío': 'border-sky-400/25 bg-sky-400/10 text-sky-300',
+  Nuevo: 'border-sky-400/25 bg-sky-400/10 text-sky-300',
   'No Contactado': 'border-amber-400/25 bg-amber-400/10 text-amber-300',
-  Contactado: 'border-cyan-400/25 bg-cyan-400/10 text-cyan-300',
+  Contactado: 'border-sky-400/25 bg-sky-400/10 text-sky-300',
   Respondió: 'border-indigo-400/25 bg-indigo-400/10 text-indigo-300',
   'Consulta Agendada': 'border-violet-400/25 bg-violet-400/10 text-violet-300',
   Agendado: 'border-violet-400/25 bg-violet-400/10 text-violet-300',

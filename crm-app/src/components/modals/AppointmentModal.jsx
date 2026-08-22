@@ -126,13 +126,13 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
             <div>
               <div className="flex items-end justify-between gap-3">
                 <div><p className="text-sm font-bold text-cream">1. Elegí el día</p><p className="mt-1 text-xs text-slate-500">Próximos 14 días</p></div>
-                <label className="text-xs font-semibold text-slate-500">Otra fecha <input className="ml-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-700" type="date" min={todayIsoDate()} value={form.appointment_date} onChange={(event) => { updateField('appointment_date', event.target.value); updateField('appointment_time', ''); }} disabled={saving} /></label>
+                <label className="text-xs font-semibold text-slate-500">Otra fecha <input className="ml-2 rounded-lg border border-slate-200 bg-input px-2 py-1.5 text-textSoft outline-none focus:border-mint" type="date" min={todayIsoDate()} value={form.appointment_date} onChange={(event) => { updateField('appointment_date', event.target.value); updateField('appointment_time', ''); }} disabled={saving} /></label>
               </div>
               <div className="scrollbar-soft mt-3 grid grid-cols-4 gap-2 sm:grid-cols-7">
                 {dateOptions.map(({ iso, date }) => {
                   const selected = form.appointment_date === iso;
                   return (
-                    <button key={iso} className={`min-h-[74px] rounded-xl border px-2 py-2 text-center transition disabled:cursor-not-allowed disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500 ${selected ? 'border-mint bg-mint text-ink shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'}`} type="button" onClick={() => { updateField('appointment_date', iso); updateField('appointment_time', ''); }} disabled={saving}>
+                    <button key={iso} className={`min-h-[74px] rounded-xl border px-2 py-2 text-center transition disabled:cursor-not-allowed disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500 ${selected ? 'border-mint bg-mint text-inverse shadow-sm' : 'border-slate-200 bg-card text-textSoft hover:border-mint/35 hover:bg-elevated'}`} type="button" onClick={() => { updateField('appointment_date', iso); updateField('appointment_time', ''); }} disabled={saving}>
                       <span className="block text-[10px] font-bold uppercase">{new Intl.DateTimeFormat('es-PY', { weekday: 'short', timeZone: 'America/Asuncion' }).format(date).replace('.', '')}</span>
                       <span className="mt-1 block text-lg font-bold">{new Intl.DateTimeFormat('es-PY', { day: '2-digit', timeZone: 'America/Asuncion' }).format(date)}</span>
                     </button>
@@ -147,7 +147,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
             </div>
             <label className="block">
               <span className="mb-2 block text-xs font-semibold text-slate-500">Notas opcionales</span>
-              <textarea className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition focus:border-mint focus:ring-4 focus:ring-blue-50" value={form.notes} onChange={(event) => updateField('notes', event.target.value)} disabled={saving} placeholder="Indicaciones comerciales o de coordinación (sin datos clínicos sensibles)." />
+              <textarea className="input-premium min-h-24" value={form.notes} onChange={(event) => updateField('notes', event.target.value)} disabled={saving} placeholder="Indicaciones comerciales o de coordinación (sin datos clínicos sensibles)." />
             </label>
           </div>
 
@@ -159,14 +159,14 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
                 const occupied = occupiedTimes.has(time);
                 const selected = form.appointment_time === time;
                 return (
-                  <button key={time} className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-bold transition disabled:cursor-not-allowed ${occupied ? 'border-slate-200 bg-slate-100 text-slate-400 line-through' : selected ? 'border-mint bg-mint text-ink shadow-sm disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500'}`} type="button" onClick={() => !occupied && updateField('appointment_time', time)} disabled={saving || occupied} aria-label={`${time}${occupied ? ', ocupado' : ', disponible'}`}>
+                  <button key={time} className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-bold transition disabled:cursor-not-allowed ${occupied ? 'border-rose-400/20 bg-rose-400/[0.07] text-rose-300/65 line-through' : selected ? 'border-mint bg-mint text-inverse shadow-sm disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500' : 'border-slate-200 bg-card text-textSoft hover:border-mint/35 hover:bg-elevated disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500'}`} type="button" onClick={() => !occupied && updateField('appointment_time', time)} disabled={saving || occupied} aria-label={`${time}${occupied ? ', ocupado' : ', disponible'}`}>
                     {time}
                   </button>
                 );
               })}
             </div>
-            <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-mint" />Seleccionado</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-white ring-1 ring-slate-300" />Disponible</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-slate-300" />Ocupado</span></div>
-            {clinicSettings?.opening_hours ? <p className="mt-4 rounded-xl bg-white p-3 text-xs leading-5 text-slate-500">Horario configurado: {clinicSettings.opening_hours}. Los slots visuales usan 08:00–12:00 y 14:00–18:00; la restricción de base sigue siendo la autoridad final.</p> : null}
+            <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-mint" />Seleccionado</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-card ring-1 ring-slate-300" />Disponible</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-rose-400/50" />Ocupado</span></div>
+            {clinicSettings?.opening_hours ? <p className="mt-4 rounded-xl border border-slate-200 bg-soft p-3 text-xs leading-5 text-slate-500">Horario configurado: {clinicSettings.opening_hours}. Los slots visuales usan 08:00–12:00 y 14:00–18:00; la restricción de base sigue siendo la autoridad final.</p> : null}
           </div>
         </div>
 

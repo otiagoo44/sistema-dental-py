@@ -41,6 +41,8 @@ Esta sección se completa en navegador real después de publicar el commit que s
 - [ ] Agenda legible: hoy, día seleccionado, slots disponibles, seleccionados y ocupados se reconocen sin depender sólo del color.
 - [ ] No hay texto oscuro sobre fondo oscuro en ninguna pestaña, modal, toast, alerta o estado vacío.
 - [ ] No hay botones invisibles ni controles activos que parezcan deshabilitados.
+- [ ] No quedan cards blancas dominantes ni superficies claras accidentales en Dashboard, Leads, Seguimientos, Agenda, Tareas o Métricas.
+- [ ] No queda ningún CTA azul dominante; las acciones principales usan champagne con texto oscuro y los azules/cyan sólo comunican información.
 - [ ] Mobile usable: navegación no tapa contenido, modales caben, filtros se abren y tablas mantienen el scroll dentro de su card.
 - [ ] Console no muestra errores no explicados durante login, navegación, formularios, Agenda, Seguimientos y Métricas.
 - [ ] Network no usa el endpoint viejo y las operaciones protegidas siguen saliendo por las RPC esperadas.
@@ -74,8 +76,10 @@ Esta evidencia permite iniciar la pasada visual, pero no marca ninguno de sus ca
 - Pulido final de contraste: CTA 8.81:1, secundario 15.94:1, primario disabled 6.25:1, peligro 9.53:1, slot ocupado 6.50:1 y detalle seleccionado de Agenda 4.99:1.
 - Build final: 2056 módulos transformados. `npm audit`: 0 vulnerabilidades. `lead-intake`: 49 passed, 0 failed. SQL verification, RLS real-users y RLS/RPC multi-clínica: PASS.
 - Código frontend: cero referencias al proyecto viejo, secrets server-side, Tailwind CDN, hard delete o `dangerouslySetInnerHTML`; `dist` conserva cero sourcemaps. Las coincidencias de `.delete(` y `dangerouslySetInnerHTML` dentro de bundles minificados pertenecen a React, Motion y Supabase, no a código de la aplicación.
-- Preview del pulido final: `https://crm-odontologia-staging-preview.vercel.app` apunta al deployment inmutable `https://crm-odontologia-staging-bgb5z11zy-ortegatiago733-2656s-projects.vercel.app`, target Preview `READY` y HTTP 200.
+- Preview del dark mode global: `https://crm-odontologia-staging-preview.vercel.app` apunta al deployment inmutable `https://crm-odontologia-staging-rbpgu4ud6-ortegatiago733-2656s-projects.vercel.app`, target Preview `READY` y HTTP 200.
 - La navegación desktop ahora desplaza únicamente la lista de opciones, sin superponer la tarjeta de usuario; en mobile conserva navegación horizontal táctil con snap. Cards, modales, botones, estados vacíos y badges neutros tienen texto claro explícito sobre superficies oscuras.
+- El CSS publicado no contiene una utilidad `bg-white` exacta ni el hover azul del CTA anterior. Los contrastes calculados son 16.96:1 para texto principal/card, 8.12:1 para muted/card, 5.43:1 para faint/sidebar y 8.41:1 para CTA champagne/texto inverso.
+- Regresión posterior al cambio visual: build Vite OK, audit 0, `lead-intake` 49/49, SQL operativo OK, RLS usuarios reales PASS y RPC transaccional multi-clínica PASS. El navegador integrado no estuvo disponible, por lo que ninguna casilla visual queda aprobada automáticamente.
 
 ## 1. Preparación y evidencia
 

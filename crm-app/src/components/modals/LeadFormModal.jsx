@@ -128,18 +128,18 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold text-slate-500">Responsable</span>
-                  <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition focus:border-mint focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:border-slate-200/60" value={form.assigned_to} onChange={(event) => updateField('assigned_to', event.target.value)} disabled={saving || !isCreate}>
+                  <select className="input-premium" value={form.assigned_to} onChange={(event) => updateField('assigned_to', event.target.value)} disabled={saving || !isCreate}>
                     {(profiles || []).map((clinicProfile) => <option key={clinicProfile.id} value={clinicProfile.id}>{clinicProfile.full_name} · {clinicProfile.role}</option>)}
                   </select>
                 </label>
                 <Select label="Próxima acción" value={form.next_action} onChange={(value) => updateField('next_action', value)} options={NEXT_ACTION_OPTIONS} disabled={saving} />
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold text-slate-500">Próximo seguimiento</span>
-                  <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition focus:border-mint focus:ring-4 focus:ring-blue-50" value={followupPreset} onChange={(event) => { const preset = event.target.value; setFollowupPreset(preset); const value = followupPresetValue(preset); if (value) updateField('next_followup_at', value); }} disabled={saving}>
+                  <select className="input-premium" value={followupPreset} onChange={(event) => { const preset = event.target.value; setFollowupPreset(preset); const value = followupPresetValue(preset); if (value) updateField('next_followup_at', value); }} disabled={saving}>
                     <option value="today">Hoy</option><option value="tomorrow">Mañana</option><option value="3d">En 3 días</option><option value="7d">En 7 días</option><option value="custom">Fecha personalizada</option>
                   </select>
                 </label>
-                {followupPreset === 'custom' ? <Field label="Fecha y hora personalizada" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} /> : <div className="rounded-xl bg-blue-50 p-3 text-sm text-blue-800 md:col-span-2 xl:col-span-3">Seguimiento programado para {formatDateTime(fromDatetimeLocalAsuncion(form.next_followup_at))}.</div>}
+                {followupPreset === 'custom' ? <Field label="Fecha y hora personalizada" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} /> : <div className="rounded-xl border border-sky-400/20 bg-sky-400/10 p-3 text-sm text-sky-300 md:col-span-2 xl:col-span-3">Seguimiento programado para {formatDateTime(fromDatetimeLocalAsuncion(form.next_followup_at))}.</div>}
                 <TextArea label={isCreate ? 'Nota interna (opcional)' : 'Notas'} value={form.notes} onChange={(value) => updateField('notes', value)} disabled={saving} className="md:col-span-2 xl:col-span-3" />
                 {canAdmin && !isCreate ? <><Field label="Score" type="number" value={form.score} onChange={(value) => updateField('score', value)} disabled={saving} /><Field label="Valor potencial estimado" type="number" value={form.estimated_value} onChange={(value) => updateField('estimated_value', value)} disabled={saving} /></> : null}
               </div>
@@ -170,7 +170,7 @@ function FormSection({ number, title, description, children }) {
   return (
     <section className="rounded-2xl border border-slate-200 p-4 sm:p-5">
       <div className="mb-4 flex items-start gap-3">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">{number}</span>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-mint/25 bg-mint/10 text-xs font-bold text-mint">{number}</span>
         <div><h3 className="font-bold text-cream">{title}</h3><p className="mt-1 text-xs text-slate-500">{description}</p></div>
       </div>
       {children}

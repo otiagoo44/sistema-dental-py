@@ -58,7 +58,7 @@ export default function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, o
         alwaysContent={(
           <label className="block">
             <span className="mb-2 block text-xs font-semibold text-slate-500">Buscar por nombre o teléfono</span>
-            <span className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 transition focus-within:border-mint focus-within:ring-4 focus-within:ring-blue-50">
+            <span className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-input px-3 transition focus-within:border-mint focus-within:ring-4 focus-within:ring-mint/10">
               <Search className="h-4 w-4 text-slate-400" />
               <input className="w-full bg-transparent text-sm text-cream outline-none placeholder:text-slate-400" value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value })} placeholder="Ej. Laura o 0981…" />
             </span>
@@ -81,7 +81,7 @@ export default function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, o
           </div>
           <div className="flex items-center gap-2">
             <ArrowDownUp className="h-4 w-4 text-slate-400" />
-            <select className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })}>
+            <select className="min-h-10 rounded-xl border border-slate-200 bg-input px-3 text-sm font-medium text-textSoft outline-none focus:border-mint" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })}>
               <option value="recent">Más recientes</option><option value="hot">Más calientes</option><option value="followup">Seguimiento más próximo</option><option value="overdue">Más atrasados</option>
             </select>
             <span className="text-xs font-semibold text-slate-500">{filteredLeads.length} resultados</span>
@@ -114,11 +114,11 @@ export default function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, o
                 <Button size="sm" type="button" onClick={() => onOpenLead(lead.id)}>Ver detalle</Button>
                 {['Nuevo', 'No Contactado', 'No Respondió'].includes(lead.status) ? <Button size="sm" variant="secondary" type="button" onClick={() => onMarkContacted(lead)}><Check className="h-4 w-4" />Contactado</Button> : null}
                 <Button size="sm" variant="secondary" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button>
-                <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a>
+                <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-card px-3 py-2 text-xs font-semibold text-textSoft transition hover:border-mint/30 hover:bg-elevated hover:text-cream" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a>
                 <Button size="sm" variant="ghost" type="button" onClick={() => copyMessage(lead)}><Clipboard className="h-4 w-4" />Copiar mensaje</Button>
                 {canAdmin ? <Button size="sm" variant="ghost" type="button" onClick={() => onCreateTask(lead)}><Plus className="h-4 w-4" />Crear tarea</Button> : null}
                 <Button size="sm" variant="ghost" type="button" onClick={() => onEditLead(lead)}><Edit3 className="h-4 w-4" />Editar</Button>
-                <select className="min-h-9 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600" value={lead.status} aria-label={`Estado comercial de ${lead.name}`} onChange={(event) => { const nextStatus = event.target.value; if (nextStatus === LEAD_STATUS.scheduled && nextStatus !== lead.status) onScheduleAppointment(lead); else onUpdateLead(lead.id, { status: nextStatus }); }}>
+                <select className="min-h-9 rounded-xl border border-slate-200 bg-input px-3 py-2 text-xs font-semibold text-textSoft outline-none focus:border-mint" value={lead.status} aria-label={`Estado comercial de ${lead.name}`} onChange={(event) => { const nextStatus = event.target.value; if (nextStatus === LEAD_STATUS.scheduled && nextStatus !== lead.status) onScheduleAppointment(lead); else onUpdateLead(lead.id, { status: nextStatus }); }}>
                   {LEAD_STATUSES.filter((status) => status !== ARCHIVED_STATUS).map((status) => <option key={status}>{status}</option>)}
                 </select>
                 {canAdmin && !isArchivedLead(lead) ? <Button size="sm" variant="danger" type="button" onClick={() => onArchiveLead(lead)}><Archive className="h-4 w-4" />Archivar</Button> : null}
@@ -132,7 +132,7 @@ export default function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, o
 }
 
 function QuickFilter({ active, onClick, children }) {
-  return <button className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition ${active ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`} type="button" onClick={onClick}>{children}</button>;
+  return <button className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition ${active ? 'border-mint/45 bg-mint/10 text-mint' : 'border-slate-200 bg-card text-textSoft hover:border-mint/30 hover:bg-elevated hover:text-cream'}`} type="button" onClick={onClick}>{children}</button>;
 }
 
 export function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchiveLead, onSave, onMarkContacted, onScheduleAppointment, setNotice }) {
@@ -181,7 +181,7 @@ export function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchi
       <Card className="p-5">
         <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-5 md:flex-row md:items-start md:justify-between">
           <div>
-            <button className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-mint hover:text-blue-700" type="button" onClick={onBack}>
+            <button className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-mint hover:text-goldHover" type="button" onClick={onBack}>
               <ChevronLeft className="h-4 w-4" />Volver a leads
             </button>
             <h2 className="text-2xl font-semibold">{lead.name}</h2>
@@ -224,7 +224,7 @@ export function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchi
           <Field label="Próximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => setForm({ ...form, next_followup_at: value })} />
           <label className="block md:col-span-2">
             <span className="mb-2 block text-xs font-semibold text-slate-500">Notas</span>
-            <textarea className="min-h-32 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none focus:border-mint focus:ring-4 focus:ring-blue-50" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+            <textarea className="input-premium min-h-32" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
           </label>
         </div>
 
@@ -248,7 +248,7 @@ export function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchi
         </div>
       </Card>
 
-      <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-glow">
+      <aside className="rounded-2xl border border-slate-200 bg-card p-5 text-cream shadow-glow">
         <h3 className="mb-4 text-lg font-semibold">Eventos</h3>
         {events.length ? (
           <div className="space-y-3">

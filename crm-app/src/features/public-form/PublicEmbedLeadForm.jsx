@@ -100,8 +100,8 @@ export default function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
   }
 
   return (
-    <main className="min-h-screen bg-ink px-4 py-6 text-cream">
-      <form className="mx-auto max-w-2xl rounded-3xl border border-slate-200 bg-white p-5 shadow-glow" onSubmit={handleSubmit}>
+    <main className="min-h-screen bg-app px-4 py-6 text-cream">
+      <form className="mx-auto max-w-2xl rounded-3xl border border-slate-200 bg-card p-5 shadow-glow" onSubmit={handleSubmit}>
         <div className="mb-5 border-b border-white/10 pb-4">
           <p className="text-xs uppercase tracking-[0.2em] text-mint">{clinicSlug}</p>
           <h1 className="mt-1 text-2xl font-semibold">Solicitar consulta</h1>
@@ -134,7 +134,7 @@ export default function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
           </p>
         </div>
 
-        <button className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-mint/70 bg-mint px-4 py-3 font-semibold text-ink hover:bg-blue-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-elevated disabled:text-slate-500" type="submit" disabled={sending}>
+        <button className="button-primary mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-bold disabled:cursor-not-allowed" type="submit" disabled={sending}>
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon />}
           Enviar consulta
         </button>

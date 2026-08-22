@@ -28,7 +28,7 @@ export default function Dashboard({ leads, appointments, tasks, canAdmin = false
     const priority = [
       ...hotPending.map((lead) => ({ id: `hot-${lead.id}`, rank: 1, title: lead.name, detail: `Lead caliente sin contactar · ${lead.treatment || 'Tratamiento sin definir'}`, label: 'Ver lead', icon: Flame, tone: 'red', onClick: () => onOpenLead(lead.id) })),
       ...overdueFollowups.map((lead) => ({ id: `followup-${lead.id}`, rank: 2, title: lead.name, detail: `${lead.next_action || 'Seguimiento pendiente'} · ${formatDateTime(lead.next_followup_at)}`, label: 'Contactar', icon: AlarmClock, tone: 'amber', onClick: () => onOpenLead(lead.id) })),
-      ...todayAppointments.map((appointment) => ({ id: `appointment-${appointment.id}`, rank: 3, title: appointment.leads?.name || 'Cita de hoy', detail: `${formatTime(appointment.appointment_time)} · ${appointment.doctor_assigned}`, label: 'Ver cita', icon: CalendarCheck2, tone: 'blue', onClick: () => onNavigate('agenda') })),
+      ...todayAppointments.map((appointment) => ({ id: `appointment-${appointment.id}`, rank: 3, title: appointment.leads?.name || 'Cita de hoy', detail: `${formatTime(appointment.appointment_time)} · ${appointment.doctor_assigned}`, label: 'Ver cita', icon: CalendarCheck2, tone: 'info', onClick: () => onNavigate('agenda') })),
       ...noShows.slice(0, 3).map((appointment) => ({ id: `noshow-${appointment.id}`, rank: 4, title: appointment.leads?.name || 'No-show', detail: 'No asistió. Recuperar y ofrecer reprogramación.', label: 'Reagendar', icon: RefreshCw, tone: 'red', onClick: () => onRescheduleSafe(appointment, onOpenLead) })),
       ...overdueTasks.map((task) => ({ id: `task-${task.id}`, rank: 5, title: task.title, detail: task.leads?.name || 'Tarea sin lead asociado', label: 'Completar tarea', icon: CheckCircle2, tone: 'slate', onClick: () => onCompleteTask(task.id) })),
     ].sort((a, b) => a.rank - b.rank).slice(0, 10);
@@ -57,13 +57,13 @@ export default function Dashboard({ leads, appointments, tasks, canAdmin = false
       </div>
 
       {canAdmin ? (
-        <Card className="overflow-hidden border-mint/20 bg-gradient-to-r from-[#1d1912] via-panel to-[#14151d] p-5 sm:p-6">
+        <Card className="overflow-hidden border-mint/30 bg-gradient-to-br from-card via-elevated to-hover p-5 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-mint/20 bg-mint/10 text-mint"><BarChart3 className="h-5 w-5" /></span>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-mint">Impacto comercial</p>
-                <h3 className="mt-1 text-lg font-semibold text-cream">Convertí la operación de hoy en decisiones del mes.</h3>
+                <h3 className="mt-1 text-lg font-semibold text-cream">Convertí oportunidades en decisiones de seguimiento.</h3>
                 <p className="mt-1 text-sm leading-6 text-slate-500">Revisá captación, seguimiento, agenda, conversión y valor potencial estimado.</p>
               </div>
             </div>
@@ -90,7 +90,7 @@ export default function Dashboard({ leads, appointments, tasks, canAdmin = false
             <div className="divide-y divide-slate-100">
               {data.priority.map((item) => {
                 const Icon = item.icon;
-                const tone = item.tone === 'red' ? 'bg-red-50 text-red-600' : item.tone === 'amber' ? 'bg-amber-50 text-amber-700' : item.tone === 'blue' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600';
+                const tone = item.tone === 'red' ? 'bg-red-50 text-red-600' : item.tone === 'amber' ? 'bg-amber-50 text-amber-700' : item.tone === 'info' ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-600';
                 return (
                   <div key={item.id} className="flex flex-col gap-3 px-5 py-4 transition hover:bg-slate-50 sm:flex-row sm:items-center">
                     <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon className="h-4 w-4" /></span>
@@ -126,7 +126,7 @@ export default function Dashboard({ leads, appointments, tasks, canAdmin = false
 
 function ImpactMini({ label, value }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-black/10 p-3 text-center">
+    <div className="rounded-xl border border-mint/15 bg-app/45 p-3 text-center">
       <p className="text-xl font-bold text-cream">{value}</p>
       <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
     </div>
