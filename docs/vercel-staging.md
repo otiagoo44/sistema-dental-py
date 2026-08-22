@@ -52,7 +52,7 @@ https://sistema-dental-py-preview.vercel.app
 
 Deployment inmutable asociado: `https://sistema-dental-559mik7rg-ortegatiago733-2656s-projects.vercel.app`. El Preview anterior `https://sistema-dental-n0vygq1wm-ortegatiago733-2656s-projects.vercel.app` se conserva como reproduccion del origin que fallo; ya esta autorizado por CORS, pero por ser inmutable no contiene el build nuevo sin CDN.
 
-La produccion `https://sistema-dental-py.vercel.app` sigue sirviendo la version anterior porque no se promovio sin QA visual. Comprobar despues de una promocion autorizada:
+La produccion `https://sistema-dental-py.vercel.app` sigue sirviendo la version anterior porque no se promovio sin QA visual. La comprobacion del 2026-08-22 detecto alli el proyecto Supabase viejo, Tailwind CDN y `/favicon.ico` 404; el Preview actual no presenta esos problemas. Comprobar despues de una promocion autorizada:
 
 ```powershell
 curl.exe -sS https://sistema-dental-py.vercel.app/js/lead-intake-form.js | Select-String "unybqqzhgqxhrwucrofm|consentimiento_contacto"

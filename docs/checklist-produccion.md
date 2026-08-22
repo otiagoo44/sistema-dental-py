@@ -91,7 +91,7 @@ Leyenda: `[x]` verificado, `[!]` parcial/riesgo o requiere accion manual, `[ ]` 
 - [x] CRM Preview construida como Vite con `npm run build`, salida `dist` y variables Preview; bundle usa Supabase/webhook nuevos y no contiene `service_role`.
 - [!] Chrome headless local no devolvio DOM; flujo de navegador queda manual.
 - [!] El navegador integrado no estuvo disponible en la sesión 2026-08-22; el rediseño compiló pero la checklist visual por roles y responsive sigue pendiente.
-- [!] Landing Vercel de produccion no promovida: `https://sistema-dental-py.vercel.app` sigue sirviendo el deploy anterior hasta QA visual y aprobacion de produccion.
+- [!] Landing Vercel de produccion no promovida: `https://sistema-dental-py.vercel.app` sigue sirviendo el deploy anterior, que referencia el proyecto Supabase viejo, carga Tailwind por CDN y devuelve 404 para `/favicon.ico`. No usarla para captar leads hasta QA visual, aprobacion y promocion del build Preview actual.
 - [!] El primer deployment del proyecto CRM staging fue asignado automaticamente por Vercel al target production del proyecto nuevo; no se uso `--prod`. La URL aprobada para QA es exclusivamente el alias Preview estable indicado arriba.
 - [ ] Supabase Auth Site URL/Redirect URLs configuradas para el dominio CRM final.
 - [ ] QA visual en navegador del CRM Preview con owner/admin, receptionist, QA Clinic B y usuario sin profile.
