@@ -15,7 +15,7 @@ export default function FilterPanel({
     <Card className="p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
-          <span className="mt-0.5 rounded-lg bg-blue-50 p-2 text-mint">
+          <span className="mt-0.5 rounded-lg border border-mint/20 bg-mint/10 p-2 text-mint">
             <SlidersHorizontal className="h-4 w-4" />
           </span>
           <div className="min-w-0">
@@ -24,7 +24,7 @@ export default function FilterPanel({
           </div>
         </div>
         <button
-          className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50 md:hidden"
+          className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-elevated px-3 text-xs font-bold text-slate-600 transition hover:border-mint/30 hover:bg-hover md:hidden"
           type="button"
           onClick={() => setOpen((current) => !current)}
           aria-expanded={open}

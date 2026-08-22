@@ -66,7 +66,7 @@ export default function AgendaView({ appointments, actionId, onOutcome, onResche
                 const count = appointments.filter((appointment) => appointment.appointment_date === iso && APPOINTMENT_ACTIVE_STATUSES.includes(appointment.status)).length;
                 const selected = selectedDate === iso;
                 return (
-                  <button key={iso} className={`min-h-[76px] rounded-xl border px-1 py-2 text-center transition ${selected ? 'border-mint bg-mint text-white shadow-sm' : iso === today ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'}`} type="button" onClick={() => { setSelectedDate(iso); setMode('day'); }}>
+                  <button key={iso} className={`min-h-[76px] rounded-xl border px-1 py-2 text-center transition ${selected ? 'border-mint bg-mint text-[#080a0f] shadow-sm' : iso === today ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'}`} type="button" onClick={() => { setSelectedDate(iso); setMode('day'); }}>
                     <span className="block text-[10px] font-bold uppercase">{new Intl.DateTimeFormat('es-PY', { weekday: 'short', timeZone: 'America/Asuncion' }).format(date).replace('.', '')}</span>
                     <span className="mt-1 block text-lg font-bold">{new Intl.DateTimeFormat('es-PY', { day: '2-digit', timeZone: 'America/Asuncion' }).format(date)}</span>
                     <span className={`mt-1 block text-[10px] ${selected ? 'text-white/80' : 'text-slate-400'}`}>{count} {count === 1 ? 'cita' : 'citas'}</span>
@@ -101,7 +101,7 @@ export default function AgendaView({ appointments, actionId, onOutcome, onResche
                       <div className="mt-2"><StatusBadge value={appointment.status} /></div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-mint px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a>
+                      <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-mint px-3 py-2 text-xs font-semibold text-[#080a0f] transition hover:bg-blue-700" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a>
                       <AgendaActionButton icon={Check} label="Confirmar" loading={actionId === `${appointment.id}:confirm`} disabled={isBusy || appointment.status === APPOINTMENT_STATUS.confirmed} onClick={() => onOutcome(appointment, 'confirm')} />
                       <AgendaActionButton icon={UserCheck} label="Asistió" loading={actionId === `${appointment.id}:attended`} disabled={isBusy || appointment.status === APPOINTMENT_STATUS.attended} onClick={() => onOutcome(appointment, 'attended')} />
                       <AgendaActionButton icon={Ban} label="No asistió" loading={actionId === `${appointment.id}:noShow`} disabled={isBusy || appointment.status === APPOINTMENT_STATUS.noShow} onClick={() => onOutcome(appointment, 'noShow')} />
@@ -131,4 +131,3 @@ function AgendaActionButton({ icon: Icon, label, loading, disabled, onClick }) {
     </button>
   );
 }
-

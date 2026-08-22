@@ -12,7 +12,7 @@ Alias estable del Preview UX actual:
 https://crm-odontologia-staging-preview.vercel.app
 ```
 
-Deployment inmutable asociado: `https://crm-odontologia-staging-3j5vgivqk-ortegatiago733-2656s-projects.vercel.app`. Este Preview tiene Deployment Protection y todavia requiere QA visual. No usar el primer deployment estable del proyecto para QA: Vercel lo asigno automaticamente al target production del proyecto nuevo antes de que existiera un Preview, aunque no se ejecuto `--prod`.
+Deployment inmutable asociado al tema premium: `https://crm-odontologia-staging-r2sfp0eck-ortegatiago733-2656s-projects.vercel.app`. Este Preview tiene Deployment Protection y todavia requiere QA visual. No usar el primer deployment estable del proyecto para QA: Vercel lo asigno automaticamente al target production del proyecto nuevo antes de que existiera un Preview, aunque no se ejecuto `--prod`.
 
 - Root Directory: `crm-app`
 - Framework: Vite

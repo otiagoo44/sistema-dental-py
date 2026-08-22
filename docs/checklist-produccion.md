@@ -71,9 +71,12 @@ Leyenda: `[x]` verificado, `[!]` parcial/riesgo o requiere accion manual, `[ ]` 
 - [x] CRM usa RPC transaccional para `Nuevo lead`; el request no incluye `clinic_id`.
 - [x] `Nuevo lead` está visible para owner/admin y receptionist e incluye fuente, consentimiento, responsable, clasificación/score y seguimiento.
 - [x] Navegación por rol renovada: Dashboard, Leads, Seguimientos, Agenda y Tareas para recepción; Métricas y Configuración sólo owner/admin.
+- [x] Tema visual migrado a grafito/champagne con wordmark tipográfico, componentes oscuros y estados semánticos sin azul médico dominante.
+- [x] Contraste técnico de texto base/muted y CTA entre 6.92:1 y 18.92:1; pendiente confirmación perceptual en QA visual.
 - [x] Leads incluye búsqueda, ocho filtros/atajos y cuatro ordenamientos.
 - [x] Agenda visual incluye calendario de 14 días, selección de responsable y slots de 30 minutos con ocupados deshabilitados.
-- [x] Métricas usa cards, barras y embudo CSS sin dependencia de charts; valor potencial se etiqueta como estimación, no ingreso.
+- [x] Métricas usa cards, barras, embudo CSS y tablas por fuente/tratamiento sin dependencia de charts; valor potencial se etiqueta como estimación, no ingreso.
+- [x] Dashboard conecta owner/admin con `Ver impacto comercial`; receptionist conserva un CTA operativo a Seguimientos.
 - [x] Nuevo lead usa secciones y selects; `Guardar lead` y `Guardar y agendar` conservan la RPC transaccional.
 - [x] Helpers `datetime-local` para `America/Asuncion` probados ida/vuelta.
 - [x] `/form/:slug` existe en el CRM e incluye consentimiento y aviso de privacidad.

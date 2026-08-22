@@ -2,17 +2,18 @@ import { motion } from 'motion/react';
 
 export default function StatCard({ label, value, tone = 'mint', detail, icon: Icon }) {
   const tones = {
-    mint: 'text-blue-700 bg-blue-50',
-    gold: 'text-amber-700 bg-amber-50',
-    danger: 'text-red-700 bg-red-50',
+    mint: 'border border-mint/20 bg-mint/10 text-mint',
+    gold: 'border border-amber-400/20 bg-amber-400/10 text-amber-300',
+    danger: 'border border-rose-400/20 bg-rose-400/10 text-rose-300',
     cream: 'text-cream',
-    success: 'text-emerald-700 bg-emerald-50',
-    purple: 'text-violet-700 bg-violet-50',
+    success: 'border border-emerald-400/20 bg-emerald-400/10 text-emerald-300',
+    purple: 'border border-violet-400/20 bg-violet-400/10 text-violet-300',
+    cyan: 'border border-cyan-400/20 bg-cyan-400/10 text-cyan-300',
   };
 
   return (
     <motion.div
-      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-glow transition-shadow duration-200 hover:shadow-lg"
+      className="rounded-2xl border border-slate-200 bg-panel/95 p-5 shadow-glow transition duration-200 hover:border-slate-300 hover:bg-elevated"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2 }}

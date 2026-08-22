@@ -913,6 +913,7 @@ export default function App() {
           leads={activeLeads}
           appointments={appointments}
           tasks={tasks}
+          canAdmin={canAdmin}
           onCreateLead={openCreateLeadModal}
           onOpenLead={handleLeadSelect}
           onScheduleAppointment={openAppointmentModal}

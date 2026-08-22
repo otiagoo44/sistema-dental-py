@@ -21,6 +21,11 @@ Estado de este documento: checklist preparada, no ejecutada. La revisión de có
 - [ ] 13. Responsive: probar 320 px, 375 px, tablet y notebook; navegación, filtros, cards y modales sin scroll horizontal.
 - [ ] 14. Console/Network: cero errores no explicados; requests de agenda y seguimiento salen por RPC.
 - [ ] 15. No hay datos cruzados entre clínicas después de crear, contactar, posponer, agendar y completar.
+- [ ] 16. Tema oscuro premium: fondo, sidebar, cards, filtros, agenda y modales mantienen la misma jerarquía grafito/champagne.
+- [ ] 17. Legibilidad: texto principal, muted, estados semánticos, inputs y placeholders se leen sin esfuerzo en todas las pantallas.
+- [ ] 18. Dashboard owner/admin muestra `Ver impacto comercial` y navega a `Métricas`; receptionist muestra `Ver seguimientos pendientes`.
+- [ ] 19. Métricas contiene Captación, Seguimiento, Agenda, Conversión, Valor percibido y tablas por fuente/tratamiento.
+- [ ] 20. Responsive de Métricas: cards no quedan aplastadas y las tablas usan scroll horizontal contenido sin romper la página.
 
 ## Evidencia tecnica de release 2026-08-21
 
@@ -47,6 +52,7 @@ Esta evidencia permite iniciar la pasada visual, pero no marca ninguno de sus ca
 - `lead-intake`: 49 passed, 0 failed.
 - Búsquedas de proyecto viejo, `dangerouslySetInnerHTML`, `.delete(` y sourcemaps: sin hallazgos.
 - El navegador integrado no estuvo disponible; ninguna casilla visual de este documento se considera aprobada por esa razón.
+- El tema premium usa contraste calculado entre 6.92:1 y 18.92:1 para texto base/muted, y 8.81:1 para el CTA champagne. Esta verificación técnica no reemplaza la revisión visual.
 
 ## 1. Preparación y evidencia
 
@@ -124,6 +130,8 @@ Falla crítica: cualquier dato visible antes de resolver un profile activo.
 - [ ] Comparar calientes pendientes, seguimientos vencidos, citas de hoy, tareas vencidas, no-shows y leads sin responsable.
 - [ ] Validar respuesta promedio sólo con leads que tengan `created_at` y `last_contact_at`.
 - [ ] Ejecutar una acción desde `Prioridad de hoy` y confirmar que abre el destino correcto.
+- [ ] Como owner/admin, pulsar `Ver impacto comercial` y confirmar que abre la pestaña `Métricas`.
+- [ ] Como receptionist, confirmar que ese CTA no aparece y que se muestra `Ver seguimientos pendientes`.
 - [ ] En Seguimientos, validar filtros por responsable, prioridad, fuente, tratamiento, estado y ventana temporal.
 - [ ] Posponer un seguimiento y confirmar una sola tarea abierta actualizada y event `followup_postponed`.
 - [ ] Repetir como DentalPro y QA Clinic B; ningún conteo debe mezclar clínicas.
@@ -192,9 +200,13 @@ Todas estas acciones deben salir por `schedule_lead_appointment` o `update_appoi
 ## 6.1 Métricas owner/admin
 
 - [ ] Probar Esta semana, Este mes, Últimos 30 días, Últimos 90 días y Este año.
+- [ ] Confirmar que la navegación muestra exactamente `Métricas` con acento visual champagne para owner/admin.
 - [ ] Validar captación, contacto, agenda, asistencia, no-shows, embudo y seguimiento con filas visibles.
+- [ ] Comparar las tablas `Fuentes que generan oportunidades` y `Tratamientos más solicitados` con los leads visibles.
+- [ ] Confirmar que el funnel muestra Nuevo, Contactado, Agendado, Asistió, Tratamiento iniciado y Perdido; `Tratamiento iniciado` es el estado disponible más cercano a ganado.
 - [ ] Confirmar que `Valor potencial estimado` usa `estimated_value` o `treatment_prices` y muestra el aviso `no ingreso confirmado`.
 - [ ] Receptionist no ve ni puede forzar la pestaña.
+- [ ] Probar las tablas a 320 px y 375 px: el scroll debe quedar dentro de la card.
 
 ## 7. Archivado
 

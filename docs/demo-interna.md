@@ -4,8 +4,8 @@ Objetivo: validar el relato y el flujo operativo con el equipo interno. No es un
 
 ## Estado del release 2026-08-21
 
-- CRM Preview disponible: `https://crm-odontologia-staging-hsghneld5-ortegatiago733-2656s-projects.vercel.app`.
-- Landing Preview validada por HTTP: `https://sistema-dental-n0vygq1wm-ortegatiago733-2656s-projects.vercel.app`.
+- CRM Preview disponible: `https://crm-odontologia-staging-preview.vercel.app`.
+- Landing Preview validada por HTTP: `https://sistema-dental-py-preview.vercel.app`.
 - La landing de produccion no fue promovida.
 - Auth URLs y QA visual por roles siguen pendientes; por lo tanto, la demo interna todavia no esta aprobada.
 
@@ -31,7 +31,7 @@ Objetivo: validar el relato y el flujo operativo con el equipo interno. No es un
 
 ### 0. Qué necesita atención ahora
 
-Abrir Dashboard y explicar que la pantalla prioriza leads calientes sin contactar, seguimientos vencidos, citas de hoy, no-shows y tareas atrasadas. Entrar a `Seguimientos` para mostrar la cola agrupada por vencimiento y no por simple fecha de creación.
+Abrir Dashboard y explicar que la pantalla prioriza leads calientes sin contactar, seguimientos vencidos, citas de hoy, no-shows y tareas atrasadas. Con owner/admin, usar `Ver impacto comercial` para conectar la operación diaria con Métricas. Entrar a `Seguimientos` para mostrar la cola agrupada por vencimiento y no por simple fecha de creación.
 
 ### 1. Entrada del lead
 
@@ -74,7 +74,7 @@ Reprogramar para cerrar el relato de recuperación.
 
 ### 6. Métricas y roles
 
-Con owner/admin, abrir Métricas y mostrar embudo, fuentes, tratamientos, asistencia, seguimientos y `Valor potencial estimado`. Decir explícitamente que es una estimación interna y no ingreso confirmado.
+Con owner/admin, abrir la pestaña exacta `Métricas` y recorrer Captación, Seguimiento, Agenda, Conversión comercial y Valor percibido. Mostrar las tablas por fuente/tratamiento y `Valor potencial estimado`. Decir explícitamente que es una estimación interna y no ingreso confirmado, y que `Tratamiento iniciado` es el estado disponible más cercano a ganado.
 
 Mostrar también Configuración y Archivado. Cambiar a receptionist y mostrar:
 

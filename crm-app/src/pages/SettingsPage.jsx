@@ -113,7 +113,7 @@ function PublicFormSettings({ clinic, config, saving, onSave, setNotice }) {
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <button className="inline-flex items-center gap-2 rounded-xl bg-mint px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" type="button" onClick={handleSave} disabled={saving}>
+        <button className="inline-flex items-center gap-2 rounded-xl bg-mint px-4 py-2 text-sm font-semibold text-[#080a0f] hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" type="button" onClick={handleSave} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Guardar configuracion
         </button>
@@ -148,4 +148,3 @@ function SnippetBlock({ title, value }) {
     </div>
   );
 }
-

@@ -9,7 +9,7 @@ export default function ModalShell({
 }) {
   return createPortal(
     <motion.div
-      className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 ${overlayClassName}`}
+      className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 px-3 py-4 backdrop-blur-md sm:px-4 sm:py-6 ${overlayClassName}`}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -17,7 +17,7 @@ export default function ModalShell({
       role="presentation"
     >
       <motion.form
-        className={`w-full rounded-3xl border border-slate-200 bg-white shadow-2xl ${className}`}
+        className={`w-full rounded-3xl border border-slate-200 bg-elevated shadow-premium ${className}`}
         initial={{ opacity: 0, y: 14, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 8, scale: 0.99 }}

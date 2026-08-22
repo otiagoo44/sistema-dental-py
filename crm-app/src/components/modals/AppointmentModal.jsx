@@ -132,7 +132,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
                 {dateOptions.map(({ iso, date }) => {
                   const selected = form.appointment_date === iso;
                   return (
-                    <button key={iso} className={`min-h-[74px] rounded-xl border px-2 py-2 text-center transition ${selected ? 'border-mint bg-mint text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'}`} type="button" onClick={() => { updateField('appointment_date', iso); updateField('appointment_time', ''); }} disabled={saving}>
+                    <button key={iso} className={`min-h-[74px] rounded-xl border px-2 py-2 text-center transition ${selected ? 'border-mint bg-mint text-[#080a0f] shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'}`} type="button" onClick={() => { updateField('appointment_date', iso); updateField('appointment_time', ''); }} disabled={saving}>
                       <span className="block text-[10px] font-bold uppercase">{new Intl.DateTimeFormat('es-PY', { weekday: 'short', timeZone: 'America/Asuncion' }).format(date).replace('.', '')}</span>
                       <span className="mt-1 block text-lg font-bold">{new Intl.DateTimeFormat('es-PY', { day: '2-digit', timeZone: 'America/Asuncion' }).format(date)}</span>
                     </button>
@@ -159,7 +159,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
                 const occupied = occupiedTimes.has(time);
                 const selected = form.appointment_time === time;
                 return (
-                  <button key={time} className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-bold transition ${occupied ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 line-through' : selected ? 'border-mint bg-mint text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'}`} type="button" onClick={() => !occupied && updateField('appointment_time', time)} disabled={saving || occupied} aria-label={`${time}${occupied ? ', ocupado' : ', disponible'}`}>
+                  <button key={time} className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-bold transition ${occupied ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 line-through' : selected ? 'border-mint bg-mint text-[#080a0f] shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'}`} type="button" onClick={() => !occupied && updateField('appointment_time', time)} disabled={saving || occupied} aria-label={`${time}${occupied ? ', ocupado' : ', disponible'}`}>
                     {time}
                   </button>
                 );

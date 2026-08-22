@@ -134,7 +134,7 @@ export default function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
           </p>
         </div>
 
-        <button className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-mint px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={sending}>
+        <button className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-mint px-4 py-3 font-semibold text-[#080a0f] hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={sending}>
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon />}
           Enviar consulta
         </button>
@@ -146,4 +146,3 @@ export default function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
 function SendIcon() {
   return <ExternalLink className="h-4 w-4" />;
 }
-

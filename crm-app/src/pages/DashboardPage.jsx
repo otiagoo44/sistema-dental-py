@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AlarmClock, CalendarCheck2, CalendarDays, CheckCircle2, Clock3, FilePlus, Flame, RefreshCw, UserRound, UsersRound } from 'lucide-react';
+import { AlarmClock, BarChart3, CalendarCheck2, CalendarDays, CheckCircle2, Clock3, FilePlus, Flame, RefreshCw, UserRound, UsersRound } from 'lucide-react';
 import { formatDateTime, formatTime, todayIsoDate, toLocalIsoDate } from '../lib/formatters';
 import { terminalStatuses, APPOINTMENT_STATUS, APPOINTMENT_ACTIVE_STATUSES, isOpenTask } from '../lib/crmDomain';
 import EmptyState from '../components/ui/EmptyState';
@@ -8,7 +8,7 @@ import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import StatCard from '../components/ui/StatCard';
 
-export default function Dashboard({ leads, appointments, tasks, onCreateLead, onOpenLead, onScheduleAppointment, onCompleteTask, onNavigate }) {
+export default function Dashboard({ leads, appointments, tasks, canAdmin = false, onCreateLead, onOpenLead, onScheduleAppointment, onCompleteTask, onNavigate }) {
   const data = useMemo(() => {
     const now = Date.now();
     const today = todayIsoDate();
@@ -56,6 +56,27 @@ export default function Dashboard({ leads, appointments, tasks, onCreateLead, on
         <StatCard label="Sin responsable" value={data.unassigned.length} tone="cream" icon={UserRound} />
       </div>
 
+      {canAdmin ? (
+        <Card className="overflow-hidden border-mint/20 bg-gradient-to-r from-[#1d1912] via-panel to-[#14151d] p-5 sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-mint/20 bg-mint/10 text-mint"><BarChart3 className="h-5 w-5" /></span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-mint">Impacto comercial</p>
+                <h3 className="mt-1 text-lg font-semibold text-cream">Convertí la operación de hoy en decisiones del mes.</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-500">Revisá captación, seguimiento, agenda, conversión y valor potencial estimado.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3 sm:min-w-[340px]">
+              <ImpactMini label="Nuevos hoy" value={data.newToday} />
+              <ImpactMini label="Calientes" value={data.hotPending.length} />
+              <ImpactMini label="Vencidos" value={data.overdueFollowups.length} />
+            </div>
+            <Button className="w-full lg:w-auto" type="button" onClick={() => onNavigate('metrics')}><BarChart3 className="h-4 w-4" />Ver impacto comercial</Button>
+          </div>
+        </Card>
+      ) : null}
+
       <div className="grid gap-5 xl:grid-cols-[1.45fr_0.55fr]">
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
@@ -93,16 +114,25 @@ export default function Dashboard({ leads, appointments, tasks, onCreateLead, on
             <Button variant="secondary" type="button" onClick={() => onNavigate('followups')}><AlarmClock className="h-4 w-4" />Trabajar seguimientos</Button>
             <Button variant="secondary" type="button" onClick={() => onNavigate('agenda')}><CalendarDays className="h-4 w-4" />Revisar agenda</Button>
           </div>
-          <div className="mt-5 rounded-2xl bg-blue-50 p-4 text-sm leading-6 text-blue-800">
-            <strong>Regla operativa:</strong> ningún lead caliente debería terminar el día sin contacto o próxima acción.
+          <div className="mt-5 rounded-2xl border border-mint/15 bg-mint/[0.06] p-4 text-sm leading-6 text-slate-600">
+            <strong className="text-mint">Regla operativa:</strong> ningún lead caliente debería terminar el día sin contacto o próxima acción.
           </div>
+          {!canAdmin ? <Button className="mt-3 w-full" variant="ghost" type="button" onClick={() => onNavigate('followups')}><AlarmClock className="h-4 w-4" />Ver seguimientos pendientes</Button> : null}
         </Card>
       </div>
     </section>
   );
 }
 
+function ImpactMini({ label, value }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-black/10 p-3 text-center">
+      <p className="text-xl font-bold text-cream">{value}</p>
+      <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+    </div>
+  );
+}
+
 function onRescheduleSafe(appointment, onOpenLead) {
   if (appointment?.lead_id) onOpenLead(appointment.lead_id);
 }
-
