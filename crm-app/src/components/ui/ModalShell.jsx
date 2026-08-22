@@ -17,7 +17,7 @@ export default function ModalShell({
       role="presentation"
     >
       <motion.form
-        className={`w-full rounded-3xl border border-slate-200 bg-elevated shadow-premium ${className}`}
+        className={`ui-dark-surface w-full rounded-3xl border border-slate-200 bg-elevated text-cream shadow-premium ${className}`}
         initial={{ opacity: 0, y: 14, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 8, scale: 0.99 }}

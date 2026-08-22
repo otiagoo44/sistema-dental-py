@@ -2,7 +2,7 @@ const statusStyles = {
   'Lead Caliente': 'border-rose-400/25 bg-rose-400/10 text-rose-300',
   'Lead Medio': 'border-amber-400/25 bg-amber-400/10 text-amber-300',
   'Lead Frío': 'border-cyan-400/20 bg-cyan-400/[0.08] text-cyan-300',
-  Nuevo: 'border-slate-400/20 bg-slate-400/[0.08] text-slate-300',
+  Nuevo: 'border-slate-400/20 bg-slate-400/[0.08] text-slate-600',
   'No Contactado': 'border-amber-400/25 bg-amber-400/10 text-amber-300',
   Contactado: 'border-cyan-400/25 bg-cyan-400/10 text-cyan-300',
   Respondió: 'border-indigo-400/25 bg-indigo-400/10 text-indigo-300',
@@ -14,7 +14,7 @@ const statusStyles = {
   'No Asistió': 'border-rose-400/25 bg-rose-400/10 text-rose-300',
   Perdido: 'border-rose-400/25 bg-rose-400/10 text-rose-300',
   Archivado: 'border-slate-400/20 bg-slate-400/[0.08] text-slate-400',
-  baja: 'border-slate-400/20 bg-slate-400/[0.08] text-slate-300',
+  baja: 'border-slate-400/20 bg-slate-400/[0.08] text-slate-600',
   media: 'border-amber-400/25 bg-amber-400/10 text-amber-300',
   alta: 'border-orange-400/25 bg-orange-400/10 text-orange-300',
   urgente: 'border-rose-400/25 bg-rose-400/10 text-rose-300',
@@ -30,7 +30,7 @@ export default function StatusBadge({ value }) {
   if (!value) return null;
 
   return (
-    <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyles[value] || 'border-slate-400/20 bg-slate-400/[0.08] text-slate-300'}`}>
+    <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyles[value] || 'border-slate-400/20 bg-slate-400/[0.08] text-slate-600'}`}>
       {value}
     </span>
   );

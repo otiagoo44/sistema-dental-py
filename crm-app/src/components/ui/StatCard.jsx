@@ -13,7 +13,7 @@ export default function StatCard({ label, value, tone = 'mint', detail, icon: Ic
 
   return (
     <motion.div
-      className="rounded-2xl border border-slate-200 bg-panel/95 p-5 shadow-glow transition duration-200 hover:border-slate-300 hover:bg-elevated"
+      className="ui-dark-surface rounded-2xl border border-slate-200 bg-panel/95 p-5 text-cream shadow-glow transition duration-200 hover:border-slate-300 hover:bg-elevated"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2 }}

@@ -3,7 +3,7 @@ import StatusBadge from '../ui/StatusBadge';
 
 export function LeadMiniCard({ lead, onOpenLead }) {
   return (
-    <button className="rounded-lg border border-white/10 bg-ink/60 p-4 text-left transition hover:border-mint/40" type="button" onClick={() => onOpenLead(lead.id)}>
+    <button className="ui-dark-surface rounded-lg border border-white/10 bg-ink/60 p-4 text-left text-cream transition hover:border-mint/40" type="button" onClick={() => onOpenLead(lead.id)}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold">{lead.name}</h3>

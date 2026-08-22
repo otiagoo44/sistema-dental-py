@@ -74,7 +74,8 @@ Esta evidencia permite iniciar la pasada visual, pero no marca ninguno de sus ca
 - Pulido final de contraste: CTA 8.81:1, secundario 15.94:1, primario disabled 6.25:1, peligro 9.53:1, slot ocupado 6.50:1 y detalle seleccionado de Agenda 4.99:1.
 - Build final: 2056 módulos transformados. `npm audit`: 0 vulnerabilidades. `lead-intake`: 49 passed, 0 failed. SQL verification, RLS real-users y RLS/RPC multi-clínica: PASS.
 - Código frontend: cero referencias al proyecto viejo, secrets server-side, Tailwind CDN, hard delete o `dangerouslySetInnerHTML`; `dist` conserva cero sourcemaps. Las coincidencias de `.delete(` y `dangerouslySetInnerHTML` dentro de bundles minificados pertenecen a React, Motion y Supabase, no a código de la aplicación.
-- Preview del pulido final: `https://crm-odontologia-staging-preview.vercel.app` apunta al deployment inmutable `https://crm-odontologia-staging-8cn30gy17-ortegatiago733-2656s-projects.vercel.app`, target Preview `READY` y HTTP 200.
+- Preview del pulido final: `https://crm-odontologia-staging-preview.vercel.app` apunta al deployment inmutable `https://crm-odontologia-staging-bgb5z11zy-ortegatiago733-2656s-projects.vercel.app`, target Preview `READY` y HTTP 200.
+- La navegación desktop ahora desplaza únicamente la lista de opciones, sin superponer la tarjeta de usuario; en mobile conserva navegación horizontal táctil con snap. Cards, modales, botones, estados vacíos y badges neutros tienen texto claro explícito sobre superficies oscuras.
 
 ## 1. Preparación y evidencia
 
