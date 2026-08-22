@@ -34,7 +34,7 @@ export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEdit
           ].map(([id, label]) => (
             <button
               key={id}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${filter === id ? 'bg-mint text-[#080a0f]' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${filter === id ? 'bg-mint text-ink' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               type="button"
               onClick={() => setFilter(id)}
             >

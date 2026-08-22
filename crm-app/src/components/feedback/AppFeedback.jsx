@@ -49,7 +49,7 @@ export function Banner({ text, tone, onClose }) {
       role={tone === 'danger' ? 'alert' : 'status'}
     >
       <span className="flex items-center gap-2">{tone === 'danger' ? <Ban className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}{text}</span>
-      <button className="rounded-lg p-1 opacity-70 hover:bg-white/50 hover:opacity-100" type="button" onClick={onClose} aria-label="Cerrar mensaje"><X className="h-4 w-4" /></button>
+      <button className="rounded-lg p-1 opacity-80 transition hover:bg-white/10 hover:opacity-100" type="button" onClick={onClose} aria-label="Cerrar mensaje"><X className="h-4 w-4" /></button>
     </motion.div>,
     document.body,
   );

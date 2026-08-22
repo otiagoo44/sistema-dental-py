@@ -73,6 +73,8 @@ Leyenda: `[x]` verificado, `[!]` parcial/riesgo o requiere accion manual, `[ ]` 
 - [x] Navegación por rol renovada: Dashboard, Leads, Seguimientos, Agenda y Tareas para recepción; Métricas y Configuración sólo owner/admin.
 - [x] Tema visual migrado a grafito/champagne con wordmark tipográfico, componentes oscuros y estados semánticos sin azul médico dominante.
 - [x] Contraste técnico de texto base/muted y CTA entre 6.92:1 y 18.92:1; pendiente confirmación perceptual en QA visual.
+- [x] Pulido final corrige tipografía de sidebar, texto seleccionado de Agenda y estados primary/secondary/ghost/danger/disabled; el ratio mínimo calculado de los estados revisados es 4.99:1.
+- [x] Inputs, selects y textareas centralizan texto, placeholder, caret, calendario y estado disabled para tema oscuro sin cambiar validaciones ni payloads.
 - [x] Leads incluye búsqueda, ocho filtros/atajos y cuatro ordenamientos.
 - [x] Agenda visual incluye calendario de 14 días, selección de responsable y slots de 30 minutos con ocupados deshabilitados.
 - [x] Métricas usa cards, barras, embudo CSS y tablas por fuente/tratamiento sin dependencia de charts; valor potencial se etiqueta como estimación, no ingreso.
@@ -83,6 +85,7 @@ Leyenda: `[x]` verificado, `[!]` parcial/riesgo o requiere accion manual, `[ ]` 
 - [x] Build Vite 7.3.6 posterior a `Nuevo lead`: OK.
 - [x] `npm audit`: 0 vulnerabilidades.
 - [x] Suite 2026-08-22: SQL verification, RLS real-users, RLS/RPC transaccional y `lead-intake` 49/49 PASS.
+- [x] Build final de pulido: 2056 módulos transformados; `npm audit` 0 vulnerabilidades; no existe script lint en `package.json`.
 - [x] `dist`: 0 sourcemaps, 0 proyecto viejo, 0 marcadores de secrets server-side.
 - [x] Landing local apunta al endpoint nuevo y no envia key ni `clinic_id`.
 - [x] Preview estable de landing creado y verificado: `https://sistema-dental-py-preview.vercel.app`; el origin anterior que reproducia CORS tambien permanece autorizado.

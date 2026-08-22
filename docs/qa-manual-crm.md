@@ -27,6 +27,24 @@ Estado de este documento: checklist preparada, no ejecutada. La revisión de có
 - [ ] 19. Métricas contiene Captación, Seguimiento, Agenda, Conversión, Valor percibido y tablas por fuente/tratamiento.
 - [ ] 20. Responsive de Métricas: cards no quedan aplastadas y las tablas usan scroll horizontal contenido sin romper la página.
 
+## QA visual final de tema premium
+
+Esta sección se completa en navegador real después de publicar el commit que se está evaluando. Probar cada punto en desktop, notebook, tablet y 320/375 px cuando corresponda.
+
+- [ ] Sidebar legible: wordmark, clínica activa, links inactivos, link activo, iconos, contadores, usuario y rol tienen contraste suficiente.
+- [ ] Botones legibles: primario, secundario, peligro, ghost y disabled se distinguen en reposo, hover, focus y carga.
+- [ ] Inputs legibles: labels, valor, placeholder, error, focus y disabled son claros sobre todas las superficies oscuras.
+- [ ] Selects legibles: valor seleccionado, opciones, placeholder y estado disabled no usan texto oscuro sobre fondo oscuro.
+- [ ] Modales legibles: overlay, encabezado, secciones, controles, errores, cierre y acciones finales conservan jerarquía.
+- [ ] Métricas visible y legible para owner/admin; filtros, cards, funnel, tablas y estimación se entienden sin zoom.
+- [ ] Seguimientos visible y legible; motivo, recomendación, vencimiento, badges y acciones se diferencian correctamente.
+- [ ] Agenda legible: hoy, día seleccionado, slots disponibles, seleccionados y ocupados se reconocen sin depender sólo del color.
+- [ ] No hay texto oscuro sobre fondo oscuro en ninguna pestaña, modal, toast, alerta o estado vacío.
+- [ ] No hay botones invisibles ni controles activos que parezcan deshabilitados.
+- [ ] Mobile usable: navegación no tapa contenido, modales caben, filtros se abren y tablas mantienen el scroll dentro de su card.
+- [ ] Console no muestra errores no explicados durante login, navegación, formularios, Agenda, Seguimientos y Métricas.
+- [ ] Network no usa el endpoint viejo y las operaciones protegidas siguen saliendo por las RPC esperadas.
+
 ## Evidencia tecnica de release 2026-08-21
 
 Esta evidencia permite iniciar la pasada visual, pero no marca ninguno de sus casos como aprobado:
@@ -53,6 +71,10 @@ Esta evidencia permite iniciar la pasada visual, pero no marca ninguno de sus ca
 - Búsquedas de proyecto viejo, `dangerouslySetInnerHTML`, `.delete(` y sourcemaps: sin hallazgos.
 - El navegador integrado no estuvo disponible; ninguna casilla visual de este documento se considera aprobada por esa razón.
 - El tema premium usa contraste calculado entre 6.92:1 y 18.92:1 para texto base/muted, y 8.81:1 para el CTA champagne. Esta verificación técnica no reemplaza la revisión visual.
+- Pulido final de contraste: CTA 8.81:1, secundario 15.94:1, primario disabled 6.25:1, peligro 9.53:1, slot ocupado 6.50:1 y detalle seleccionado de Agenda 4.99:1.
+- Build final: 2056 módulos transformados. `npm audit`: 0 vulnerabilidades. `lead-intake`: 49 passed, 0 failed. SQL verification, RLS real-users y RLS/RPC multi-clínica: PASS.
+- Código frontend: cero referencias al proyecto viejo, secrets server-side, Tailwind CDN, hard delete o `dangerouslySetInnerHTML`; `dist` conserva cero sourcemaps. Las coincidencias de `.delete(` y `dangerouslySetInnerHTML` dentro de bundles minificados pertenecen a React, Motion y Supabase, no a código de la aplicación.
+- Preview del pulido final: `https://crm-odontologia-staging-preview.vercel.app` apunta al deployment inmutable `https://crm-odontologia-staging-8cn30gy17-ortegatiago733-2656s-projects.vercel.app`, target Preview `READY` y HTTP 200.
 
 ## 1. Preparación y evidencia
 

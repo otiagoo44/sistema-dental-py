@@ -100,7 +100,7 @@ function PublicFormSettings({ clinic, config, saving, onSave, setNotice }) {
         <Field label="clinic_slug" value={form.clinic_slug} onChange={(value) => updateField('clinic_slug', slugify(value))} disabled={saving} />
         <div className="grid gap-2">
           <Field label="public_token / landing_token" value={form.public_token} onChange={(value) => updateField('public_token', value.trim())} disabled={saving} />
-          <button className="w-fit rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cream/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={() => updateField('public_token', generatePublicToken())} disabled={saving}>
+          <button className="w-fit rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cream/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:border-slate-200/60 disabled:text-slate-500" type="button" onClick={() => updateField('public_token', generatePublicToken())} disabled={saving}>
             Generar token
           </button>
         </div>
@@ -113,7 +113,7 @@ function PublicFormSettings({ clinic, config, saving, onSave, setNotice }) {
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <button className="inline-flex items-center gap-2 rounded-xl bg-mint px-4 py-2 text-sm font-semibold text-[#080a0f] hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" type="button" onClick={handleSave} disabled={saving}>
+        <button className="inline-flex items-center gap-2 rounded-xl border border-mint/70 bg-mint px-4 py-2 text-sm font-semibold text-ink hover:bg-blue-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-elevated disabled:text-slate-500" type="button" onClick={handleSave} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Guardar configuracion
         </button>

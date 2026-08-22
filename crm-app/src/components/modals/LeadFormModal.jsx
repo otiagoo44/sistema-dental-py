@@ -128,7 +128,7 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold text-slate-500">Responsable</span>
-                  <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition focus:border-mint focus:ring-4 focus:ring-blue-50 disabled:opacity-60" value={form.assigned_to} onChange={(event) => updateField('assigned_to', event.target.value)} disabled={saving || !isCreate}>
+                  <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-cream outline-none transition focus:border-mint focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:border-slate-200/60" value={form.assigned_to} onChange={(event) => updateField('assigned_to', event.target.value)} disabled={saving || !isCreate}>
                     {(profiles || []).map((clinicProfile) => <option key={clinicProfile.id} value={clinicProfile.id}>{clinicProfile.full_name} · {clinicProfile.role}</option>)}
                   </select>
                 </label>

@@ -8,7 +8,7 @@ export function ModalHeader({ title, subtitle, onClose, disabled }) {
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-mint">{subtitle}</p>
         <h2 className="mt-1 text-2xl font-bold tracking-tight text-cream">{title}</h2>
       </div>
-      <button className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={onClose} disabled={disabled} aria-label="Cerrar">
+      <button className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-cream disabled:cursor-not-allowed disabled:border-slate-200/60 disabled:text-slate-400" type="button" onClick={onClose} disabled={disabled} aria-label="Cerrar">
         <X className="h-4 w-4" />
       </button>
     </div>

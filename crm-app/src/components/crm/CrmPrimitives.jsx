@@ -32,7 +32,7 @@ export function Select({ label, value, onChange, options, placeholder, disabled 
   return (
     <label className="block">
       <span className="mb-2 block text-xs font-semibold text-slate-500">{label}</span>
-      <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-cream outline-none transition hover:border-slate-300 focus:border-mint focus:ring-4 focus:ring-mint/10 disabled:cursor-not-allowed disabled:opacity-60" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+      <select className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-cream outline-none transition hover:border-slate-300 focus:border-mint focus:ring-4 focus:ring-mint/10 disabled:cursor-not-allowed disabled:border-slate-200/60" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
         {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
         {(options || []).map((option) => {
           const optionValue = typeof option === 'object' ? option.value : option;
@@ -48,7 +48,7 @@ export function Field({ label, value, onChange, type = 'text', disabled = false,
   return (
     <label className="block">
       <span className="mb-2 block text-xs font-semibold text-slate-500">{label}</span>
-      <input className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-cream outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-mint focus:ring-4 focus:ring-mint/10 disabled:cursor-not-allowed disabled:opacity-60" type={type} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} />
+      <input className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-cream outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-mint focus:ring-4 focus:ring-mint/10 disabled:cursor-not-allowed disabled:border-slate-200/60" type={type} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} />
     </label>
   );
 }
@@ -57,7 +57,7 @@ export function TextArea({ label, value, onChange, disabled = false, className =
   return (
     <label className={`block ${className}`}>
       <span className="mb-2 block text-xs font-semibold text-slate-500">{label}</span>
-      <textarea className="min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-cream outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-mint focus:ring-4 focus:ring-mint/10 disabled:cursor-not-allowed disabled:opacity-60" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} />
+      <textarea className="min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-cream outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-mint focus:ring-4 focus:ring-mint/10 disabled:cursor-not-allowed disabled:border-slate-200/60" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} />
     </label>
   );
 }

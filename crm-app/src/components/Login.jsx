@@ -81,7 +81,7 @@ export default function Login() {
           {error ? <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">No pudimos iniciar sesión. Revisá el email y la contraseña.</p> : null}
 
           <button
-            className="w-full rounded-xl border border-mint/70 bg-mint px-4 py-3 font-semibold text-[#080a0f] shadow-[0_12px_34px_rgba(200,169,106,0.18)] transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-xl border border-mint/70 bg-mint px-4 py-3 font-semibold text-ink shadow-[0_12px_34px_rgba(200,169,106,0.18)] transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-elevated disabled:text-slate-500 disabled:shadow-none"
             type="submit"
             disabled={loading || !hasSupabaseConfig}
           >
