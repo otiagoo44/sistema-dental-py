@@ -152,3 +152,16 @@ Antes de esa fase se deben definir consentimiento, ownership de la cuenta Meta, 
 Abrir WhatsApp por sí solo no confirma contacto. Las plantillas las administra owner/admin en **Configuración → Plantillas de WhatsApp**.
 
 No están automatizados el envío de WhatsApp, WhatsApp Cloud API, ManyChat ni Instagram. El botón siempre deja el control final en recepción.
+
+## Rutina con Vista Hoy y semáforo
+
+1. Entrá a **Dashboard → Hoy** al comenzar el turno.
+2. Trabajá primero los items `Urgente`, luego los de `Atención`.
+3. Usá la plantilla de la etapa; revisá el texto antes de enviarlo manualmente.
+4. Registrá `Sí, respondió`, `No respondió`, `Número inválido` o `Posponer`.
+5. Dejá cada oportunidad con cita, próxima acción o cierre con motivo.
+6. Antes de terminar el turno, verificá que no queden calientes sin contacto ni tareas vencidas.
+
+Si una oportunidad se pierde, seleccioná el motivo real. `Otro` requiere una nota breve. No uses `Perdido` para ocultar duplicados o limpiar la lista: los datos se conservan y alimentan las métricas.
+
+En el detalle, **Historial comercial** permite responder quién contactó, qué tarea se completó y cuándo se agendó sin leer datos técnicos.

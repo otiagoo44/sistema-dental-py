@@ -307,3 +307,35 @@ Gate: hasta completar esta checklist y la landing pública real, la decisión m�
 - [ ] Con QA Clinic B, comprobar que no aparecen plantillas ni eventos de DentalPro.
 
 WhatsApp sigue siendo manual: la CRM abre `wa.me`, pero no envía mensajes, no usa WhatsApp Cloud API y no integra ManyChat.
+
+## QA de retención e insights comerciales
+
+### Recepción
+
+- [ ] Entrar al Dashboard y confirmar que **Hoy** explica qué hacer primero.
+- [ ] Confirmar que alertas y semáforo coinciden: Rojo urgente, Ámbar atención, Verde ordenado y Gris cerrado.
+- [ ] Abrir un urgente, usar WhatsApp y elegir un resultado de contacto.
+- [ ] Agendar o posponer desde Hoy sin navegar por pantallas innecesarias.
+- [ ] Confirmar que Leads, Seguimientos, Tareas y detalle muestran la misma prioridad.
+- [ ] Marcar un lead como `Perdido`: no permite continuar sin motivo; `Otro` exige nota.
+- [ ] Confirmar que archivar no borra el lead y sólo está disponible para owner/admin.
+- [ ] Abrir el detalle y verificar **Historial comercial**: mensajes, contactos, tareas y citas tienen fecha, actor y texto humano; nunca JSON crudo.
+
+### Owner/admin
+
+- [ ] Abrir Métricas y recorrer Resumen, Fuentes, Tratamientos, Responsables y Reportes.
+- [ ] Confirmar que Panel del dueño explica salud comercial y causa de Atención/Crítica.
+- [ ] Verificar motivos de pérdida, pérdidas por fuente y tratamientos más perdidos.
+- [ ] Copiar el reporte semanal y comprobar que números coinciden con el período.
+- [ ] Confirmar el disclaimer: actividad comercial y valor potencial no son ingresos confirmados.
+- [ ] Abrir Configuración → Plantillas, recorrer las nueve etapas, restaurar una, previsualizar y copiar.
+- [ ] Confirmar que receptionist no puede editar plantillas ni ver Métricas.
+- [ ] Confirmar con QA Clinic B que no aparecen templates, responsables, reportes ni datos de DentalPro.
+
+### Diseño y carga cognitiva
+
+- [ ] La sidebar conserva scroll interno y todas las opciones siguen accesibles.
+- [ ] No se agregó una pestaña principal para Reportes o Panel del dueño.
+- [ ] Subpestañas de Métricas/Configuración tienen scroll contenido en 320/375 px.
+- [ ] Hoy no muestra filas duplicadas para el mismo lead y los botones son tocables en mobile.
+- [ ] No hay cards claras, CTA azul dominante, texto oscuro sobre fondo oscuro ni navegación saturada.

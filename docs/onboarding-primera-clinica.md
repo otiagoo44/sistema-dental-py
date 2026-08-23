@@ -236,7 +236,7 @@ No ampliar alcance durante la estabilización salvo error crítico. Las automati
 Antes de capacitar a recepción:
 
 1. Verificar el WhatsApp, nombre y enlace de agenda de la clínica.
-2. Ingresar como owner/admin y revisar las cinco plantillas en **Configuración → Plantillas de WhatsApp**.
+2. Ingresar como owner/admin y revisar las nueve plantillas en **Configuración → Plantillas**: primer contacto, urgencia, precio, sin respuesta, recordatorio, no-show, post consulta, reactivación y confirmación.
 3. Adaptar tono y firma sin prometer resultados clínicos ni inventar precios.
 4. Probar las variables con un lead sintético y confirmar que no quedan marcadores `{{...}}`.
 5. Probar `Sí, respondió`, `No respondió`, `Número inválido` y `Posponer`.
@@ -244,3 +244,16 @@ Antes de capacitar a recepción:
 7. Confirmar aislamiento con un usuario de otra clínica.
 
 La implementación inicial usa enlaces `wa.me`; el envío automático, WhatsApp Cloud API, ManyChat e Instagram automático son fases posteriores.
+
+## Configurar el proceso comercial
+
+1. Acordar con el owner quién atiende cada fuente y en cuánto tiempo.
+2. Explicar el semáforo: Rojo se trabaja primero; Ámbar durante el día; Verde ya tiene flujo; Gris está cerrado.
+3. Definir quién puede marcar perdido y revisar los once motivos estándar.
+4. Enseñar a recepción a empezar en **Hoy**, no recorriendo toda la base.
+5. Probar una pérdida con motivo y verificarla en Métricas.
+6. Ajustar tratamientos/precios conservadores para que “Valor potencial estimado” sea útil sin presentarlo como ingreso.
+7. Revisar Fuentes, Tratamientos y Responsables con el owner al finalizar la primera semana.
+8. Copiar el primer reporte semanal y dejar documentada una decisión operativa concreta.
+
+El historial comercial registra actividad del equipo; no reemplaza historia clínica ni debe contener datos clínicos sensibles.

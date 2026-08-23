@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Clipboard, Loader2, RotateCcw, Save } from 'lucide-react';
+import { Clipboard, Eye, Loader2, RotateCcw, Save } from 'lucide-react';
 import { slugify, generatePublicToken, formatAllowedOrigins, publicFormPayloadExample, publicFormFetchSnippet, publicFormIframeSnippet } from '../lib/crmDomain';
-import { WHATSAPP_TEMPLATE_DEFINITIONS, WHATSAPP_VARIABLES } from '../lib/messages';
+import { buildMessageFromTemplate, WHATSAPP_TEMPLATE_DEFINITIONS, WHATSAPP_VARIABLES } from '../lib/messages';
 import { Info, Field, TextArea } from '../components/crm/CrmPrimitives';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -19,10 +19,16 @@ export default function SettingsView({
   onSaveMessageTemplates,
   setNotice,
 }) {
+  const [section, setSection] = useState('clinic');
   return (
     <section className="space-y-6">
-      <PageHeader eyebrow="Administración" title="Configuración" subtitle="Datos de la clínica y conexión segura del formulario público. Sólo visible para owner/admin." />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <PageHeader eyebrow="Administración" title="Configuración" subtitle="Datos de la clínica, plantillas y conexión segura del formulario público. Sólo visible para owner/admin." />
+      <div className="scrollbar-soft flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-card p-2">
+        {[["clinic", "Clínica"], ["templates", "Plantillas"], ["system", "Sistema"]].map(([id, label]) => (
+          <button key={id} type="button" onClick={() => setSection(id)} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${section === id ? 'bg-mint text-inverse' : 'text-textSoft hover:bg-elevated hover:text-cream'}`}>{label}</button>
+        ))}
+      </div>
+      {section === 'clinic' ? <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <h2 className="mb-4 text-lg font-semibold">Datos de la clínica</h2>
           <div className="grid gap-4">
@@ -43,14 +49,16 @@ export default function SettingsView({
             <Info label="Rol" value={profile?.role || 'Sin dato'} />
           </div>
         </Card>
-      </div>
+      </div> : null}
 
-      <PublicFormSettings clinic={clinic} config={publicFormConfig} saving={savingPublicForm} onSave={onSavePublicForm} setNotice={setNotice} />
-      <WhatsAppTemplatesSettings
+      {section === 'system' ? <PublicFormSettings clinic={clinic} config={publicFormConfig} saving={savingPublicForm} onSave={onSavePublicForm} setNotice={setNotice} /> : null}
+      {section === 'templates' ? <WhatsAppTemplatesSettings
         templates={messageTemplates}
         saving={savingTemplates}
         onSave={onSaveMessageTemplates}
-      />
+        clinic={clinic}
+        setNotice={setNotice}
+      /> : null}
     </section>
   );
 }
@@ -62,7 +70,7 @@ function buildTemplateDraft(templates = []) {
   }));
 }
 
-function WhatsAppTemplatesSettings({ templates, saving, onSave }) {
+function WhatsAppTemplatesSettings({ templates, saving, onSave, clinic, setNotice }) {
   const [draft, setDraft] = useState(() => buildTemplateDraft(templates));
   const [formError, setFormError] = useState('');
 
@@ -83,6 +91,23 @@ function WhatsAppTemplatesSettings({ templates, saving, onSave }) {
     } catch (saveError) {
       setFormError(saveError.message || 'No se pudieron guardar las plantillas.');
     }
+  }
+
+  const exampleLead = { name: 'Laura', treatment: 'Implante dental', urgency: 'Esta semana', situation: 'Quiere agendar una consulta', source: 'WhatsApp directo' };
+  const exampleAppointment = { appointment_date: 'viernes 28', appointment_time: '10:00' };
+
+  function previewMessage(definition) {
+    return buildMessageFromTemplate(
+      draft[definition.key] || definition.message,
+      exampleLead,
+      exampleAppointment,
+      { name: clinic?.name, whatsapp: clinic?.whatsapp, calendar_link: clinic?.calendar_link },
+    );
+  }
+
+  async function copyPreview(definition) {
+    await navigator.clipboard.writeText(previewMessage(definition));
+    setNotice?.(`Vista previa de “${definition.name}” copiada.`);
   }
 
   return (
@@ -128,6 +153,11 @@ function WhatsAppTemplatesSettings({ templates, saving, onSave }) {
               disabled={saving}
               className="min-h-56"
             />
+            <details className="mt-3 rounded-xl border border-slate-200 bg-card p-3">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-bold text-mint"><Eye className="h-3.5 w-3.5" />Vista previa con datos de ejemplo</summary>
+              <p className="mt-3 whitespace-pre-line text-sm leading-6 text-textSoft">{previewMessage(definition)}</p>
+              <Button className="mt-3" size="sm" variant="secondary" type="button" onClick={() => copyPreview(definition)}><Clipboard className="h-3.5 w-3.5" />Copiar mensaje</Button>
+            </details>
           </article>
         ))}
       </div>

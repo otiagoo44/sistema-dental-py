@@ -128,3 +128,16 @@ Si la QA visual y el redeploy aún están pendientes, la decisión sigue siendo 
 6. Como owner/admin, abrir Configuración y mostrar las plantillas editables por clínica.
 
 Mensaje comercial correcto: el sistema reduce pasos duplicados y mantiene oportunidades bajo seguimiento. No afirmar que envía WhatsApp automáticamente ni prometer pacientes o ingresos.
+
+## Escena: del trabajo diario al control del dueño
+
+1. Ingresar como receptionist y abrir **Dashboard → Hoy**.
+2. Explicar el semáforo y resolver un lead Rojo con WhatsApp, resultado de contacto y cita o seguimiento.
+3. Abrir el historial comercial del lead para mostrar quién actuó y cuándo.
+4. Marcar otro lead como `Perdido`; seleccionar motivo y comprobar que `Otro` exige una nota.
+5. Ingresar como owner/admin y abrir **Métricas → Resumen** para mostrar salud comercial.
+6. Recorrer Fuentes, Tratamientos, Responsables y motivos de pérdida.
+7. Abrir Reportes, seleccionar semana/mes y copiar el reporte.
+8. Cerrar recordando: el reporte refleja actividad y oportunidades bajo seguimiento; no ingresos confirmados.
+
+Alertas, prioridad y reporte se calculan desde los datos actuales. El envío automático semanal por email queda como fase futura vía `automation_jobs`/n8n.

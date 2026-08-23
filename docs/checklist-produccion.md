@@ -8,7 +8,7 @@ Leyenda: `[x]` verificado, `[!]` parcial/riesgo o requiere accion manual, `[ ]` 
 
 - [x] Proyecto nuevo responde por CLI y reporta `ACTIVE_HEALTHY`.
 - [x] Repo linkeado a `unybqqzhgqxhrwucrofm`.
-- [x] Diez migraciones locales/remotas alineadas; la última enlaza contacto/tareas y agrega plantillas multi-clínica.
+- [x] Catorce migraciones locales/remotas alineadas; las últimas agregan cierre con motivo, endurecen la RPC cross-clínica y preservan el intake de servidor.
 - [x] 16 tablas CRM creadas.
 - [x] RLS activo en las 16 tablas sensibles.
 - [x] 38 policies finales revisadas por rol.
@@ -124,3 +124,16 @@ No publicar como produccion ni prospectar hasta completar los items pendientes d
 - [x] Receptionist puede usar plantillas y registrar resultados.
 - [x] No hay envío automático, WhatsApp API, ManyChat ni Instagram automático.
 - [x] `supabase/reset_qa_leads.sql` dejó 13 leads y preservó el único registro no clasificable como sintético.
+
+## Retención e insights comerciales
+
+- [x] `mark_lead_lost` exige motivo estándar, nota para `Otro`, valida rol/clínica y registra evento/auditoría.
+- [x] Trigger impide entrar a `Perdido`/`Archivado` sin motivo estructurado, incluso por caminos alternativos.
+- [x] Prueba dedicada bloquea acceso cross-clínica de la RPC `security definer`.
+- [x] Nueve plantillas comerciales por clínica; edición limitada a owner/admin y uso disponible para recepción.
+- [x] Semáforo derivado sin columna persistida: evita prioridad desactualizada.
+- [x] Dashboard incluye Vista Hoy deduplicada y alertas visibles de riesgo.
+- [x] Detalle del lead unifica eventos, tareas y citas en Historial comercial.
+- [x] Métricas contiene subpestañas Resumen, Fuentes, Tratamientos, Responsables y Reportes.
+- [x] Reporte semanal/mensual generable y copiable, sin envío automático ni promesas de ingreso.
+- [ ] QA visual por roles de Vista Hoy, pérdidas, timeline, scorecard, templates y reporte en Preview.

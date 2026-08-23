@@ -42,7 +42,8 @@ begin
   from unnest(array[
     'create_manual_lead','schedule_lead_appointment','update_appointment_outcome',
     'complete_task','mark_lead_contacted','complete_contact_task',
-    'record_contact_attempt','record_whatsapp_opened'
+    'record_contact_attempt','record_whatsapp_opened','record_message_copied',
+    'mark_lead_lost'
   ]) as name
   where not exists (
     select 1
@@ -89,6 +90,31 @@ begin
     where table_schema = 'public' and table_name = 'message_templates' and column_name = 'template_key'
   ) then
     raise exception 'Falta message_templates.template_key';
+  end if;
+
+  if exists (
+    select 1
+    from unnest(array['lost_reason','lost_reason_note','lost_at','lost_by']) as required_column
+    where not exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'leads' and column_name = required_column
+    )
+  ) then
+    raise exception 'Faltan columnas estructuradas de motivo de perdida';
+  end if;
+
+  if exists (
+    select 1 from public.clinics c
+    where (
+      select count(*) from public.message_templates mt
+      where mt.clinic_id = c.id
+        and mt.template_key = any(array[
+          'first_contact','urgency','price_inquiry','no_response','appointment_reminder',
+          'no_show','post_consultation','cold_reactivation','attendance_confirmation'
+        ])
+    ) < 9
+  ) then
+    raise exception 'Alguna clinica no tiene las 9 plantillas comerciales';
   end if;
 
   select count(*) into duplicate_count

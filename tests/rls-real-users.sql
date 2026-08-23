@@ -48,13 +48,12 @@ begin
     raise exception 'Lead manual owner no creo event y task';
   end if;
 
-  update public.leads
-  set is_archived = true,
-      archived_at = now(),
-      archived_by = auth.uid(),
-      archived_reason = 'RLS real-user test',
-      status = 'Archivado'
-  where id = '00000000-0000-0000-0000-000000000203';
+  perform public.mark_lead_lost(
+    '00000000-0000-0000-0000-000000000203',
+    'Otro',
+    'RLS real-user test',
+    true
+  );
 
   if not exists (
     select 1 from public.leads

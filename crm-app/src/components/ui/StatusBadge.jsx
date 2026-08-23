@@ -24,6 +24,10 @@ const statusStyles = {
   cancelado: 'border-slate-400/20 bg-slate-400/[0.08] text-slate-400',
   Activo: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300',
   Inactivo: 'border-slate-400/20 bg-slate-400/[0.08] text-slate-400',
+  Urgente: 'border-rose-400/30 bg-rose-400/10 text-rose-200',
+  Atención: 'border-amber-400/30 bg-amber-400/10 text-amber-200',
+  Ordenado: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200',
+  Cerrado: 'border-slate-400/20 bg-slate-400/[0.08] text-slate-300',
 };
 
 export default function StatusBadge({ value }) {

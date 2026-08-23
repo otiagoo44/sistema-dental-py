@@ -12,7 +12,7 @@ Alias estable del Preview UX actual:
 https://crm-odontologia-staging-preview.vercel.app
 ```
 
-Deployment inmutable asociado al dark mode global premium: `https://crm-odontologia-staging-rbpgu4ud6-ortegatiago733-2656s-projects.vercel.app`. El deployment está `READY`, responde HTTP 200 y todavía requiere QA visual con usuarios reales. No usar el primer deployment estable del proyecto para QA: Vercel lo asignó automáticamente al target production del proyecto nuevo antes de que existiera un Preview, aunque no se ejecutó `--prod`.
+Deployment inmutable asociado a las mejoras de retención y scorecard: `https://crm-odontologia-staging-2yyvov1on-ortegatiago733-2656s-projects.vercel.app`. El deployment está `READY`; la comprobación autorizada del bundle confirmó el proyecto Supabase nuevo, ausencia del proyecto viejo y ausencia de claves server-side. Vercel Deployment Protection continúa activa, por lo que el acceso web requiere una cuenta autorizada. Todavía falta QA visual con usuarios reales.
 
 - Root Directory: `crm-app`
 - Framework: Vite

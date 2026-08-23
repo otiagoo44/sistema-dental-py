@@ -137,7 +137,8 @@ export default function App() {
     name: clinic?.name,
     whatsapp: clinic?.whatsapp,
     calendar_link: clinic?.calendar_link,
-  }), [clinic]);
+    responsible: profile?.full_name,
+  }), [clinic, profile?.full_name]);
 
   useEffect(() => {
     if (['settings', 'metrics'].includes(activeView) && !canAdmin) {
@@ -158,6 +159,11 @@ export default function App() {
     const before = leads.find((lead) => lead.id === leadId);
     const statusChanged = patch.status && patch.status !== before?.status;
     const leadPatch = { ...patch };
+
+    if (statusChanged && patch.status === 'Perdido') {
+      if (before) setArchiveModal({ lead: before, archive: false });
+      return;
+    }
 
     if (statusChanged && APPOINTMENT_OUTCOME_LEAD_STATUSES.includes(patch.status)) {
       setError('Confirmado, Asistió y No Asistió se registran desde Agenda para mantener el turno sincronizado.');
@@ -416,7 +422,13 @@ export default function App() {
 
     if (!lead?.id) return;
     setError('');
-    setArchiveModal(lead);
+    setArchiveModal({ lead, archive: true });
+  }
+
+  function openLostLeadModal(lead) {
+    if (!lead?.id) return;
+    setError('');
+    setArchiveModal({ lead, archive: false });
   }
 
   async function saveLeadForm(form, options = {}) {
@@ -507,6 +519,12 @@ export default function App() {
 
     if (patch.status === ARCHIVED_STATUS && !isArchivedLead(lead)) {
       throw new Error('Para archivar un lead usa el boton Archivar y registra el motivo.');
+    }
+
+    if (patch.status === 'Perdido' && patch.status !== lead.status) {
+      setLeadModal(null);
+      openLostLeadModal(lead);
+      return;
     }
 
     const statusChanged = patch.status && patch.status !== lead.status;
@@ -627,43 +645,25 @@ export default function App() {
     }
   }
 
-  async function archiveLead(lead, reason) {
-    const cleanReason = cleanOptionalText(reason);
-
-    if (!profile?.clinic_id || !canAdmin || !lead?.id) {
-      throw new Error('Solo un admin puede archivar leads.');
-    }
-
-    if (!cleanReason) {
-      throw new Error('El motivo de archivado es obligatorio.');
-    }
+  async function saveLeadLoss(lead, { reason, note, archive }) {
+    if (!profile?.clinic_id || !lead?.id) throw new Error('No se pudo identificar la oportunidad.');
+    if (archive && !canAdmin) throw new Error('Solo owner/admin puede archivar leads.');
 
     setArchiveSaving(true);
     setError('');
     setNotice('');
 
     try {
-      const { error: archiveError } = await supabase
-        .from('leads')
-        .update({
-          is_archived: true,
-          archived_at: new Date().toISOString(),
-          archived_by: session.user.id,
-          archived_reason: cleanReason,
-          status: ARCHIVED_STATUS,
-        })
-        .eq('id', lead.id)
-        .eq('clinic_id', profile.clinic_id);
+      const { error: archiveError } = await supabase.rpc('mark_lead_lost', {
+        p_lead_id: lead.id,
+        p_reason: reason,
+        p_reason_note: cleanOptionalText(note),
+        p_archive: Boolean(archive),
+      });
 
       if (archiveError) {
         throw new Error(archiveError.message);
       }
-
-      const { error: eventError } = await createLeadEvent(lead.id, {
-        event_type: 'lead_archived',
-        title: 'Lead archivado',
-        description: cleanReason,
-      });
 
       await refreshClinicData();
       if (selectedLeadId === lead.id) {
@@ -672,12 +672,7 @@ export default function App() {
 
       setArchiveModal(null);
 
-      if (eventError) {
-        setError(`El lead fue archivado, pero no se pudo registrar el evento: ${eventError.message}`);
-        return;
-      }
-
-      setNotice('Lead archivado.');
+      setNotice(archive ? 'Oportunidad archivada con motivo registrado.' : 'Oportunidad marcada como perdida con motivo registrado.');
     } finally {
       setArchiveSaving(false);
     }
@@ -936,6 +931,20 @@ export default function App() {
     }
   }
 
+  async function handleMessageCopied({ lead, templateKey }) {
+    const { error: eventError } = await supabase.rpc('record_message_copied', {
+      p_lead_id: lead.id,
+      p_template_key: templateKey,
+    });
+    if (eventError) {
+      console.warn('Message copied but event could not be recorded', eventError);
+      setError('El mensaje se copió, pero no se pudo registrar la acción en el historial.');
+      return;
+    }
+    if (selectedLeadId === lead.id) await loadLeadEvents(lead.id);
+    setNotice('Mensaje copiado y acción registrada.');
+  }
+
   async function submitContactOutcome(outcome, note) {
     const context = contactOutcomeModal;
     if (!context?.lead?.id) return;
@@ -1061,11 +1070,17 @@ export default function App() {
           leads={activeLeads}
           appointments={appointments}
           tasks={tasks}
+          profiles={clinicProfiles}
           canAdmin={canAdmin}
           onCreateLead={openCreateLeadModal}
           onOpenLead={handleLeadSelect}
           onScheduleAppointment={openAppointmentModal}
           onCompleteTask={completeTask}
+          onMarkContacted={markLeadContacted}
+          onPostpone={postponeLeadFollowup}
+          onWhatsAppOpened={handleWhatsAppOpened}
+          messageTemplates={messageTemplates}
+          clinicContext={clinicContext}
           onNavigate={setActiveView}
         />
       ) : null}
@@ -1073,6 +1088,7 @@ export default function App() {
         <FollowupsView
           leads={activeLeads}
           tasks={tasks}
+          appointments={appointments}
           profiles={clinicProfiles}
           onOpenLead={handleLeadSelect}
           onEditLead={openEditLeadModal}
@@ -1088,10 +1104,13 @@ export default function App() {
       {activeView === 'leads' ? (
         <LeadsView
           leads={leads}
+          appointments={appointments}
+          tasks={tasks}
           canAdmin={canAdmin}
           onCreateLead={openCreateLeadModal}
           onEditLead={openEditLeadModal}
           onArchiveLead={openArchiveLeadModal}
+          onMarkLost={openLostLeadModal}
           onOpenLead={handleLeadSelect}
           onUpdateLead={updateLead}
           onScheduleAppointment={openAppointmentModal}
@@ -1099,6 +1118,7 @@ export default function App() {
           onMarkContacted={markLeadContacted}
           profiles={clinicProfiles}
           onWhatsAppOpened={handleWhatsAppOpened}
+          onMessageCopied={handleMessageCopied}
           messageTemplates={messageTemplates}
           clinicContext={clinicContext}
           setNotice={setNotice}
@@ -1108,14 +1128,19 @@ export default function App() {
         <LeadDetail
           lead={selectedLead}
           events={leadEvents}
+          tasks={tasks}
+          appointments={appointments}
+          profiles={clinicProfiles}
           canAdmin={canAdmin}
           onBack={() => setActiveView('leads')}
           onEditLead={openEditLeadModal}
           onArchiveLead={openArchiveLeadModal}
+          onMarkLost={openLostLeadModal}
           onSave={updateLead}
           onMarkContacted={markLeadContacted}
           onScheduleAppointment={openAppointmentModal}
           onWhatsAppOpened={handleWhatsAppOpened}
+          onMessageCopied={handleMessageCopied}
           messageTemplates={messageTemplates}
           clinicContext={clinicContext}
           setNotice={setNotice}
@@ -1132,10 +1157,10 @@ export default function App() {
         />
       ) : null}
       {activeView === 'tasks' ? (
-        <TasksView tasks={tasks} leads={activeLeads} canAdmin={canAdmin} onCreateTask={openCreateTaskModal} onEditTask={openEditTaskModal} onComplete={completeTask} onOpenLead={handleLeadSelect} onWhatsAppOpened={handleWhatsAppOpened} messageTemplates={messageTemplates} clinicContext={clinicContext} />
+        <TasksView tasks={tasks} leads={activeLeads} appointments={appointments} canAdmin={canAdmin} onCreateTask={openCreateTaskModal} onEditTask={openEditTaskModal} onComplete={completeTask} onOpenLead={handleLeadSelect} onWhatsAppOpened={handleWhatsAppOpened} messageTemplates={messageTemplates} clinicContext={clinicContext} />
       ) : null}
       {activeView === 'metrics' && canAdmin ? (
-        <MetricsView leads={activeLeads} appointments={appointments} tasks={tasks} treatmentPrices={treatmentPrices} />
+        <MetricsView leads={leads} appointments={appointments} tasks={tasks} treatmentPrices={treatmentPrices} profiles={clinicProfiles} clinic={clinic} />
       ) : null}
       {activeView === 'settings' && canAdmin ? (
         <SettingsView clinic={clinic} profile={profile} publicFormConfig={publicFormConfig} savingPublicForm={publicFormSaving} onSavePublicForm={savePublicFormConfig} messageTemplates={messageTemplates} savingTemplates={templateSaving} onSaveMessageTemplates={saveMessageTemplates} setNotice={setNotice} />
@@ -1172,7 +1197,7 @@ export default function App() {
           onSubmit={saveLeadForm}
         />
       ) : null}
-      {archiveModal ? <ArchiveLeadModal key="archive-modal" lead={archiveModal} saving={archiveSaving} onClose={() => setArchiveModal(null)} onSubmit={archiveLead} /> : null}
+      {archiveModal ? <ArchiveLeadModal key="archive-modal" lead={archiveModal.lead} archive={archiveModal.archive} saving={archiveSaving} onClose={() => setArchiveModal(null)} onSubmit={saveLeadLoss} /> : null}
       {taskModal ? (
         <TaskFormModal
           key="task-modal"

@@ -28,6 +28,17 @@ Para ayudarte rápido, podemos coordinar una evaluación y confirmar el mejor ho
 ¿Preferís que te agendemos hoy o mañana?`,
   },
   {
+    key: 'price_inquiry',
+    name: 'Consulta por precio',
+    situation: 'Quiere precio',
+    description: 'Orienta la conversación sin inventar precios ni prometer resultados.',
+    message: `Hola {{nombre}}, soy de {{clinica}}.
+
+Vimos tu consulta sobre {{tratamiento}}. Para orientarte correctamente, primero necesitamos entender tu caso y revisar qué opción te conviene.
+
+¿Te queda mejor coordinar una evaluación hoy o mañana?`,
+  },
+  {
     key: 'no_response',
     name: 'Seguimiento sin respuesta',
     situation: 'Sin respuesta',
@@ -56,9 +67,42 @@ Vimos que no pudiste asistir a tu evaluación por {{tratamiento}}. Podemos ayuda
     description: 'Recordatorio breve y humano para una consulta ya agendada.',
     message: `Hola {{nombre}}, soy de {{clinica}}.
 
-Te recordamos tu evaluación por {{tratamiento}}. Si necesitás ajustar el horario, respondé este mensaje y te ayudamos.
+Te recordamos tu evaluación por {{tratamiento}} para el {{fecha_cita}} ({{hora_cita}}). Si necesitás ajustar el horario, respondé este mensaje y te ayudamos.
 
 ¡Te esperamos!`,
+  },
+  {
+    key: 'post_consultation',
+    name: 'Post consulta',
+    situation: 'Seguimiento posterior',
+    description: 'Aclara dudas y propone un próximo paso luego de la consulta.',
+    message: `Hola {{nombre}}, soy de {{clinica}}.
+
+Quería saber si te quedó alguna duda después de tu consulta sobre {{tratamiento}}. Podemos ayudarte a definir el próximo paso con claridad.
+
+¿Preferís que lo revisemos hoy o mañana?`,
+  },
+  {
+    key: 'cold_reactivation',
+    name: 'Reactivación de lead frío',
+    situation: 'Reactivar 30d',
+    description: 'Retoma una oportunidad anterior con un tono simple y sin presión.',
+    message: `Hola {{nombre}}, soy de {{clinica}}.
+
+Hace un tiempo consultaste por {{tratamiento}} y quería confirmar si todavía te interesa revisarlo.
+
+Si te sirve, podemos retomar tu caso y buscar un horario esta semana.`,
+  },
+  {
+    key: 'attendance_confirmation',
+    name: 'Confirmación de asistencia',
+    situation: 'Cita próxima',
+    description: 'Solicita confirmación explícita antes de una cita.',
+    message: `Hola {{nombre}}, soy de {{clinica}}.
+
+Queremos confirmar tu cita por {{tratamiento}} para el {{fecha_cita}} ({{hora_cita}}).
+
+¿Podés confirmarnos tu asistencia?`,
   },
 ];
 
@@ -67,9 +111,12 @@ export const WHATSAPP_VARIABLES = [
   '{{tratamiento}}',
   '{{urgencia}}',
   '{{situacion}}',
+  '{{fuente}}',
   '{{evaluacion_previa}}',
   '{{clinica}}',
   '{{responsable}}',
+  '{{fecha_cita}}',
+  '{{hora_cita}}',
   '{{agenda_link}}',
   '{{telefono_clinica}}',
 ];
@@ -79,7 +126,10 @@ export function selectWhatsAppTemplateKey(lead, context = 'auto') {
   const text = normalizeText(`${lead?.status || ''} ${lead?.urgency || ''} ${lead?.situation || ''} ${lead?.treatment || ''}`);
   if (text.includes('no asistio')) return 'no_show';
   if (text.includes('urgencia') || text.includes('dolor') || text.includes('hoy')) return 'urgency';
+  if (text.includes('precio')) return 'price_inquiry';
   if (text.includes('no respondio')) return 'no_response';
+  if (text.includes('reactivar') || lead?.classification === 'Lead Frío') return 'cold_reactivation';
+  if (text.includes('asistio')) return 'post_consultation';
   if (text.includes('agendada') || text.includes('confirmado')) return 'appointment_reminder';
   return 'first_contact';
 }
@@ -91,7 +141,7 @@ export function getWhatsAppTemplate(templates = [], templateKey = 'first_contact
   return stored || recommended;
 }
 
-export function buildWhatsAppMessage(lead, template, clinicContext = {}) {
+export function buildMessageFromTemplate(template, lead = {}, appointment = null, clinicContext = {}) {
   const rawTemplate = typeof template === 'string'
     ? template
     : template?.message || WHATSAPP_TEMPLATE_DEFINITIONS[0].message;
@@ -102,9 +152,12 @@ export function buildWhatsAppMessage(lead, template, clinicContext = {}) {
     treatment: String(lead?.treatment || 'tu consulta').trim(),
     urgencia: String(lead?.urgency || 'pronto').trim(),
     situacion: String(lead?.situation || '').trim(),
+    fuente: String(lead?.source || 'consulta directa').trim(),
     evaluacion_previa: String(lead?.evaluation_previous || '').trim(),
     clinica: String(clinicContext?.name || clinicContext?.clinic_name || 'la clínica').trim(),
     responsable: String(clinicContext?.responsible || clinicContext?.responsable || 'nuestro equipo').trim(),
+    fecha_cita: String(appointment?.appointment_date || clinicContext?.appointment_date || 'día coordinado').trim(),
+    hora_cita: String(appointment?.appointment_time || clinicContext?.appointment_time || 'horario acordado').slice(0, 24).trim(),
     agenda_link: String(clinicContext?.calendar_link || clinicContext?.agenda_link || '').trim(),
     telefono_clinica: String(clinicContext?.whatsapp || clinicContext?.phone || '').trim(),
   };
@@ -117,9 +170,13 @@ export function buildWhatsAppMessage(lead, template, clinicContext = {}) {
     .trim();
 }
 
-export function buildLeadMessage(lead, templates = [], clinicContext = {}, templateKey = 'auto') {
+export function buildWhatsAppMessage(lead, template, clinicContext = {}, appointment = null) {
+  return buildMessageFromTemplate(template, lead, appointment, clinicContext);
+}
+
+export function buildLeadMessage(lead, templates = [], clinicContext = {}, templateKey = 'auto', appointment = null) {
   const selectedKey = selectWhatsAppTemplateKey(lead, templateKey);
-  return buildWhatsAppMessage(lead, getWhatsAppTemplate(templates, selectedKey), clinicContext);
+  return buildWhatsAppMessage(lead, getWhatsAppTemplate(templates, selectedKey), clinicContext, appointment);
 }
 
 export function normalizeWhatsAppPhone(lead) {

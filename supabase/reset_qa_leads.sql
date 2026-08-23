@@ -172,7 +172,7 @@ values
   (
     '00000000-0000-0000-0000-000000000211', '00000000-0000-0000-0000-000000000101',
     'QA Kevin Perdido', '0981000111', '+595981000111', 'Blanqueamiento', 'Solo estoy consultando',
-    18, 'Lead Frío', 'Perdido', 'Está comparando opciones', 'No',
+    18, 'Lead Frío', 'No Contactado', 'Está comparando opciones', 'No',
     'Escenario sintético terminal.', 500000, null, null,
     now() - interval '10 days', 3, 'https://wa.me/595981000111', 'Instagram DM', 'qa/lost', 'Dato sintético, no corresponde a paciente real.',
     true, now(), 'seed_qa', 'qa/lost'
@@ -185,6 +185,13 @@ values
     null, 0, 'https://wa.me/595982000112', 'seed_qa', 'qa/clinic-b', 'Dato sintético, no corresponde a paciente real.',
     true, now(), 'seed_qa', 'qa/clinic-b'
   );
+
+update public.leads
+set status = 'Perdido',
+    lost_reason = 'Sólo estaba consultando',
+    lost_reason_note = 'Escenario sintético para métricas de pérdida.',
+    lost_at = now() - interval '2 days'
+where id = '00000000-0000-0000-0000-000000000211';
 
 insert into public.appointments (
   id, clinic_id, lead_id, appointment_date, appointment_time,

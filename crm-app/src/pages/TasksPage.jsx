@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Check, Edit3, FilePlus } from 'lucide-react';
 import { formatDateTime } from '../lib/formatters';
+import { getLeadPriority } from '../lib/commercialInsights';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import StatusBadge from '../components/ui/StatusBadge';
+import PriorityBadge from '../components/ui/PriorityBadge';
 import WhatsAppButton from '../components/crm/WhatsAppButton';
 
-export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEditTask, onComplete, onOpenLead, onWhatsAppOpened, messageTemplates, clinicContext }) {
+export default function TasksView({ tasks, leads, appointments, canAdmin, onCreateTask, onEditTask, onComplete, onOpenLead, onWhatsAppOpened, messageTemplates, clinicContext }) {
   const [filter, setFilter] = useState('pendientes');
   const now = Date.now();
   const filteredTasks = useMemo(() => {
@@ -52,6 +54,7 @@ export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEdit
           const isDone = ['hecho', 'Completada'].includes(task.status);
           const isOverdue = !isDone && task.due_at && new Date(task.due_at).getTime() < Date.now();
           const displayStatus = isOverdue ? 'vencido' : task.status;
+          const leadPriority = lead ? getLeadPriority(lead, { tasks, appointments }) : null;
 
           return (
             <Card key={task.id} as="article" className="card-enter flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
@@ -60,6 +63,7 @@ export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEdit
                   <h3 className="font-semibold">{task.title}</h3>
                   <StatusBadge value={task.priority} />
                   <StatusBadge value={displayStatus} />
+                  <PriorityBadge priority={leadPriority} />
                 </div>
                 {task.description ? <p className="mt-2 text-sm text-slate-500">{task.description}</p> : null}
                 <div className="mt-3 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
