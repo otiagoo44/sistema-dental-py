@@ -1,19 +1,19 @@
 import { useMemo, useState } from 'react';
-import { Check, Edit3, ExternalLink, FilePlus } from 'lucide-react';
+import { Check, Edit3, FilePlus } from 'lucide-react';
 import { formatDateTime } from '../lib/formatters';
-import { buildWhatsappUrl } from '../lib/messages';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import StatusBadge from '../components/ui/StatusBadge';
+import WhatsAppButton from '../components/crm/WhatsAppButton';
 
-export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEditTask, onComplete, onOpenLead }) {
+export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEditTask, onComplete, onOpenLead, onWhatsAppOpened, messageTemplates, clinicContext }) {
   const [filter, setFilter] = useState('pendientes');
   const now = Date.now();
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
-      const isDone = task.status === 'hecho';
+      const isDone = ['hecho', 'Completada'].includes(task.status);
       const isOverdue = !isDone && task.due_at && new Date(task.due_at).getTime() < now;
 
       if (filter === 'completadas') return isDone;
@@ -49,7 +49,7 @@ export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEdit
       {filteredTasks.length ? (
         filteredTasks.map((task) => {
           const lead = task.leads || leads.find((item) => item.id === task.lead_id) || null;
-          const isDone = task.status === 'hecho';
+          const isDone = ['hecho', 'Completada'].includes(task.status);
           const isOverdue = !isDone && task.due_at && new Date(task.due_at).getTime() < Date.now();
           const displayStatus = isOverdue ? 'vencido' : task.status;
 
@@ -71,10 +71,7 @@ export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEdit
               <div className="flex flex-wrap gap-2">
                 {lead ? <Button size="sm" variant="ghost" type="button" onClick={() => onOpenLead(lead.id)}>Abrir lead</Button> : null}
                 {lead ? (
-                  <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-card px-3 py-2 text-xs font-semibold text-textSoft transition hover:border-mint/30 hover:bg-elevated hover:text-cream" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    WhatsApp
-                  </a>
+                  <WhatsAppButton lead={lead} task={task} templates={messageTemplates} clinicContext={clinicContext} onOpened={onWhatsAppOpened} />
                 ) : null}
                 {canAdmin ? (
                   <Button size="sm" variant="secondary" type="button" onClick={() => onEditTask(task)}>
@@ -85,7 +82,7 @@ export default function TasksView({ tasks, leads, canAdmin, onCreateTask, onEdit
                 <Button
                   size="sm"
                   type="button"
-                  onClick={() => onComplete(task.id)}
+                  onClick={() => onComplete(task)}
                   disabled={isDone}
                 >
                   <Check className="h-4 w-4" />

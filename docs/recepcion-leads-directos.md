@@ -138,3 +138,17 @@ Antes de usar los textos, el owner debe aprobar tono, horario y aviso de privaci
 Una fase posterior puede evaluar WhatsApp Cloud API, ManyChat o Meta Lead Ads con webhook entrante y una Edge Function `message-intake` o extensión de `lead-intake`. El servidor podría crear un lead al detectar nombre/teléfono; si faltan datos, crear un lead incompleto o una task para recepción. n8n podría consumir `automation_jobs` después del guardado.
 
 Antes de esa fase se deben definir consentimiento, ownership de la cuenta Meta, plantillas, deduplicación, rate limits, observabilidad, costos y procedimiento de baja. Nada de esto está activo hoy.
+## Contactar por WhatsApp sin duplicar trabajo
+
+1. Abrí el lead desde Leads, Seguimientos o Tareas.
+2. Presioná **Abrir WhatsApp**. La CRM prepara un mensaje con los datos disponibles del paciente y de la clínica.
+3. Revisá el texto en WhatsApp y envialo manualmente si corresponde.
+4. Al volver a la CRM, elegí el resultado:
+   - **Sí, respondió**: marca el lead `Contactado`, cierra la tarea de contacto y crea el siguiente seguimiento.
+   - **No respondió**: registra el intento sin marcarlo como contactado y programa otro contacto.
+   - **Número inválido**: registra el problema y crea la acción para verificar el número.
+   - **Posponer a mañana**: mantiene la tarea pendiente y mueve su vencimiento.
+
+Abrir WhatsApp por sí solo no confirma contacto. Las plantillas las administra owner/admin en **Configuración → Plantillas de WhatsApp**.
+
+No están automatizados el envío de WhatsApp, WhatsApp Cloud API, ManyChat ni Instagram. El botón siempre deja el control final en recepción.

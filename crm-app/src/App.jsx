@@ -36,6 +36,8 @@ import {
   slugify,
   parseAllowedOrigins,
   taskConfigForLeadStatus,
+  isContactTask,
+  isOpenTask,
   buildLeadFormPatch,
   getPublicFormRoute,
 } from './lib/crmDomain';
@@ -43,6 +45,7 @@ import {
 const PublicEmbedLeadForm = lazy(() => import('./features/public-form/PublicEmbedLeadForm'));
 const AppointmentModal = lazy(() => import('./components/modals/AppointmentModal'));
 const ArchiveLeadModal = lazy(() => import('./components/modals/ArchiveLeadModal'));
+const ContactOutcomeModal = lazy(() => import('./components/modals/ContactOutcomeModal'));
 const LeadFormModal = lazy(() => import('./components/modals/LeadFormModal'));
 const TaskFormModal = lazy(() => import('./components/modals/TaskFormModal'));
 const AgendaView = lazy(() => import('./pages/AgendaPage'));
@@ -71,6 +74,7 @@ export default function App() {
     leadEvents,
     publicFormConfig,
     clinicProfiles,
+    messageTemplates,
     refreshClinicData,
     loadLeadEvents,
     setPublicFormConfig,
@@ -87,6 +91,9 @@ export default function App() {
   const [taskModal, setTaskModal] = useState(null);
   const [taskFormSaving, setTaskFormSaving] = useState(false);
   const [publicFormSaving, setPublicFormSaving] = useState(false);
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [contactOutcomeModal, setContactOutcomeModal] = useState(null);
+  const [contactOutcomeSaving, setContactOutcomeSaving] = useState(false);
 
   useEffect(() => {
     if (authError) setError(authError);
@@ -104,6 +111,9 @@ export default function App() {
     setTaskModal(null);
     setTaskFormSaving(false);
     setPublicFormSaving(false);
+    setTemplateSaving(false);
+    setContactOutcomeModal(null);
+    setContactOutcomeSaving(false);
   }, [session]);
 
   const selectedLead = useMemo(() => leads.find((lead) => lead.id === selectedLeadId) || null, [leads, selectedLeadId]);
@@ -123,6 +133,11 @@ export default function App() {
     };
   }, [activeLeads, appointments, tasks]);
   const publicFormRoute = getPublicFormRoute();
+  const clinicContext = useMemo(() => ({
+    name: clinic?.name,
+    whatsapp: clinic?.whatsapp,
+    calendar_link: clinic?.calendar_link,
+  }), [clinic]);
 
   useEffect(() => {
     if (['settings', 'metrics'].includes(activeView) && !canAdmin) {
@@ -350,12 +365,29 @@ export default function App() {
     return true;
   }
 
-  async function markLeadContacted(lead) {
-    await saveLeadFollowup(lead, {
-      status: 'Contactado',
-      nextAction: 'Hacer seguimiento',
-      dueAt: tomorrowFollowupAsuncion(),
+  async function markLeadContacted(lead, options = {}) {
+    if (!profile?.clinic_id || !lead?.id) return false;
+    setError('');
+    setNotice('');
+
+    const { error: contactError } = await supabase.rpc('mark_lead_contacted', {
+      p_lead_id: lead.id,
+      p_contact_channel: options.channel || 'manual',
+      p_note: cleanOptionalText(options.note),
+      p_next_action: options.nextAction || 'Hacer seguimiento',
+      p_next_followup_at: options.dueAt || tomorrowFollowupAsuncion(),
     });
+
+    if (contactError) {
+      console.error('Error marking lead contacted', contactError);
+      setError(contactError.message || 'No se pudo registrar el contacto.');
+      return false;
+    }
+
+    await refreshClinicData();
+    if (selectedLeadId === lead.id) await loadLeadEvents(lead.id);
+    setNotice('Lead contactado; la tarea de contacto se cerró y quedó creado el próximo seguimiento.');
+    return true;
   }
 
   async function postponeLeadFollowup(lead, days = 1) {
@@ -861,8 +893,19 @@ export default function App() {
   async function completeTask(taskId) {
     if (!profile?.clinic_id) return;
 
+    const task = typeof taskId === 'object' ? taskId : tasks.find((item) => item.id === taskId);
+    if (task && isContactTask(task)) {
+      const lead = leads.find((item) => item.id === task.lead_id) || task.leads;
+      if (!lead) {
+        setError('La tarea de contacto no tiene un lead disponible.');
+        return;
+      }
+      setContactOutcomeModal({ lead, task, source: 'task' });
+      return;
+    }
+
     const { error: taskError } = await supabase.rpc('complete_task', {
-      p_task_id: taskId,
+      p_task_id: task?.id || taskId,
     });
 
     if (taskError) {
@@ -873,6 +916,111 @@ export default function App() {
 
     await refreshClinicData();
     setNotice('Tarea marcada como hecha.');
+  }
+
+  async function handleWhatsAppOpened({ lead, task = null, templateKey }) {
+    const linkedTask = task || tasks.find((item) => item.lead_id === lead.id
+      && isContactTask(item)
+      && isOpenTask(item));
+    setContactOutcomeModal({ lead, task: linkedTask || null, templateKey, source: 'whatsapp' });
+
+    const { error: eventError } = await supabase.rpc('record_whatsapp_opened', {
+      p_lead_id: lead.id,
+      p_template_key: templateKey,
+    });
+    if (eventError) {
+      console.warn('WhatsApp opened but event could not be recorded', eventError);
+      setError('WhatsApp se abrió, pero no se pudo registrar el evento en la CRM.');
+    } else if (selectedLeadId === lead.id) {
+      await loadLeadEvents(lead.id);
+    }
+  }
+
+  async function submitContactOutcome(outcome, note) {
+    const context = contactOutcomeModal;
+    if (!context?.lead?.id) return;
+    setContactOutcomeSaving(true);
+    setError('');
+    setNotice('');
+
+    try {
+      if (context.task?.id) {
+        const { error: outcomeError } = await supabase.rpc('complete_contact_task', {
+          p_task_id: context.task.id,
+          p_outcome: outcome,
+          p_note: cleanOptionalText(note),
+        });
+        if (outcomeError) throw outcomeError;
+      } else if (outcome === 'respondio') {
+        const { error: contactedError } = await supabase.rpc('mark_lead_contacted', {
+          p_lead_id: context.lead.id,
+          p_contact_channel: context.source === 'whatsapp' ? 'whatsapp' : 'manual',
+          p_note: cleanOptionalText(note),
+          p_next_action: 'Hacer seguimiento',
+          p_next_followup_at: tomorrowFollowupAsuncion(),
+        });
+        if (contactedError) throw contactedError;
+      } else if (outcome === 'posponer') {
+        const { error: postponeError } = await supabase.rpc('save_lead_followup', {
+          p_lead_id: context.lead.id,
+          p_status: null,
+          p_next_action: context.lead.next_action || 'Reintentar contacto',
+          p_next_followup_at: addDaysAsuncion(1, 9),
+        });
+        if (postponeError) throw postponeError;
+      } else {
+        const { error: attemptError } = await supabase.rpc('record_contact_attempt', {
+          p_lead_id: context.lead.id,
+          p_outcome: outcome,
+          p_note: cleanOptionalText(note),
+          p_contact_channel: context.source === 'whatsapp' ? 'whatsapp' : 'manual',
+        });
+        if (attemptError) throw attemptError;
+      }
+
+      await refreshClinicData();
+      if (selectedLeadId === context.lead.id) await loadLeadEvents(context.lead.id);
+      setContactOutcomeModal(null);
+      setNotice(outcome === 'respondio'
+        ? 'Contacto confirmado y tareas sincronizadas.'
+        : outcome === 'posponer'
+          ? 'Contacto pospuesto para mañana.'
+          : 'Intento registrado y próximo contacto programado.');
+    } catch (outcomeError) {
+      console.error('Error saving contact outcome', outcomeError);
+      setError(outcomeError.message || 'No se pudo guardar el resultado del contacto.');
+    } finally {
+      setContactOutcomeSaving(false);
+    }
+  }
+
+  async function saveMessageTemplates(nextTemplates) {
+    if (!profile?.clinic_id || !canAdmin) throw new Error('Solo owner/admin puede editar plantillas.');
+    if (nextTemplates.some((template) => !String(template.message || '').trim())) {
+      throw new Error('Ninguna plantilla puede quedar vacía.');
+    }
+
+    setTemplateSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      const payload = nextTemplates.map((template) => ({
+        clinic_id: profile.clinic_id,
+        template_key: template.template_key,
+        name: template.name,
+        situation: template.situation,
+        treatment: null,
+        message: String(template.message).trim(),
+      }));
+      const { error: templateError } = await supabase
+        .from('message_templates')
+        .upsert(payload, { onConflict: 'clinic_id,template_key' });
+      if (templateError) throw templateError;
+      await refreshClinicData();
+      setNotice('Plantillas de WhatsApp guardadas para esta clínica.');
+    } finally {
+      setTemplateSaving(false);
+    }
   }
 
   async function handleLogout() {
@@ -932,6 +1080,9 @@ export default function App() {
           onScheduleAppointment={openAppointmentModal}
           onCompleteTask={completeTask}
           onPostpone={postponeLeadFollowup}
+          onWhatsAppOpened={handleWhatsAppOpened}
+          messageTemplates={messageTemplates}
+          clinicContext={clinicContext}
         />
       ) : null}
       {activeView === 'leads' ? (
@@ -947,6 +1098,9 @@ export default function App() {
           onCreateTask={openCreateTaskModal}
           onMarkContacted={markLeadContacted}
           profiles={clinicProfiles}
+          onWhatsAppOpened={handleWhatsAppOpened}
+          messageTemplates={messageTemplates}
+          clinicContext={clinicContext}
           setNotice={setNotice}
         />
       ) : null}
@@ -961,6 +1115,9 @@ export default function App() {
           onSave={updateLead}
           onMarkContacted={markLeadContacted}
           onScheduleAppointment={openAppointmentModal}
+          onWhatsAppOpened={handleWhatsAppOpened}
+          messageTemplates={messageTemplates}
+          clinicContext={clinicContext}
           setNotice={setNotice}
         />
       ) : null}
@@ -975,13 +1132,13 @@ export default function App() {
         />
       ) : null}
       {activeView === 'tasks' ? (
-        <TasksView tasks={tasks} leads={activeLeads} canAdmin={canAdmin} onCreateTask={openCreateTaskModal} onEditTask={openEditTaskModal} onComplete={completeTask} onOpenLead={handleLeadSelect} />
+        <TasksView tasks={tasks} leads={activeLeads} canAdmin={canAdmin} onCreateTask={openCreateTaskModal} onEditTask={openEditTaskModal} onComplete={completeTask} onOpenLead={handleLeadSelect} onWhatsAppOpened={handleWhatsAppOpened} messageTemplates={messageTemplates} clinicContext={clinicContext} />
       ) : null}
       {activeView === 'metrics' && canAdmin ? (
         <MetricsView leads={activeLeads} appointments={appointments} tasks={tasks} treatmentPrices={treatmentPrices} />
       ) : null}
       {activeView === 'settings' && canAdmin ? (
-        <SettingsView clinic={clinic} profile={profile} publicFormConfig={publicFormConfig} savingPublicForm={publicFormSaving} onSavePublicForm={savePublicFormConfig} setNotice={setNotice} />
+        <SettingsView clinic={clinic} profile={profile} publicFormConfig={publicFormConfig} savingPublicForm={publicFormSaving} onSavePublicForm={savePublicFormConfig} messageTemplates={messageTemplates} savingTemplates={templateSaving} onSaveMessageTemplates={saveMessageTemplates} setNotice={setNotice} />
       ) : null}
       </Suspense>
       <Suspense fallback={null}>
@@ -1026,6 +1183,15 @@ export default function App() {
           saving={taskFormSaving}
           onClose={() => setTaskModal(null)}
           onSubmit={saveTaskForm}
+        />
+      ) : null}
+      {contactOutcomeModal ? (
+        <ContactOutcomeModal
+          key="contact-outcome-modal"
+          context={contactOutcomeModal}
+          saving={contactOutcomeSaving}
+          onClose={() => setContactOutcomeModal(null)}
+          onSubmit={submitContactOutcome}
         />
       ) : null}
       </AnimatePresence>

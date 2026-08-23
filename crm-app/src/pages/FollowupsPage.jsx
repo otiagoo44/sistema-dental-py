@@ -10,8 +10,9 @@ import Card from '../components/ui/Card';
 import FilterPanel from '../components/ui/FilterPanel';
 import PageHeader from '../components/ui/PageHeader';
 import StatusBadge from '../components/ui/StatusBadge';
+import WhatsAppButton from '../components/crm/WhatsAppButton';
 
-export default function FollowupsView({ leads, tasks, profiles, onOpenLead, onEditLead, onMarkContacted, onScheduleAppointment, onCompleteTask, onPostpone }) {
+export default function FollowupsView({ leads, tasks, profiles, onOpenLead, onEditLead, onMarkContacted, onScheduleAppointment, onCompleteTask, onPostpone, onWhatsAppOpened, messageTemplates, clinicContext }) {
   const [filters, setFilters] = useState({ assigned: '', classification: '', source: '', treatment: '', status: '', window: 'all' });
   const profileNames = useMemo(() => Object.fromEntries((profiles || []).map((profile) => [profile.id, profile.full_name])), [profiles]);
   const treatmentOptions = useMemo(() => uniqueStrings(leads.map((lead) => lead.treatment)).sort(), [leads]);
@@ -106,6 +107,7 @@ export default function FollowupsView({ leads, tasks, profiles, onOpenLead, onEd
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
                     <Button size="sm" type="button" onClick={() => onOpenLead(lead.id)}>Abrir lead</Button>
+                    <WhatsAppButton lead={lead} task={task} templates={messageTemplates} clinicContext={clinicContext} onOpened={onWhatsAppOpened} />
                     {['Nuevo', 'No Contactado', 'No Respondió'].includes(lead.status) ? <Button size="sm" variant="secondary" type="button" onClick={() => onMarkContacted(lead)}><Check className="h-4 w-4" />Marcar contactado</Button> : null}
                     <Button size="sm" variant="secondary" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button>
                     {task ? <Button size="sm" variant="secondary" type="button" onClick={() => onCompleteTask(task.id)}><CheckCircle2 className="h-4 w-4" />Completar tarea</Button> : null}

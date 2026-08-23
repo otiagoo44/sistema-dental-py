@@ -20,6 +20,7 @@ export default function useClinicWorkspace({ session, onError }) {
   const [leadEvents, setLeadEvents] = useState([]);
   const [publicFormConfig, setPublicFormConfig] = useState(null);
   const [clinicProfiles, setClinicProfiles] = useState([]);
+  const [messageTemplates, setMessageTemplates] = useState([]);
 
   useEffect(() => {
     if (!session?.user?.id) {
@@ -33,6 +34,7 @@ export default function useClinicWorkspace({ session, onError }) {
       setLeadEvents([]);
       setPublicFormConfig(null);
       setClinicProfiles([]);
+      setMessageTemplates([]);
       setBootLoading(false);
       return;
     }
@@ -110,6 +112,7 @@ export default function useClinicWorkspace({ session, onError }) {
     setClinicProfiles(data.profiles);
     setClinicSettings(data.settings);
     setTreatmentPrices(data.prices);
+    setMessageTemplates(data.messageTemplates);
     return true;
   }
 
@@ -139,6 +142,7 @@ export default function useClinicWorkspace({ session, onError }) {
     leadEvents,
     publicFormConfig,
     clinicProfiles,
+    messageTemplates,
     refreshClinicData,
     loadLeadEvents,
     setPublicFormConfig,

@@ -36,7 +36,7 @@ export function getLeadEvents(clinicId, leadId) {
 }
 
 export async function getClinicWorkspace(clinicId) {
-  const [leadsResult, appointmentsResult, tasksResult, profilesResult, settingsResult, pricesResult] = await Promise.all([
+  const [leadsResult, appointmentsResult, tasksResult, profilesResult, settingsResult, pricesResult, templatesResult] = await Promise.all([
     supabase
       .from('leads')
       .select('*')
@@ -44,13 +44,13 @@ export async function getClinicWorkspace(clinicId) {
       .order('created_at', { ascending: false }),
     supabase
       .from('appointments')
-      .select('*, leads(id, name, phone, phone_plus, treatment, whatsapp_link)')
+      .select('*, leads(id, name, phone, phone_plus, treatment, urgency, situation, evaluation_previous, status, whatsapp_link)')
       .eq('clinic_id', clinicId)
       .order('appointment_date', { ascending: true })
       .order('appointment_time', { ascending: true }),
     supabase
       .from('tasks')
-      .select('*, leads(id, name, phone, phone_plus, whatsapp_link)')
+      .select('*, leads(id, name, phone, phone_plus, treatment, urgency, situation, evaluation_previous, status, whatsapp_link)')
       .eq('clinic_id', clinicId)
       .order('due_at', { ascending: true, nullsFirst: false }),
     supabase
@@ -69,6 +69,11 @@ export async function getClinicWorkspace(clinicId) {
       .select('treatment, estimated_price')
       .eq('clinic_id', clinicId)
       .order('treatment', { ascending: true }),
+    supabase
+      .from('message_templates')
+      .select('id, clinic_id, template_key, name, treatment, situation, message, updated_at')
+      .eq('clinic_id', clinicId)
+      .order('name', { ascending: true }),
   ]);
 
   const error = leadsResult.error
@@ -76,7 +81,8 @@ export async function getClinicWorkspace(clinicId) {
     || tasksResult.error
     || profilesResult.error
     || settingsResult.error
-    || pricesResult.error;
+    || pricesResult.error
+    || templatesResult.error;
 
   if (error) return { data: null, error };
 
@@ -88,6 +94,7 @@ export async function getClinicWorkspace(clinicId) {
       profiles: profilesResult.data || [],
       settings: settingsResult.data || null,
       prices: pricesResult.data || [],
+      messageTemplates: templatesResult.data || [],
     },
     error: null,
   };

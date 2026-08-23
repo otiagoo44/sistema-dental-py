@@ -1,12 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Clipboard, Loader2, Save } from 'lucide-react';
+import { Clipboard, Loader2, RotateCcw, Save } from 'lucide-react';
 import { slugify, generatePublicToken, formatAllowedOrigins, publicFormPayloadExample, publicFormFetchSnippet, publicFormIframeSnippet } from '../lib/crmDomain';
+import { WHATSAPP_TEMPLATE_DEFINITIONS, WHATSAPP_VARIABLES } from '../lib/messages';
 import { Info, Field, TextArea } from '../components/crm/CrmPrimitives';
+import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import StatusBadge from '../components/ui/StatusBadge';
 
-export default function SettingsView({ clinic, profile, publicFormConfig, savingPublicForm, onSavePublicForm, setNotice }) {
+export default function SettingsView({
+  clinic,
+  profile,
+  publicFormConfig,
+  savingPublicForm,
+  onSavePublicForm,
+  messageTemplates,
+  savingTemplates,
+  onSaveMessageTemplates,
+  setNotice,
+}) {
   return (
     <section className="space-y-6">
       <PageHeader eyebrow="Administración" title="Configuración" subtitle="Datos de la clínica y conexión segura del formulario público. Sólo visible para owner/admin." />
@@ -34,6 +46,98 @@ export default function SettingsView({ clinic, profile, publicFormConfig, saving
       </div>
 
       <PublicFormSettings clinic={clinic} config={publicFormConfig} saving={savingPublicForm} onSave={onSavePublicForm} setNotice={setNotice} />
+      <WhatsAppTemplatesSettings
+        templates={messageTemplates}
+        saving={savingTemplates}
+        onSave={onSaveMessageTemplates}
+      />
+    </section>
+  );
+}
+
+function buildTemplateDraft(templates = []) {
+  return Object.fromEntries(WHATSAPP_TEMPLATE_DEFINITIONS.map((definition) => {
+    const stored = templates.find((template) => template.template_key === definition.key);
+    return [definition.key, stored?.message || definition.message];
+  }));
+}
+
+function WhatsAppTemplatesSettings({ templates, saving, onSave }) {
+  const [draft, setDraft] = useState(() => buildTemplateDraft(templates));
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    setDraft(buildTemplateDraft(templates));
+    setFormError('');
+  }, [templates]);
+
+  async function handleSave() {
+    setFormError('');
+    try {
+      await onSave(WHATSAPP_TEMPLATE_DEFINITIONS.map((definition) => ({
+        template_key: definition.key,
+        name: definition.name,
+        situation: definition.situation,
+        message: String(draft[definition.key] || '').trim(),
+      })));
+    } catch (saveError) {
+      setFormError(saveError.message || 'No se pudieron guardar las plantillas.');
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-card p-5 text-cream shadow-glow">
+      <div className="mb-5 border-b border-slate-200 pb-4">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-mint">Mensajes por clínica</p>
+        <h2 className="mt-1 text-xl font-semibold">Plantillas de WhatsApp</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-textMuted">
+          Recepción usa estas plantillas al abrir WhatsApp. El sistema sólo prepara el texto: nunca lo envía automáticamente.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {WHATSAPP_VARIABLES.map((variable) => (
+            <code key={variable} className="rounded-lg border border-mint/20 bg-mint/10 px-2 py-1 text-xs text-mint">{variable}</code>
+          ))}
+        </div>
+      </div>
+
+      {formError ? <div className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{formError}</div> : null}
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        {WHATSAPP_TEMPLATE_DEFINITIONS.map((definition) => (
+          <article key={definition.key} className="rounded-2xl border border-slate-200 bg-soft p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-cream">{definition.name}</h3>
+                <p className="mt-1 text-xs leading-5 text-textMuted">{definition.description}</p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                type="button"
+                onClick={() => setDraft((current) => ({ ...current, [definition.key]: definition.message }))}
+                disabled={saving}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Restaurar
+              </Button>
+            </div>
+            <TextArea
+              label="Mensaje"
+              value={draft[definition.key] || ''}
+              onChange={(value) => setDraft((current) => ({ ...current, [definition.key]: value }))}
+              disabled={saving}
+              className="min-h-56"
+            />
+          </article>
+        ))}
+      </div>
+
+      <div className="mt-5 flex justify-end border-t border-slate-200 pt-5">
+        <Button type="button" onClick={handleSave} loading={saving}>
+          {!saving ? <Save className="h-4 w-4" /> : null}
+          Guardar plantillas
+        </Button>
+      </div>
     </section>
   );
 }

@@ -25,6 +25,8 @@ declare
   no_show public.appointments;
   recovery_task public.tasks;
   manual_lead public.leads;
+  attempt_lead public.leads;
+  attempted_task public.tasks;
   booking_blocked boolean := false;
 begin
   if (select count(*) from public.clinics) <> 1 then
@@ -35,6 +37,14 @@ begin
   end if;
   if (select count(*) from public.clinic_public_forms) <> 1 then
     raise exception 'DentalPro owner no puede ver exactamente su public form';
+  end if;
+
+  update public.message_templates
+  set message = message
+  where clinic_id = '00000000-0000-0000-0000-000000000101'
+    and template_key = 'first_contact';
+  if not found then
+    raise exception 'Owner no pudo editar su plantilla de WhatsApp';
   end if;
 
   select * into manual_lead
@@ -66,6 +76,72 @@ begin
     where lead_id = manual_lead.id and type = 'followup' and status = 'pendiente'
   ) then
     raise exception 'save_lead_followup no creo tarea sin duplicar el flujo';
+  end if;
+
+  if exists (
+    select 1 from public.tasks
+    where lead_id = manual_lead.id and type = 'contact'
+      and status in ('pendiente', 'vencido', 'Pendiente', 'Vencida')
+  ) or not exists (
+    select 1 from public.tasks
+    where lead_id = manual_lead.id and type = 'contact'
+      and status = 'hecho' and completed_at is not null and completed_by = auth.uid()
+  ) or not exists (
+    select 1 from public.lead_events
+    where lead_id = manual_lead.id and event_type = 'task_completed_auto'
+  ) then
+    raise exception 'Contactado no cerro y audito la tarea de contacto';
+  end if;
+
+  select * into attempt_lead
+  from public.create_manual_lead(
+    'QA Contact Outcome Transactional', '0981000998', null,
+    'Consulta general', 'Esta semana', 'Prueba outcome de contacto',
+    'WhatsApp directo', true, null, 'Contactar lead', now() + interval '1 hour',
+    null, 'Lead Medio', 50, 'Quiere agendar una consulta', 'No', null
+  );
+
+  select * into attempted_task
+  from public.complete_contact_task((
+    select id from public.tasks
+    where lead_id = attempt_lead.id and type = 'contact' and status = 'pendiente'
+    limit 1
+  ), 'no_respondio', 'Intento QA');
+
+  if attempted_task.status <> 'hecho'
+     or (select status from public.leads where id = attempt_lead.id) = 'Contactado'
+     or not exists (
+       select 1 from public.tasks
+       where lead_id = attempt_lead.id and type = 'contact' and status = 'pendiente'
+     )
+     or not exists (
+       select 1 from public.lead_events
+       where lead_id = attempt_lead.id and event_type = 'contact_attempted'
+     ) then
+    raise exception 'no_respondio cambio estado o no creo el proximo intento';
+  end if;
+
+  perform public.complete_contact_task((
+    select id from public.tasks
+    where lead_id = attempt_lead.id and type = 'contact' and status = 'pendiente'
+    limit 1
+  ), 'respondio', 'Respondio en segunda llamada');
+
+  if (select status from public.leads where id = attempt_lead.id) <> 'Contactado'
+     or exists (
+       select 1 from public.tasks
+       where lead_id = attempt_lead.id and type = 'contact'
+         and status in ('pendiente', 'vencido', 'Pendiente', 'Vencida')
+     ) then
+    raise exception 'respondio no marco lead Contactado o dejo contacto abierto';
+  end if;
+
+  perform public.record_whatsapp_opened(attempt_lead.id, 'first_contact');
+  if not exists (
+    select 1 from public.lead_events
+    where lead_id = attempt_lead.id and event_type = 'whatsapp_opened'
+  ) then
+    raise exception 'record_whatsapp_opened no creo evento';
   end if;
 
   update public.leads
@@ -165,6 +241,7 @@ declare
   direct_appointment_blocked boolean := false;
   scheduled public.appointments;
   completed public.tasks;
+  templates_updated integer := 0;
 begin
   if exists (select 1 from public.leads where clinic_id <> '00000000-0000-0000-0000-000000000101') then
     raise exception 'Receptionist ve leads cross-clinic';
@@ -174,6 +251,23 @@ begin
   end if;
   if exists (select 1 from public.audit_logs) then
     raise exception 'Receptionist ve audit logs';
+  end if;
+  if not exists (
+    select 1 from public.message_templates
+    where clinic_id = '00000000-0000-0000-0000-000000000101'
+  ) or exists (
+    select 1 from public.message_templates
+    where clinic_id <> '00000000-0000-0000-0000-000000000101'
+  ) then
+    raise exception 'Receptionist no puede usar plantillas de su clinica o ve plantillas cross-clinic';
+  end if;
+
+  update public.message_templates
+  set message = 'No debe guardar'
+  where template_key = 'first_contact';
+  get diagnostics templates_updated = row_count;
+  if templates_updated <> 0 then
+    raise exception 'Receptionist pudo editar plantillas';
   end if;
 
   begin
@@ -265,6 +359,12 @@ begin
   end if;
   if exists (select 1 from public.leads where clinic_id <> '00000000-0000-0000-0000-000000000102') then
     raise exception 'QA B owner ve DentalPro';
+  end if;
+  if exists (
+    select 1 from public.message_templates
+    where clinic_id <> '00000000-0000-0000-0000-000000000102'
+  ) then
+    raise exception 'QA B owner ve plantillas de DentalPro';
   end if;
 
   begin

@@ -118,3 +118,13 @@ El lead y la tarea existen antes de cualquier procesamiento n8n. No presentar au
 - [ ] Las dudas o defectos se registraron con pasos reproducibles.
 
 Si la QA visual y el redeploy aún están pendientes, la decisión sigue siendo `A) Listo para QA manual visual`, no listo para prospectar.
+## Escena: contacto enlazado
+
+1. Abrir un lead caliente con tarea de contacto pendiente.
+2. Mostrar el mensaje de WhatsApp prearmado desde el detalle del lead.
+3. Volver a la CRM y elegir **Sí, respondió**.
+4. Mostrar que el lead queda `Contactado`, la tarea inicial se completa y aparece un seguimiento futuro.
+5. En otro lead, elegir **No respondió** y mostrar que el estado no cambia a `Contactado`.
+6. Como owner/admin, abrir Configuración y mostrar las plantillas editables por clínica.
+
+Mensaje comercial correcto: el sistema reduce pasos duplicados y mantiene oportunidades bajo seguimiento. No afirmar que envía WhatsApp automáticamente ni prometer pacientes o ingresos.

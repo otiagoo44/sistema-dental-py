@@ -105,7 +105,14 @@ export function getTreatmentOptions(clinicSettings, treatmentPrices = []) {
 }
 
 export function isOpenTask(task) {
-  return !['hecho', 'cancelado'].includes(normalizeText(task?.status));
+  return !['hecho', 'completada', 'cancelado', 'cancelada'].includes(normalizeText(task?.status));
+}
+
+export function isContactTask(task) {
+  const type = normalizeText(task?.type);
+  if (['contact', 'contact_lead', 'initial_contact', 'follow_up_contact', 'manual_contact'].includes(type)) return true;
+  if (type) return false;
+  return /(contactar|contacto|whatsapp|llamar)/.test(normalizeText(task?.title));
 }
 
 export function startOfAsuncionDate(daysOffset = 0) {

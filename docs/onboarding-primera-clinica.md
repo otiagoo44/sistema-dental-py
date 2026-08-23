@@ -231,3 +231,16 @@ No entregar `service_role`, secret keys, salts, tokens internos de administraci�
 - Día 7: reunión corta con owner; documentar métricas, incidencias y decisión de continuar.
 
 No ampliar alcance durante la estabilización salvo error crítico. Las automatizaciones de mensajería quedan para una fase posterior con consentimiento, plantillas, rate limits y ownership definidos.
+## Configurar el contacto por WhatsApp
+
+Antes de capacitar a recepción:
+
+1. Verificar el WhatsApp, nombre y enlace de agenda de la clínica.
+2. Ingresar como owner/admin y revisar las cinco plantillas en **Configuración → Plantillas de WhatsApp**.
+3. Adaptar tono y firma sin prometer resultados clínicos ni inventar precios.
+4. Probar las variables con un lead sintético y confirmar que no quedan marcadores `{{...}}`.
+5. Probar `Sí, respondió`, `No respondió`, `Número inválido` y `Posponer`.
+6. Ingresar como receptionist y comprobar que puede usar mensajes, pero no editar plantillas.
+7. Confirmar aislamiento con un usuario de otra clínica.
+
+La implementación inicial usa enlaces `wa.me`; el envío automático, WhatsApp Cloud API, ManyChat e Instagram automático son fases posteriores.

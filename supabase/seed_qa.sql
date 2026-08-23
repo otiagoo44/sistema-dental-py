@@ -148,28 +148,31 @@ on conflict (clinic_id, treatment) do update set
   estimated_price = excluded.estimated_price,
   updated_at = now();
 
-insert into public.message_templates (id, clinic_id, name, treatment, situation, message)
+insert into public.message_templates (id, clinic_id, template_key, name, treatment, situation, message)
 values
   (
     '00000000-0000-0000-0000-000000000501',
     '00000000-0000-0000-0000-000000000101',
+    'first_contact',
     'Primer contacto', null, 'Nuevo lead',
-    'Hola {{name}}, gracias por contactar con DentalPro QA. ¿Querés que coordinemos una evaluación para {{treatment}}?'
+    E'Hola {{nombre}}, soy de {{clinica}}.\n\nVimos tu consulta sobre {{tratamiento}} y te escribo para ayudarte a avanzar sin perder tiempo.\n\nPara orientarte bien, lo más práctico es agendar una evaluación breve y revisar tu caso con el odontólogo.\n\n¿Te queda mejor coordinar para hoy o para mañana?'
   ),
   (
     '00000000-0000-0000-0000-000000000502',
     '00000000-0000-0000-0000-000000000101',
+    'no_show',
     'Recuperación no-show', null, 'No Asistió',
-    'Hola {{name}}, vimos que no pudiste asistir. Podemos ayudarte a reprogramar tu consulta.'
+    E'Hola {{nombre}}, soy de {{clinica}}.\n\nVimos que no pudiste asistir a tu evaluación por {{tratamiento}}. Podemos ayudarte a reprogramarla sin complicaciones.\n\n¿Te queda mejor mañana o esta semana?'
   ),
   (
     '00000000-0000-0000-0000-000000000503',
     '00000000-0000-0000-0000-000000000102',
+    'first_contact',
     'Primer contacto', null, 'Nuevo lead',
-    'Hola {{name}}, gracias por contactar con QA Clinic B. ¿Querés coordinar una evaluación?'
+    E'Hola {{nombre}}, soy de {{clinica}}.\n\nVimos tu consulta sobre {{tratamiento}} y queremos ayudarte a coordinar una evaluación.\n\n¿Te queda mejor hoy o mañana?'
   )
-on conflict (id) do update set
-  clinic_id = excluded.clinic_id,
+on conflict (clinic_id, template_key) do update set
+  template_key = excluded.template_key,
   name = excluded.name,
   treatment = excluded.treatment,
   situation = excluded.situation,

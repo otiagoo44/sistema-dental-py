@@ -289,3 +289,21 @@ Este bloque sólo aprueba el deploy real, no el archivo local.
 - [ ] Se actualizó `docs/checklist-produccion.md` sólo con resultados realmente observados.
 
 Gate: hasta completar esta checklist y la landing pública real, la decisión máxima permitida es `A) Listo para QA manual visual`.
+
+## QA de contacto enlazado y WhatsApp
+
+- [ ] Abrir un lead `Nuevo` con una tarea `contact` pendiente.
+- [ ] Cambiar el estado a `Contactado` y confirmar que la tarea de contacto queda `hecho`.
+- [ ] Confirmar que se crea un seguimiento futuro, sin duplicados abiertos del mismo tipo.
+- [ ] Confirmar en Eventos `task_completed_auto` y `lead_contacted`.
+- [ ] Desde Tareas, completar una tarea de contacto y elegir **Sí, respondió**.
+- [ ] Repetir con **No respondió**: el lead no debe quedar `Contactado` y debe aparecer un próximo intento.
+- [ ] Repetir con **Número inválido** y **Posponer a mañana**.
+- [ ] Abrir WhatsApp desde Leads, detalle, Seguimientos y Tareas.
+- [ ] Confirmar que el número se normaliza, el mensaje aparece prearmado y ninguna variable `{{...}}` queda visible.
+- [ ] Volver a la CRM y confirmar que abrir WhatsApp no cambia el estado por sí solo.
+- [ ] Con owner/admin, editar una plantilla en Configuración y verificar el nuevo texto.
+- [ ] Con receptionist, usar la plantilla y confirmar que Configuración no está disponible.
+- [ ] Con QA Clinic B, comprobar que no aparecen plantillas ni eventos de DentalPro.
+
+WhatsApp sigue siendo manual: la CRM abre `wa.me`, pero no envía mensajes, no usa WhatsApp Cloud API y no integra ManyChat.

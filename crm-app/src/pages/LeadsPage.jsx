@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowDownUp, CalendarPlus, Check, ChevronLeft, Clipboard, Edit3, FilePlus, Flame, MessageCircle, Phone, Plus, Save, Search } from 'lucide-react';
+import { Archive, ArrowDownUp, CalendarPlus, Check, ChevronLeft, Clipboard, Edit3, FilePlus, Flame, Phone, Plus, Save, Search } from 'lucide-react';
 import { CLASSIFICATIONS, LEAD_STATUSES, NEXT_ACTION_OPTIONS } from '../lib/constants';
 import { formatDateTime, formatMoney, fromDatetimeLocalAsuncion, normalizeText, todayIsoDate, toDatetimeLocalAsuncion, toLocalIsoDate } from '../lib/formatters';
-import { buildLeadMessage, buildWhatsappUrl } from '../lib/messages';
+import { buildLeadMessage } from '../lib/messages';
 import { ARCHIVED_STATUS, LEAD_STATUS, isArchivedLead, displayConsultationReason, uniqueStrings } from '../lib/crmDomain';
 import { Info, Select, Field } from '../components/crm/CrmPrimitives';
 import EmptyState from '../components/ui/EmptyState';
@@ -11,8 +11,9 @@ import Card from '../components/ui/Card';
 import FilterPanel from '../components/ui/FilterPanel';
 import PageHeader from '../components/ui/PageHeader';
 import StatusBadge from '../components/ui/StatusBadge';
+import WhatsAppButton from '../components/crm/WhatsAppButton';
 
-export default function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, onArchiveLead, onOpenLead, onUpdateLead, onScheduleAppointment, onCreateTask, onMarkContacted, profiles, setNotice }) {
+export default function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, onArchiveLead, onOpenLead, onUpdateLead, onScheduleAppointment, onCreateTask, onMarkContacted, onWhatsAppOpened, messageTemplates, clinicContext, profiles, setNotice }) {
   const [filters, setFilters] = useState({ status: '', classification: '', treatment: '', source: '', assigned: '', date: '', q: '', uncontacted: false, hotOnly: false, showArchived: false, sort: 'recent' });
   const treatmentOptions = useMemo(() => uniqueStrings(leads.map((lead) => lead.treatment)).sort(), [leads]);
   const sourceOptions = useMemo(() => uniqueStrings(leads.map((lead) => lead.source)).sort(), [leads]);
@@ -45,7 +46,7 @@ export default function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, o
   }, [leads, filters, canAdmin]);
 
   async function copyMessage(lead) {
-    await navigator.clipboard.writeText(buildLeadMessage(lead));
+    await navigator.clipboard.writeText(buildLeadMessage(lead, messageTemplates, clinicContext));
     setNotice('Mensaje copiado.');
   }
 
@@ -114,7 +115,7 @@ export default function LeadsView({ leads, canAdmin, onCreateLead, onEditLead, o
                 <Button size="sm" type="button" onClick={() => onOpenLead(lead.id)}>Ver detalle</Button>
                 {['Nuevo', 'No Contactado', 'No Respondió'].includes(lead.status) ? <Button size="sm" variant="secondary" type="button" onClick={() => onMarkContacted(lead)}><Check className="h-4 w-4" />Contactado</Button> : null}
                 <Button size="sm" variant="secondary" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button>
-                <a className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-card px-3 py-2 text-xs font-semibold text-textSoft transition hover:border-mint/30 hover:bg-elevated hover:text-cream" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a>
+                <WhatsAppButton lead={lead} templates={messageTemplates} clinicContext={clinicContext} onOpened={onWhatsAppOpened} />
                 <Button size="sm" variant="ghost" type="button" onClick={() => copyMessage(lead)}><Clipboard className="h-4 w-4" />Copiar mensaje</Button>
                 {canAdmin ? <Button size="sm" variant="ghost" type="button" onClick={() => onCreateTask(lead)}><Plus className="h-4 w-4" />Crear tarea</Button> : null}
                 <Button size="sm" variant="ghost" type="button" onClick={() => onEditLead(lead)}><Edit3 className="h-4 w-4" />Editar</Button>
@@ -135,7 +136,7 @@ function QuickFilter({ active, onClick, children }) {
   return <button className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition ${active ? 'border-mint/45 bg-mint/10 text-mint' : 'border-slate-200 bg-card text-textSoft hover:border-mint/30 hover:bg-elevated hover:text-cream'}`} type="button" onClick={onClick}>{children}</button>;
 }
 
-export function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchiveLead, onSave, onMarkContacted, onScheduleAppointment, setNotice }) {
+export function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchiveLead, onSave, onMarkContacted, onScheduleAppointment, onWhatsAppOpened, messageTemplates, clinicContext, setNotice }) {
   const [form, setForm] = useState(null);
 
   useEffect(() => {
@@ -154,7 +155,7 @@ export function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchi
   }
 
   async function copyMessage() {
-    await navigator.clipboard.writeText(buildLeadMessage(lead));
+    await navigator.clipboard.writeText(buildLeadMessage(lead, messageTemplates, clinicContext));
     setNotice('Mensaje copiado.');
   }
 
@@ -241,6 +242,14 @@ export function LeadDetail({ lead, events, canAdmin, onBack, onEditLead, onArchi
             Aumentar intentos
           </Button>
           <Button variant="secondary" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button>
+          <WhatsAppButton
+            lead={lead}
+            templates={messageTemplates}
+            clinicContext={clinicContext}
+            onOpened={onWhatsAppOpened}
+            label="Abrir WhatsApp"
+            className="min-h-11 px-4 py-2.5 text-sm"
+          />
           <Button variant="ghost" type="button" onClick={copyMessage}>
             <Clipboard className="h-4 w-4" />
             Copiar mensaje

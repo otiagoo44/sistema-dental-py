@@ -8,14 +8,14 @@ Leyenda: `[x]` verificado, `[!]` parcial/riesgo o requiere accion manual, `[ ]` 
 
 - [x] Proyecto nuevo responde por CLI y reporta `ACTIVE_HEALTHY`.
 - [x] Repo linkeado a `unybqqzhgqxhrwucrofm`.
-- [x] Nueve migraciones locales/remotas alineadas; la última agrega seguimiento atómico y fuente manual `Presencial` sin cambios destructivos.
+- [x] Diez migraciones locales/remotas alineadas; la última enlaza contacto/tareas y agrega plantillas multi-clínica.
 - [x] 16 tablas CRM creadas.
 - [x] RLS activo en las 16 tablas sensibles.
 - [x] 38 policies finales revisadas por rol.
 - [x] Cero policies `DELETE` en tablas CRM.
 - [x] Privilegios Data API explicitados; `anon` sin acceso directo a tablas CRM.
 - [x] Helpers privados `app_private` instalados.
-- [x] RPCs `create_manual_lead`, `save_lead_followup`, `schedule_lead_appointment`, `update_appointment_outcome` y `complete_task` instaladas.
+- [x] RPCs operativas instaladas, incluyendo `mark_lead_contacted`, `complete_contact_task`, `record_contact_attempt` y `record_whatsapp_opened`.
 - [x] `create_manual_lead` deriva `clinic_id` del profile autenticado; no acepta ese parámetro desde frontend.
 - [x] Owner/admin y receptionist crean lead, event y task manuales en una transacción.
 - [x] Responsable manual validado contra profiles activos de la misma clínica; asignación cross-clínica bloqueada.
@@ -113,3 +113,14 @@ Leyenda: `[x]` verificado, `[!]` parcial/riesgo o requiere accion manual, `[ ]` 
 - [x] QA visual, onboarding y recepción de leads directos documentados en archivos canónicos.
 
 No publicar como produccion ni prospectar hasta completar los items pendientes de Auth, navegador y landing real.
+
+## Contacto y plantillas
+
+- [x] `mark_lead_contacted` cierra sólo tareas de contacto abiertas.
+- [x] `complete_contact_task` exige un resultado y no afecta tareas de cita, no-show o presupuesto.
+- [x] `record_whatsapp_opened` registra apertura sin marcar contacto.
+- [x] El enlace `wa.me` incluye teléfono normalizado y mensaje codificado.
+- [x] Las plantillas son propias de cada clínica y sólo owner/admin puede editarlas.
+- [x] Receptionist puede usar plantillas y registrar resultados.
+- [x] No hay envío automático, WhatsApp API, ManyChat ni Instagram automático.
+- [x] `supabase/reset_qa_leads.sql` dejó 13 leads y preservó el único registro no clasificable como sintético.

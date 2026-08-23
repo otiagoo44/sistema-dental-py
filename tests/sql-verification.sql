@@ -39,7 +39,11 @@ begin
 
   select array_agg(name order by name)
   into missing_rpcs
-  from unnest(array['create_manual_lead','schedule_lead_appointment','update_appointment_outcome','complete_task']) as name
+  from unnest(array[
+    'create_manual_lead','schedule_lead_appointment','update_appointment_outcome',
+    'complete_task','mark_lead_contacted','complete_contact_task',
+    'record_contact_attempt','record_whatsapp_opened'
+  ]) as name
   where not exists (
     select 1
     from pg_proc p
@@ -67,6 +71,24 @@ begin
 
   if to_regclass('public.leads_clinic_phone_plus_unique') is null then
     raise exception 'Falta el indice unico de duplicados por clinica y telefono';
+  end if;
+
+  if to_regclass('public.message_templates_clinic_key_unique_idx') is null then
+    raise exception 'Falta el indice unico multi-clinica de plantillas';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'tasks' and column_name = 'completed_by'
+  ) then
+    raise exception 'Falta tasks.completed_by';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'message_templates' and column_name = 'template_key'
+  ) then
+    raise exception 'Falta message_templates.template_key';
   end if;
 
   select count(*) into duplicate_count
