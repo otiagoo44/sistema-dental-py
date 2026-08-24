@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FileText } from 'lucide-react';
 import { addDaysAsuncion, fromDatetimeLocalAsuncion, toDatetimeLocalAsuncion } from '../../lib/formatters';
+import { humanizeCrmError } from '../../lib/errors';
 import { Field, TextArea } from '../crm/CrmPrimitives';
 import Button from '../ui/Button';
 import ModalShell from '../ui/ModalShell';
@@ -34,17 +35,17 @@ export default function QuoteModal({ context, saving, onClose, onSubmit }) {
     try {
       await onSubmit({ ...form, amount: Number(form.amount), next_action_at: nextActionAt });
     } catch (submitError) {
-      setError(submitError.message || 'No se pudo guardar el presupuesto.');
+      setError(humanizeCrmError(submitError, 'No se pudo guardar el presupuesto. Intentá de nuevo.'));
     }
   }
 
   return (
-    <ModalShell className="max-w-xl p-5 sm:p-6" onClose={onClose} titleId="quote-title" descriptionId="quote-description" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+    <ModalShell className="max-w-xl p-5 sm:p-6" onClose={onClose} closeDisabled={saving} titleId="quote-title" descriptionId="quote-description" onSubmit={(event) => { event.preventDefault(); submit(); }}>
       <ModalHeader title={context?.quote ? 'Editar presupuesto' : 'Registrar presupuesto'} subtitle={context?.lead?.name} onClose={onClose} disabled={saving} titleId="quote-title" />
       <p id="quote-description" className="mb-5 text-base leading-6 text-textMuted">Este monto es una cotización real. No se contará como cobro ni ingreso.</p>
       {error ? <div aria-live="assertive" className="mb-4 rounded-xl border border-red-300/30 bg-red-400/10 p-3 text-sm text-red-200">{error}</div> : null}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field className="sm:col-span-2" label="Tratamiento" value={form.treatment} onChange={(value) => setForm({ ...form, treatment: value })} disabled={saving} />
+        <Field className="sm:col-span-2" label="Tratamiento" value={form.treatment} onChange={(value) => setForm({ ...form, treatment: value })} disabled={saving} data-autofocus />
         <Field label="Monto (Gs.)" type="number" min="1" value={form.amount} onChange={(value) => setForm({ ...form, amount: value })} disabled={saving} />
         <Field label="Odontólogo / profesional" value={form.professional_name} onChange={(value) => setForm({ ...form, professional_name: value })} disabled={saving} />
         <Field className="sm:col-span-2" label="Próximo seguimiento" type="datetime-local" value={form.next_action_at} onChange={(value) => setForm({ ...form, next_action_at: value })} disabled={saving} />

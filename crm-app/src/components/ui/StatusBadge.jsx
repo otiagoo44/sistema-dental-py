@@ -34,7 +34,7 @@ export default function StatusBadge({ value }) {
   if (!value) return null;
 
   return (
-    <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyles[value] || 'border-slate-400/20 bg-slate-400/[0.08] text-slate-600'}`}>
+    <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-sm font-semibold ${statusStyles[value] || 'border-slate-400/20 bg-slate-400/[0.08] text-slate-600'}`}>
       {value}
     </span>
   );

@@ -86,11 +86,10 @@ export async function getClinicWorkspace(clinicId) {
       .order('name', { ascending: true }),
   ]);
 
-  const quoteRelationPending = quotesResult.error && ['42P01', 'PGRST205'].includes(quotesResult.error.code);
   const error = leadsResult.error
     || appointmentsResult.error
     || tasksResult.error
-    || (quoteRelationPending ? null : quotesResult.error)
+    || quotesResult.error
     || eventsResult.error
     || profilesResult.error
     || settingsResult.error
@@ -104,7 +103,7 @@ export async function getClinicWorkspace(clinicId) {
       leads: leadsResult.data || [],
       appointments: appointmentsResult.data || [],
       tasks: tasksResult.data || [],
-      quotes: quoteRelationPending ? [] : quotesResult.data || [],
+      quotes: quotesResult.data || [],
       events: eventsResult.data || [],
       profiles: profilesResult.data || [],
       settings: settingsResult.data || null,

@@ -24,7 +24,7 @@ alter table public.appointments
 create table if not exists public.quotes (
   id uuid primary key default gen_random_uuid(),
   clinic_id uuid not null references public.clinics(id) on delete restrict,
-  lead_id uuid not null references public.leads(id) on delete cascade,
+  lead_id uuid not null references public.leads(id) on delete restrict,
   appointment_id uuid references public.appointments(id) on delete set null,
   treatment text not null,
   amount numeric(14, 2) not null,
@@ -65,7 +65,7 @@ begin
   if not exists (select 1 from pg_catalog.pg_constraint where conname = 'quotes_clinic_lead_fk') then
     alter table public.quotes
       add constraint quotes_clinic_lead_fk
-      foreign key (clinic_id, lead_id) references public.leads (clinic_id, id) on delete cascade;
+      foreign key (clinic_id, lead_id) references public.leads (clinic_id, id) on delete restrict;
   end if;
   if not exists (select 1 from pg_catalog.pg_constraint where conname = 'quotes_clinic_lead_appointment_fk') then
     alter table public.quotes
@@ -142,6 +142,30 @@ as $function$
   limit 1;
 $function$;
 
+create or replace function app_private.resolve_clinic_assignee(
+  p_clinic_id uuid,
+  p_candidate_id uuid
+)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select coalesce(
+    (
+      select p.id
+      from public.profiles p
+      where p.id = p_candidate_id
+        and p.clinic_id = p_clinic_id
+        and p.active is true
+        and p.role in ('receptionist', 'owner', 'admin')
+      limit 1
+    ),
+    app_private.default_clinic_assignee(p_clinic_id)
+  );
+$function$;
+
 create or replace function app_private.cancel_open_lead_tasks(
   p_clinic_id uuid,
   p_lead_id uuid,
@@ -178,6 +202,7 @@ $function$;
 
 revoke all on function app_private.is_open_opportunity(text, boolean) from public, anon, authenticated, service_role;
 revoke all on function app_private.default_clinic_assignee(uuid) from public, anon, authenticated, service_role;
+revoke all on function app_private.resolve_clinic_assignee(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function app_private.cancel_open_lead_tasks(uuid, uuid, uuid, text[]) from public, anon, authenticated, service_role;
 
 -- Repair historical operational inconsistencies without deleting business history.
@@ -261,7 +286,7 @@ from events;
 -- one exists and a usable next-action mirror for backwards-compatible screens.
 with repaired as (
   update public.leads l
-  set assigned_to = coalesce(l.assigned_to, app_private.default_clinic_assignee(l.clinic_id)),
+  set assigned_to = app_private.resolve_clinic_assignee(l.clinic_id, l.assigned_to),
       next_action = coalesce(nullif(btrim(l.next_action), ''), 'Definir próximo paso'),
       next_followup_at = coalesce(l.next_followup_at, now()),
       updated_at = now()
@@ -269,10 +294,7 @@ with repaired as (
     and (
       nullif(btrim(l.next_action), '') is null
       or l.next_followup_at is null
-      or (
-        l.assigned_to is null
-        and app_private.default_clinic_assignee(l.clinic_id) is not null
-      )
+      or l.assigned_to is distinct from app_private.resolve_clinic_assignee(l.clinic_id, l.assigned_to)
     )
   returning l.clinic_id, l.id as lead_id, l.assigned_to, l.next_action, l.next_followup_at
 ), events as (
@@ -410,7 +432,11 @@ declare
   created_new boolean := false;
   created_after_terminal boolean := false;
 begin
-  if coalesce((select auth.role()), '') <> 'service_role' then
+  if coalesce(
+    nullif(current_setting('request.jwt.claim.role', true), ''),
+    (select auth.jwt() ->> 'role'),
+    ''
+  ) <> 'service_role' then
     raise exception using errcode = '42501', message = 'Service role required';
   end if;
 
@@ -488,7 +514,7 @@ begin
         source = coalesce(nullif(btrim(p_source), ''), l.source),
         page = coalesce(nullif(btrim(p_page), ''), l.page),
         notes = coalesce(l.notes, nullif(btrim(p_notes), '')),
-        assigned_to = coalesce(l.assigned_to, assigned_user_id),
+        assigned_to = app_private.resolve_clinic_assignee(l.clinic_id, l.assigned_to),
         consent_contact = true,
         consent_at = p_consent_at,
         consent_source = nullif(btrim(p_source), ''),
@@ -554,7 +580,7 @@ begin
     priority = excluded.priority,
     status = 'pendiente',
     due_at = least(coalesce(tasks.due_at, excluded.due_at), excluded.due_at),
-    assigned_to = coalesce(tasks.assigned_to, excluded.assigned_to),
+    assigned_to = app_private.resolve_clinic_assignee(excluded.clinic_id, tasks.assigned_to),
     completed_at = null,
     completed_by = null,
     updated_at = now();
@@ -751,6 +777,7 @@ declare
   next_task_priority text := 'media';
   assigned_user_id uuid;
   cancelled_task_ids uuid[] := array[]::uuid[];
+  cancelled_quote_ids uuid[] := array[]::uuid[];
   event_type_value text;
   event_title text;
 begin
@@ -779,7 +806,21 @@ begin
     raise exception using errcode = '22023', message = 'La oportunidad ya está cerrada';
   end if;
 
-  assigned_user_id := coalesce(lead_record.assigned_to, app_private.default_clinic_assignee(lead_record.clinic_id));
+  assigned_user_id := app_private.resolve_clinic_assignee(lead_record.clinic_id, lead_record.assigned_to);
+
+  -- A rapid repeated submit must not increment attempts or duplicate timeline
+  -- events. Domain-changing outcomes use their own idempotent branches below.
+  if normalized_outcome <> 'treatment_started' and exists (
+    select 1
+    from public.lead_events e
+    where e.clinic_id = lead_record.clinic_id
+      and e.lead_id = lead_record.id
+      and e.created_by = current_user_id
+      and e.created_at >= now() - interval '10 seconds'
+      and e.metadata ->> 'outcome' = normalized_outcome
+  ) then
+    return lead_record;
+  end if;
 
   if lead_record.status = 'Presupuesto Enviado' then
     select q.* into active_quote
@@ -794,6 +835,21 @@ begin
 
   if normalized_outcome = 'treatment_started' then
     cancelled_task_ids := app_private.cancel_open_lead_tasks(lead_record.clinic_id, lead_record.id, current_user_id, null);
+
+    with cancelled_quotes as (
+      update public.quotes q
+      set status = 'cancelled',
+          next_action_at = null,
+          updated_by = current_user_id,
+          updated_at = now()
+      where q.clinic_id = lead_record.clinic_id
+        and q.lead_id = lead_record.id
+        and q.status = 'pending'
+      returning q.id
+    )
+    select coalesce(array_agg(id), array[]::uuid[])
+    into cancelled_quote_ids
+    from cancelled_quotes;
 
     update public.leads
     set status = 'Tratamiento Iniciado',
@@ -906,6 +962,7 @@ begin
       'outcome', normalized_outcome,
       'next_followup_at', lead_record.next_followup_at,
       'cancelled_task_ids', to_jsonb(cancelled_task_ids),
+      'cancelled_quote_ids', to_jsonb(cancelled_quote_ids),
       'assigned_to', lead_record.assigned_to
     ),
     current_user_id
@@ -914,7 +971,11 @@ begin
   insert into public.audit_logs (clinic_id, actor_id, action, table_name, row_id, metadata)
   values (
     lead_record.clinic_id, current_user_id, event_type_value, 'leads', lead_record.id,
-    jsonb_build_object('outcome', normalized_outcome, 'cancelled_task_ids', to_jsonb(cancelled_task_ids))
+    jsonb_build_object(
+      'outcome', normalized_outcome,
+      'cancelled_task_ids', to_jsonb(cancelled_task_ids),
+      'cancelled_quote_ids', to_jsonb(cancelled_quote_ids)
+    )
   );
 
   return lead_record;
@@ -983,7 +1044,7 @@ begin
     for update;
 
     if found and app_private.is_open_opportunity(lead_record.status, lead_record.is_archived) then
-      assigned_user_id := coalesce(lead_record.assigned_to, app_private.default_clinic_assignee(lead_record.clinic_id));
+      assigned_user_id := app_private.resolve_clinic_assignee(lead_record.clinic_id, lead_record.assigned_to);
 
       select t.* into next_task
       from public.tasks t
@@ -1224,7 +1285,7 @@ begin
     raise exception using errcode = '22023', message = 'La oportunidad está cerrada; reactivala explícitamente antes de agendar';
   end if;
 
-  assigned_user_id := coalesce(lead_record.assigned_to, app_private.default_clinic_assignee(lead_record.clinic_id));
+  assigned_user_id := app_private.resolve_clinic_assignee(lead_record.clinic_id, lead_record.assigned_to);
 
   if p_appointment_id is not null then
     select a.* into appointment_record
@@ -1257,6 +1318,18 @@ begin
     for update;
     is_reschedule := found;
     previous_appointment_id := appointment_record.id;
+  end if;
+
+  -- The lead row lock serializes rapid submits. If the same appointment was
+  -- already saved, return it without turning a double click into a reprogramming.
+  if appointment_record.id is not null
+    and appointment_record.appointment_date = p_appointment_date
+    and appointment_record.appointment_time = p_appointment_time
+    and appointment_record.doctor_assigned = normalized_doctor
+    and coalesce(appointment_record.treatment_scheduled, '') = coalesce(nullif(btrim(p_treatment_scheduled), ''), lead_record.treatment, '')
+    and coalesce(appointment_record.notes, '') = coalesce(nullif(btrim(p_notes), ''), '')
+  then
+    return appointment_record;
   end if;
 
   begin
@@ -1426,7 +1499,7 @@ begin
   end if;
 
   appointment_at := app_private.asuncion_timestamp(appointment_record.appointment_date, appointment_record.appointment_time);
-  assigned_user_id := coalesce(lead_record.assigned_to, app_private.default_clinic_assignee(lead_record.clinic_id));
+  assigned_user_id := app_private.resolve_clinic_assignee(lead_record.clinic_id, lead_record.assigned_to);
 
   if normalized_outcome = 'Confirmado' then
     if appointment_record.status not in ('Agendado', 'Consulta Agendada', 'Pendiente', 'Reprogramado') then
@@ -1615,7 +1688,27 @@ begin
     raise exception using errcode = '42501', message = 'La cita no pertenece al paciente y clínica indicados';
   end if;
 
-  assigned_user_id := coalesce(lead_record.assigned_to, app_private.default_clinic_assignee(lead_record.clinic_id));
+  assigned_user_id := app_private.resolve_clinic_assignee(lead_record.clinic_id, lead_record.assigned_to);
+
+  select q.* into quote_record
+  from public.quotes q
+  where q.clinic_id = lead_record.clinic_id
+    and q.lead_id = lead_record.id
+    and q.status = 'pending'
+    and q.treatment = normalized_treatment
+    and q.amount = p_amount
+    and q.currency = normalized_currency
+    and q.appointment_id is not distinct from p_appointment_id
+    and q.created_by = current_user_id
+    and q.created_at >= now() - interval '10 seconds'
+  order by q.created_at desc
+  limit 1
+  for update;
+
+  if found then
+    return quote_record;
+  end if;
+
   cancelled_task_ids := app_private.cancel_open_lead_tasks(
     lead_record.clinic_id,
     lead_record.id,
@@ -1750,7 +1843,7 @@ begin
   if followup_at <= now() then
     raise exception using errcode = '22023', message = 'El seguimiento del presupuesto debe ser futuro';
   end if;
-  assigned_user_id := coalesce(lead_record.assigned_to, app_private.default_clinic_assignee(lead_record.clinic_id));
+  assigned_user_id := app_private.resolve_clinic_assignee(lead_record.clinic_id, lead_record.assigned_to);
 
   update public.quotes
   set treatment = normalized_treatment,
@@ -1833,6 +1926,7 @@ declare
   current_user_id uuid := (select auth.uid());
   quote_record public.quotes;
   lead_record public.leads;
+  remaining_quote public.quotes;
   normalized_status text := lower(coalesce(nullif(btrim(p_status), ''), ''));
   normalized_reason text := nullif(btrim(p_rejection_reason), '');
   assigned_user_id uuid;
@@ -1840,6 +1934,7 @@ declare
   next_type text;
   next_due_at timestamptz;
   cancelled_task_ids uuid[] := array[]::uuid[];
+  superseded_quote_ids uuid[] := array[]::uuid[];
 begin
   if current_user_id is null then
     raise exception using errcode = '42501', message = 'Authentication required';
@@ -1882,7 +1977,7 @@ begin
     raise exception using errcode = '22023', message = 'No se puede cambiar un presupuesto de una oportunidad cerrada';
   end if;
 
-  assigned_user_id := coalesce(lead_record.assigned_to, app_private.default_clinic_assignee(lead_record.clinic_id));
+  assigned_user_id := app_private.resolve_clinic_assignee(lead_record.clinic_id, lead_record.assigned_to);
   cancelled_task_ids := app_private.cancel_open_lead_tasks(
     quote_record.clinic_id,
     quote_record.lead_id,
@@ -1891,13 +1986,47 @@ begin
   );
 
   if normalized_status = 'accepted' then
+    -- Other open alternatives stop being active commercial money once one is
+    -- accepted, but their rows and history are preserved as cancelled.
+    with superseded_quotes as (
+      update public.quotes q
+      set status = 'cancelled',
+          next_action_at = null,
+          updated_by = current_user_id,
+          updated_at = now()
+      where q.clinic_id = quote_record.clinic_id
+        and q.lead_id = quote_record.lead_id
+        and q.id <> quote_record.id
+        and q.status = 'pending'
+      returning q.id
+    )
+    select coalesce(array_agg(id), array[]::uuid[])
+    into superseded_quote_ids
+    from superseded_quotes;
+
     next_title := 'Iniciar tratamiento';
     next_type := 'treatment_start';
     next_due_at := app_private.tomorrow_at_asuncion(9);
   else
-    next_title := 'Definir próximo paso tras rechazo';
-    next_type := 'decision_followup';
-    next_due_at := app_private.tomorrow_at_asuncion(9);
+    select q.* into remaining_quote
+    from public.quotes q
+    where q.clinic_id = quote_record.clinic_id
+      and q.lead_id = quote_record.lead_id
+      and q.id <> quote_record.id
+      and q.status = 'pending'
+    order by q.next_action_at asc nulls last, q.issued_at desc
+    limit 1
+    for update;
+
+    if found then
+      next_title := 'Dar seguimiento al presupuesto';
+      next_type := 'quote_followup';
+      next_due_at := coalesce(remaining_quote.next_action_at, app_private.tomorrow_at_asuncion(9));
+    else
+      next_title := 'Definir próximo paso tras rechazo';
+      next_type := 'decision_followup';
+      next_due_at := app_private.tomorrow_at_asuncion(9);
+    end if;
   end if;
 
   update public.quotes
@@ -1916,7 +2045,7 @@ begin
     clinic_id, lead_id, quote_id, title, description, type, priority,
     status, due_at, assigned_to, created_by
   ) values (
-    quote_record.clinic_id, quote_record.lead_id, quote_record.id,
+    quote_record.clinic_id, quote_record.lead_id, coalesce(remaining_quote.id, quote_record.id),
     next_title, next_title, next_type, 'alta', 'pendiente', next_due_at,
     assigned_user_id, current_user_id
   )
@@ -1954,7 +2083,9 @@ begin
       'amount', quote_record.amount,
       'currency', quote_record.currency,
       'rejection_reason', normalized_reason,
-      'cancelled_task_ids', to_jsonb(cancelled_task_ids)
+      'cancelled_task_ids', to_jsonb(cancelled_task_ids),
+      'superseded_quote_ids', to_jsonb(superseded_quote_ids),
+      'remaining_quote_id', remaining_quote.id
     ),
     current_user_id
   );
@@ -1964,7 +2095,12 @@ begin
     quote_record.clinic_id, current_user_id,
     case when normalized_status = 'accepted' then 'quote_accepted' else 'quote_rejected' end,
     'quotes', quote_record.id,
-    jsonb_build_object('lead_id', quote_record.lead_id, 'status', normalized_status)
+    jsonb_build_object(
+      'lead_id', quote_record.lead_id,
+      'status', normalized_status,
+      'superseded_quote_ids', to_jsonb(superseded_quote_ids),
+      'remaining_quote_id', remaining_quote.id
+    )
   );
 
   return quote_record;

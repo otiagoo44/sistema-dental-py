@@ -1,5 +1,5 @@
 import { BarChart3, CalendarDays, CheckSquare2, Gauge, ListTodo, LogOut, Settings, Users } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { NAV_ITEMS } from '../lib/constants';
 
 const icons = {
@@ -35,6 +35,7 @@ function NavButton({ item, activeView, count, onSelect, compact = false }) {
 }
 
 export default function AppLayout({ activeView, setActiveView, clinic, profile, isAdmin = false, navCounts = {}, onLogout, children }) {
+  const reduceMotion = useReducedMotion();
   const roleLabel = (item) => ({ ...item, label: isAdmin && item.adminLabel ? item.adminLabel : item.label });
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.hiddenFromMain && (!item.adminOnly || isAdmin)).map(roleLabel);
   const activeItemRaw = NAV_ITEMS.find((item) => item.id === activeView) || (activeView === 'lead-detail' ? NAV_ITEMS.find((item) => item.id === 'leads') : null);
@@ -100,10 +101,10 @@ export default function AppLayout({ activeView, setActiveView, clinic, profile, 
           <motion.main
             key={activeView}
             className="safe-bottom mx-auto w-full max-w-[1600px] p-4 pb-12 md:p-8"
-            initial={{ opacity: 0, y: 6 }}
+            initial={reduceMotion ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -3 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -3 }}
+            transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
             {children}
           </motion.main>

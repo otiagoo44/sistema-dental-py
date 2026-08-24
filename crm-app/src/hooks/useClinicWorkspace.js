@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { normalizeRole, ROLE } from '../lib/crmDomain';
 import { supabase } from '../lib/supabase';
+import { humanizeCrmError } from '../lib/errors';
 import {
   getClinic,
   getClinicWorkspace,
@@ -24,9 +25,19 @@ export default function useClinicWorkspace({ session, onError }) {
   const [publicFormConfig, setPublicFormConfig] = useState(null);
   const [clinicProfiles, setClinicProfiles] = useState([]);
   const [messageTemplates, setMessageTemplates] = useState([]);
+  const activeClinicRef = useRef(null);
+  const sessionGenerationRef = useRef(0);
+  const refreshInFlightRef = useRef(false);
+  const refreshQueuedRef = useRef(false);
+  const refreshTimerRef = useRef(null);
 
   useEffect(() => {
+    const generation = sessionGenerationRef.current + 1;
+    sessionGenerationRef.current = generation;
+
     if (!session?.user?.id) {
+      activeClinicRef.current = null;
+      refreshQueuedRef.current = false;
       setProfile(null);
       setClinic(null);
       setLeads([]);
@@ -44,39 +55,64 @@ export default function useClinicWorkspace({ session, onError }) {
       return;
     }
 
-    bootstrapUser(session.user.id);
+    // Never keep a previous user's clinic visible while a new session boots.
+    activeClinicRef.current = null;
+    refreshQueuedRef.current = false;
+    setProfile(null);
+    setClinic(null);
+    setLeads([]);
+    setAppointments([]);
+    setTasks([]);
+    setQuotes([]);
+    setWorkspaceEvents([]);
+    setClinicSettings(null);
+    setTreatmentPrices([]);
+    setLeadEvents([]);
+    setPublicFormConfig(null);
+    setClinicProfiles([]);
+    setMessageTemplates([]);
+    bootstrapUser(session.user.id, generation);
+    return () => {
+      if (sessionGenerationRef.current === generation) sessionGenerationRef.current += 1;
+      activeClinicRef.current = null;
+      refreshQueuedRef.current = false;
+    };
   }, [session?.user?.id]);
 
-  async function bootstrapUser(userId) {
+  async function bootstrapUser(userId, generation) {
     setBootLoading(true);
     onError('');
 
     const { data: profileData, error: profileError } = await getUserProfile(userId);
+    if (sessionGenerationRef.current !== generation) return;
     if (profileError) {
       console.error('Error loading user profile', profileError);
-      onError('No se pudo cargar el profile del usuario. Verifica public.profiles y las politicas RLS.');
+      onError('No pudimos cargar tu usuario. Intentá cerrar sesión y volver a entrar.');
       setBootLoading(false);
       return;
     }
 
     if (!profileData) {
-      onError('Tu usuario no tiene perfil asignado. Pedí al administrador que cree tu profile.');
+      onError('Tu usuario no tiene un perfil asignado. Pedí ayuda al administrador de la clínica.');
       setBootLoading(false);
       return;
     }
 
     const { data: clinicData, error: clinicError } = await getClinic(profileData.clinic_id);
+    if (sessionGenerationRef.current !== generation) return;
     if (clinicError) {
       console.error('Error loading clinic', clinicError);
-      onError('No se pudo cargar la clinica asociada al usuario.');
+      onError('No pudimos cargar la clínica. Intentá de nuevo.');
       setBootLoading(false);
       return;
     }
 
     const profileRole = normalizeRole(profileData.role);
+    activeClinicRef.current = profileData.clinic_id;
     setProfile({ ...profileData, raw_role: profileData.role, role: profileRole });
     setClinic(clinicData);
     await refreshClinicData(profileData.clinic_id);
+    if (sessionGenerationRef.current !== generation) return;
 
     if (profileRole === ROLE.admin) {
       await loadPublicFormConfig(profileData.clinic_id);
@@ -102,31 +138,48 @@ export default function useClinicWorkspace({ session, onError }) {
 
   const refreshClinicData = useCallback(async (clinicId = profile?.clinic_id) => {
     if (!clinicId) return false;
-
-    const { data, error } = await getClinicWorkspace(clinicId);
-    if (error) {
-      console.error('Error loading clinic data', error);
-      onError(error.message);
+    if (refreshInFlightRef.current) {
+      refreshQueuedRef.current = true;
       return false;
     }
 
-    setLeads(data.leads);
-    setAppointments(data.appointments);
-    setTasks(data.tasks);
-    setQuotes(data.quotes);
-    setWorkspaceEvents(data.events);
-    setClinicProfiles(data.profiles);
-    setClinicSettings(data.settings);
-    setTreatmentPrices(data.prices);
-    setMessageTemplates(data.messageTemplates);
-    return true;
-  }, [onError, profile?.clinic_id]);
+    refreshInFlightRef.current = true;
+    let shouldRefreshAgain = false;
 
-  const refreshTimerRef = useRef(null);
+    try {
+      const { data, error } = await getClinicWorkspace(clinicId);
+      if (activeClinicRef.current !== clinicId) return false;
+      if (error) {
+        console.error('Error loading clinic data', error);
+        onError('No pudimos actualizar la información. Intentá de nuevo.');
+        return false;
+      }
+
+      setLeads(data.leads);
+      setAppointments(data.appointments);
+      setTasks(data.tasks);
+      setQuotes(data.quotes);
+      setWorkspaceEvents(data.events);
+      setClinicProfiles(data.profiles);
+      setClinicSettings(data.settings);
+      setTreatmentPrices(data.prices);
+      setMessageTemplates(data.messageTemplates);
+      return true;
+    } finally {
+      refreshInFlightRef.current = false;
+      shouldRefreshAgain = refreshQueuedRef.current;
+      refreshQueuedRef.current = false;
+      const queuedClinicId = activeClinicRef.current;
+      if (shouldRefreshAgain && queuedClinicId) {
+        window.setTimeout(() => refreshClinicData(queuedClinicId), 0);
+      }
+    }
+  }, [onError, profile?.clinic_id]);
 
   useEffect(() => {
     const clinicId = profile?.clinic_id;
     if (!clinicId) return undefined;
+    let realtimeHealthy = false;
 
     const scheduleRefresh = () => {
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
@@ -142,16 +195,20 @@ export default function useClinicWorkspace({ session, onError }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `clinic_id=eq.${clinicId}` }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `clinic_id=eq.${clinicId}` }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes', filter: `clinic_id=eq.${clinicId}` }, scheduleRefresh)
-      .subscribe();
+      .subscribe((status) => {
+        realtimeHealthy = status === 'SUBSCRIBED';
+        if (realtimeHealthy) scheduleRefresh();
+      });
 
     const pollId = window.setInterval(() => {
-      if (document.visibilityState === 'visible') scheduleRefresh();
+      if (!realtimeHealthy && document.visibilityState === 'visible') scheduleRefresh();
     }, 25_000);
     const refreshVisible = () => {
       if (document.visibilityState === 'visible') scheduleRefresh();
     };
 
     window.addEventListener('focus', refreshVisible);
+    window.addEventListener('online', refreshVisible);
     document.addEventListener('visibilitychange', refreshVisible);
 
     return () => {
@@ -159,6 +216,7 @@ export default function useClinicWorkspace({ session, onError }) {
       refreshTimerRef.current = null;
       window.clearInterval(pollId);
       window.removeEventListener('focus', refreshVisible);
+      window.removeEventListener('online', refreshVisible);
       document.removeEventListener('visibilitychange', refreshVisible);
       supabase.removeChannel(channel);
     };
@@ -170,7 +228,7 @@ export default function useClinicWorkspace({ session, onError }) {
     const { data, error } = await getLeadEvents(profile.clinic_id, leadId);
     if (error) {
       console.error('Error loading lead events', error);
-      onError(error.message);
+      onError(humanizeCrmError(error, 'No pudimos cargar el historial. Intentá de nuevo.'));
       return false;
     }
 

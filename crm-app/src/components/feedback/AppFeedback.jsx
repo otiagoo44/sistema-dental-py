@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Ban, CheckCircle2, Loader2, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { createPortal } from 'react-dom';
 
 export function FullScreenLoader({ label }) {
@@ -31,6 +31,7 @@ export function PageSkeleton() {
 }
 
 export function Banner({ text, tone, onClose }) {
+  const reduceMotion = useReducedMotion();
   const styles = tone === 'danger' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700';
 
   useEffect(() => {
@@ -42,10 +43,10 @@ export function Banner({ text, tone, onClose }) {
   return createPortal(
     <motion.div
       className={`fixed left-4 right-4 top-4 z-[70] flex max-w-md items-center justify-between gap-4 rounded-2xl border p-4 text-sm font-medium shadow-xl sm:left-auto ${styles}`}
-      initial={{ opacity: 0, y: -10, scale: 0.98 }}
+      initial={reduceMotion ? false : { opacity: 0, y: -10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -8, scale: 0.98 }}
-      transition={{ duration: 0.18 }}
+      exit={reduceMotion ? undefined : { opacity: 0, y: -8, scale: 0.98 }}
+      transition={{ duration: reduceMotion ? 0 : 0.18 }}
       role={tone === 'danger' ? 'alert' : 'status'}
     >
       <span className="flex items-center gap-2">{tone === 'danger' ? <Ban className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}{text}</span>

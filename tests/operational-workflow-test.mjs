@@ -75,6 +75,67 @@ const oneCardQueue = buildNextActionQueue({
 assert.equal(oneCardQueue.length, 1);
 assert.equal(oneCardQueue[0].lead.id, baseLead.id);
 
+const overdueBeatsFutureAppointment = getEffectiveNextAction(baseLead, {
+  now,
+  tasks: [{ id: 'task-overdue-2', lead_id: baseLead.id, title: 'Seguimiento vencido', status: 'pendiente', due_at: '2026-08-24T14:00:00.000Z' }],
+  appointments: [{ id: 'appointment-later', lead_id: baseLead.id, status: 'Agendado', appointment_date: '2026-08-27', appointment_time: '15:00:00' }],
+});
+assert.equal(overdueBeatsFutureAppointment.taskId, 'task-overdue-2');
+
+const noShowBeatsQuote = getEffectiveNextAction({ ...baseLead, status: 'No Asistió' }, {
+  now,
+  appointments: [{ id: 'appointment-no-show-2', lead_id: baseLead.id, status: 'No Asistió', appointment_date: '2026-08-23', appointment_time: '10:00:00' }],
+  quotes: [{ id: 'quote-pending', lead_id: baseLead.id, status: 'pending', next_action_at: '2026-08-24T14:00:00.000Z' }],
+});
+assert.equal(noShowBeatsQuote.actionType, 'no_show_recovery');
+assert.equal(noShowBeatsQuote.quoteId, null);
+
+const quoteAndTaskBecomeOneAction = getEffectiveNextAction(baseLead, {
+  now,
+  tasks: [{ id: 'quote-task', lead_id: baseLead.id, quote_id: 'quote-1', type: 'quote_followup', title: 'Dar seguimiento al presupuesto', status: 'pendiente', due_at: '2026-08-24T14:00:00.000Z' }],
+  quotes: [{ id: 'quote-1', lead_id: baseLead.id, status: 'pending', next_action_at: '2026-08-24T14:00:00.000Z' }],
+});
+assert.equal(quoteAndTaskBecomeOneAction.actionType, 'quote_followup');
+assert.equal(quoteAndTaskBecomeOneAction.taskId, 'quote-task');
+assert.equal(quoteAndTaskBecomeOneAction.quoteId, 'quote-1');
+
+const todayAppointmentBeatsGenericOverdue = getEffectiveNextAction(baseLead, {
+  now,
+  tasks: [{ id: 'generic-overdue', lead_id: baseLead.id, title: 'Revisar nota', status: 'pendiente', due_at: '2026-08-24T14:00:00.000Z' }],
+  appointments: [{ id: 'appointment-in-two-hours', lead_id: baseLead.id, status: 'Agendado', appointment_date: '2026-08-24', appointment_time: '13:00:00' }],
+});
+assert.equal(todayAppointmentBeatsGenericOverdue.actionType, 'confirm_appointment');
+
+const unassignedBeatsAppointment = getEffectiveNextAction({ ...baseLead, assigned_to: null }, {
+  now,
+  appointments: [{ id: 'appointment-unassigned', lead_id: baseLead.id, status: 'Agendado', appointment_date: '2026-08-24', appointment_time: '13:00:00' }],
+});
+assert.equal(unassignedBeatsAppointment.actionType, 'assign_owner');
+
+const earliestOpenTask = getEffectiveNextAction(baseLead, {
+  now,
+  tasks: [
+    { id: 'task-later', lead_id: baseLead.id, title: 'Después', status: 'pendiente', due_at: '2026-08-26T15:00:00.000Z' },
+    { id: 'task-earlier', lead_id: baseLead.id, title: 'Antes', status: 'vencido', due_at: '2026-08-23T15:00:00.000Z' },
+    { id: 'task-cancelled', lead_id: baseLead.id, title: 'Cancelada', status: 'cancelado', due_at: '2026-08-20T15:00:00.000Z' },
+    { id: 'task-completed', lead_id: baseLead.id, title: 'Hecha', status: 'hecho', due_at: '2026-08-19T15:00:00.000Z' },
+  ],
+});
+assert.equal(earliestOpenTask.taskId, 'task-earlier');
+
+const duplicateLeadRows = buildNextActionQueue({
+  now,
+  leads: [baseLead, { ...baseLead, name: 'Laura actualizada' }],
+  tasks: [{ id: 'dedupe-task', lead_id: baseLead.id, title: 'Única acción', status: 'pendiente', due_at: '2026-08-24T14:00:00.000Z' }],
+});
+assert.equal(duplicateLeadRows.length, 1);
+assert.equal(duplicateLeadRows[0].lead.name, 'Laura actualizada');
+
+assert.equal(getEffectiveNextAction({ ...baseLead, status: 'Archivado', is_archived: true }, {
+  now,
+  tasks: [{ id: 'orphan-terminal-task', lead_id: baseLead.id, title: 'No mostrar', status: 'pendiente', due_at: '2026-08-24T14:00:00.000Z' }],
+}), null);
+
 assert.equal(normalizeLeadStatus('AsistiÃ³'), 'Asistió');
 assert.equal(normalizeAppointmentStatus('Consulta Agendada'), APPOINTMENT_STATUS.scheduled);
 assert.equal(normalizeTaskStatus('Vencida'), 'overdue');

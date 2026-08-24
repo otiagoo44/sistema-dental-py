@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toDatetimeLocalAsuncion } from '../../lib/formatters';
+import { humanizeCrmError } from '../../lib/errors';
 import { Select, Field, TextArea } from '../crm/CrmPrimitives';
 import { ModalHeader, ModalActions } from './ModalParts';
 import ModalShell from '../ui/ModalShell';
@@ -40,7 +41,7 @@ export default function TaskFormModal({ mode, task, initialLeadId, leads, saving
     try {
       await onSubmit(form);
     } catch (submitError) {
-      setFormError(submitError.message || 'No se pudo guardar la tarea.');
+      setFormError(humanizeCrmError(submitError, 'No se pudo guardar la tarea. Intentá de nuevo.'));
     }
   }
 
@@ -49,6 +50,7 @@ export default function TaskFormModal({ mode, task, initialLeadId, leads, saving
       className="max-w-2xl p-5"
       overlayClassName="sm:items-center"
       onClose={onClose}
+      closeDisabled={saving}
       titleId="task-form-title"
       onSubmit={(event) => {
         event.preventDefault();

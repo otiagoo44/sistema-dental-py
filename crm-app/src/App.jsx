@@ -11,6 +11,7 @@ import {
   tomorrowFollowupAsuncion,
 } from './lib/formatters';
 import { supabase } from './lib/supabase';
+import { humanizeCrmError } from './lib/errors';
 import useSupabaseSession from './hooks/useSupabaseSession';
 import useClinicWorkspace from './hooks/useClinicWorkspace';
 
@@ -195,7 +196,7 @@ export default function App() {
         p_followup_at: null,
       });
       if (treatmentError) {
-        setError(treatmentError.message || 'No se pudo registrar el inicio del tratamiento.');
+        setError(humanizeCrmError(treatmentError, 'No se pudo registrar el inicio del tratamiento. Intentá de nuevo.'));
         return;
       }
       await refreshClinicData();
@@ -220,7 +221,7 @@ export default function App() {
           .update({ notes: cleanOptionalText(patch.notes) })
           .eq('id', leadId)
           .eq('clinic_id', profile.clinic_id);
-        if (notesError) setError(`El flujo se guardó, pero no se pudo actualizar la nota: ${notesError.message}`);
+        if (notesError) setError(humanizeCrmError(notesError, 'El flujo se guardó, pero no se pudo actualizar la nota.'));
       }
       return;
     }
@@ -241,7 +242,7 @@ export default function App() {
 
     if (updateError) {
       console.error('Error updating lead', updateError);
-      setError(updateError.message);
+      setError(humanizeCrmError(updateError));
       return;
     }
 
@@ -259,7 +260,7 @@ export default function App() {
 
       if (eventError) {
         console.error('Error creating lead event', eventError);
-        eventErrorMessage = `El paciente se actualizó, pero no se pudo crear el evento: ${eventError.message}`;
+        eventErrorMessage = 'El paciente se actualizó, pero no pudimos registrar el cambio en su historial. Intentá de nuevo.';
       }
     }
 
@@ -270,7 +271,7 @@ export default function App() {
       );
 
       if (taskError) {
-        eventErrorMessage = eventErrorMessage || `El paciente se actualizó, pero no se pudo sincronizar la próxima acción: ${taskError.message}`;
+        eventErrorMessage = eventErrorMessage || 'El paciente se actualizó, pero no pudimos sincronizar la próxima acción. Intentá de nuevo.';
       }
     }
 
@@ -385,7 +386,7 @@ export default function App() {
 
     if (followupError) {
       console.error('Error saving lead follow-up', followupError);
-      setError(followupError.message || 'No se pudo guardar el seguimiento.');
+      setError(humanizeCrmError(followupError, 'No se pudo guardar el seguimiento. Intentá de nuevo.'));
       return false;
     }
 
@@ -410,7 +411,7 @@ export default function App() {
 
     if (contactError) {
       console.error('Error marking lead contacted', contactError);
-      setError(contactError.message || 'No se pudo registrar el contacto.');
+      setError(humanizeCrmError(contactError, 'No se pudo registrar el contacto. Intentá de nuevo.'));
       return false;
     }
 
@@ -506,7 +507,7 @@ export default function App() {
       });
 
       if (insertError) {
-        throw new Error(insertError.message);
+        throw new Error(humanizeCrmError(insertError));
       }
 
       const createdLead = Array.isArray(data) ? data[0] : data;
@@ -574,7 +575,7 @@ export default function App() {
             .eq('clinic_id', profile.clinic_id);
 
           if (updateError) {
-            throw new Error(updateError.message);
+            throw new Error(humanizeCrmError(updateError));
           }
 
           await createLeadEvent(lead.id, {
@@ -587,7 +588,7 @@ export default function App() {
               p_lead_id: lead.id,
               p_assigned_to: requestedAssignee,
             });
-            if (reassignmentError) throw new Error(reassignmentError.message);
+            if (reassignmentError) throw new Error(humanizeCrmError(reassignmentError));
           }
           await refreshClinicData();
         } finally {
@@ -609,13 +610,13 @@ export default function App() {
           p_note: cleanOptionalText(patch.notes),
           p_followup_at: null,
         });
-        if (treatmentError) throw new Error(treatmentError.message);
+        if (treatmentError) throw new Error(humanizeCrmError(treatmentError));
         if (assignmentChanged) {
           const { error: reassignmentError } = await supabase.rpc('reassign_lead_owner', {
             p_lead_id: lead.id,
             p_assigned_to: requestedAssignee,
           });
-          if (reassignmentError) throw new Error(reassignmentError.message);
+          if (reassignmentError) throw new Error(humanizeCrmError(reassignmentError));
         }
         await refreshClinicData();
         if (selectedLeadId === lead.id) await loadLeadEvents(lead.id);
@@ -648,7 +649,7 @@ export default function App() {
             .update({ notes: patch.notes })
             .eq('id', lead.id)
             .eq('clinic_id', profile.clinic_id);
-          if (notesError) throw new Error(notesError.message);
+          if (notesError) throw new Error(humanizeCrmError(notesError));
           await refreshClinicData();
         }
         setLeadModal(null);
@@ -671,7 +672,7 @@ export default function App() {
         .eq('clinic_id', profile.clinic_id);
 
       if (updateError) {
-        throw new Error(updateError.message);
+        throw new Error(humanizeCrmError(updateError));
       }
 
       if (assignmentChanged) {
@@ -679,7 +680,7 @@ export default function App() {
           p_lead_id: lead.id,
           p_assigned_to: requestedAssignee,
         });
-        if (reassignmentError) throw new Error(reassignmentError.message);
+        if (reassignmentError) throw new Error(humanizeCrmError(reassignmentError));
       }
 
       const { error: eventError } = await createLeadEvent(lead.id, {
@@ -699,12 +700,12 @@ export default function App() {
       setLeadModal(null);
 
       if (eventError) {
-        setError(`El paciente fue actualizado, pero no se pudo registrar el evento: ${eventError.message}`);
+        setError(humanizeCrmError(eventError, 'El paciente fue actualizado, pero no se pudo registrar el evento.'));
         return;
       }
 
       if (taskError) {
-        setError(`El paciente fue actualizado, pero no se pudo sincronizar la próxima acción: ${taskError.message}`);
+        setError(humanizeCrmError(taskError, 'El paciente fue actualizado, pero no se pudo sincronizar la próxima acción.'));
         return;
       }
 
@@ -731,7 +732,7 @@ export default function App() {
       });
 
       if (archiveError) {
-        throw new Error(archiveError.message);
+        throw new Error(humanizeCrmError(archiveError));
       }
 
       await refreshClinicData();
@@ -800,7 +801,7 @@ export default function App() {
           : await supabase.from('tasks').insert(payload);
 
       if (result.error) {
-        throw new Error(result.error.message);
+        throw new Error(humanizeCrmError(result.error));
       }
 
       await refreshClinicData();
@@ -848,7 +849,7 @@ export default function App() {
         : await supabase.from('clinic_public_forms').insert(payload).select('*').single();
 
       if (result.error) {
-        throw new Error(result.error.message);
+        throw new Error(humanizeCrmError(result.error));
       }
 
       setPublicFormConfig(result.data || null);
@@ -886,7 +887,7 @@ export default function App() {
       if (scheduleError) {
         const message = /ocupado|unique|appointments_active_slot/i.test(scheduleError.message || '')
           ? 'Ese horario ya está ocupado para este doctor.'
-          : scheduleError.message;
+          : humanizeCrmError(scheduleError, 'No se pudo guardar la consulta. Intentá de nuevo.');
         throw new Error(message || 'No se pudo guardar la consulta.');
       }
 
@@ -898,7 +899,7 @@ export default function App() {
       setAppointmentModal(null);
       setNotice(isReschedule ? 'Consulta reprogramada.' : 'Consulta agendada.');
     } catch (scheduleError) {
-      setError(scheduleError.message);
+      setError(humanizeCrmError(scheduleError, 'No se pudo guardar la consulta. Intentá de nuevo.'));
       throw scheduleError;
     } finally {
       setAppointmentSaving(false);
@@ -936,27 +937,28 @@ export default function App() {
     setAppointmentActionId(`${appointment.id}:${action}`);
     setError('');
     setNotice('');
+    try {
+      const { error: outcomeError } = await supabase.rpc('update_appointment_outcome', {
+        p_appointment_id: appointment.id,
+        p_outcome: config.outcome,
+      });
 
-    const { error: outcomeError } = await supabase.rpc('update_appointment_outcome', {
-      p_appointment_id: appointment.id,
-      p_outcome: config.outcome,
-    });
+      if (outcomeError) throw outcomeError;
 
-    if (outcomeError) {
+      await refreshClinicData();
+      if (selectedLeadId === appointment.lead_id) {
+        await loadLeadEvents(appointment.lead_id);
+      }
+
+      setNotice(config.notice);
+      return true;
+    } catch (outcomeError) {
       console.error('Error updating appointment outcome', outcomeError);
-      setError(outcomeError.message || 'No se pudo actualizar el resultado del turno.');
-      setAppointmentActionId('');
+      setError(humanizeCrmError(outcomeError, 'No se pudo actualizar el resultado del turno. Intentá de nuevo.'));
       return false;
+    } finally {
+      setAppointmentActionId('');
     }
-
-    await refreshClinicData();
-    if (selectedLeadId === appointment.lead_id) {
-      await loadLeadEvents(appointment.lead_id);
-    }
-
-    setAppointmentActionId('');
-    setNotice(config.notice);
-    return true;
   }
 
   async function confirmAppointmentById(appointmentId) {
@@ -1011,7 +1013,7 @@ export default function App() {
             p_notes: cleanOptionalText(form.notes),
           });
       const { error: quoteError } = await request;
-      if (quoteError) throw new Error(quoteError.message);
+      if (quoteError) throw new Error(humanizeCrmError(quoteError, 'No se pudo guardar el presupuesto. Intentá de nuevo.'));
       await refreshClinicData();
       if (selectedLeadId === context.lead.id) await loadLeadEvents(context.lead.id);
       setQuoteModal(null);
@@ -1041,7 +1043,7 @@ export default function App() {
 
     if (taskError) {
       console.error('Error completing task', taskError);
-      setError(taskError.message);
+      setError(humanizeCrmError(taskError, 'No se pudo completar la acción. Intentá de nuevo.'));
       return;
     }
 
@@ -1161,7 +1163,8 @@ export default function App() {
       setNotice(notices[outcome] || 'Resultado registrado.');
     } catch (outcomeError) {
       console.error('Error saving contact outcome', outcomeError);
-      setError(outcomeError.message || 'No se pudo guardar el resultado del contacto.');
+      setError(humanizeCrmError(outcomeError, 'No se pudo guardar el resultado. Intentá de nuevo.'));
+      throw outcomeError;
     } finally {
       setContactOutcomeSaving(false);
     }
@@ -1326,6 +1329,9 @@ export default function App() {
           onNavigate={setActiveView}
           onRegisterQuote={openQuoteModal}
           onRegisterOutcome={openRegisterOutcome}
+          onWhatsAppOpened={handleWhatsAppOpened}
+          messageTemplates={messageTemplates}
+          clinicContext={clinicContext}
         />
       ) : null}
       {activeView === 'tasks' ? (

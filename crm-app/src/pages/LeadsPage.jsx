@@ -27,13 +27,13 @@ export default function LeadsView({ leads, tasks, appointments, quotes = [], can
     const rows = leads.filter((lead) => {
       if ((!canAdmin || !filters.showArchived) && isArchivedLead(lead)) return false;
       if (filters.status && lead.status !== filters.status) return false;
-      if (filters.classification && lead.classification !== filters.classification) return false;
-      if (filters.priority && getLeadPriority(lead, { tasks, appointments }).level !== filters.priority) return false;
+      if (canAdmin && filters.classification && lead.classification !== filters.classification) return false;
+      if (canAdmin && filters.priority && getLeadPriority(lead, { tasks, appointments }).level !== filters.priority) return false;
       if (filters.treatment && lead.treatment !== filters.treatment) return false;
       if (filters.source && lead.source !== filters.source) return false;
       if (filters.assigned && lead.assigned_to !== filters.assigned) return false;
       if (filters.uncontacted && (lead.last_contact_at || !['Nuevo', 'No Contactado'].includes(lead.status))) return false;
-      if (filters.hotOnly && lead.classification !== 'Lead Caliente') return false;
+      if (canAdmin && filters.hotOnly && lead.classification !== 'Lead Caliente') return false;
       if (filters.unassignedOnly && lead.assigned_to) return false;
       if (filters.date === 'today' && toLocalIsoDate(lead.created_at) !== today) return false;
       if (filters.date === '7d' && new Date(lead.created_at).getTime() < now - 7 * 86400000) return false;
@@ -42,7 +42,7 @@ export default function LeadsView({ leads, tasks, appointments, quotes = [], can
     });
 
     return rows.sort((a, b) => {
-      if (filters.sort === 'hot') return CLASSIFICATIONS.indexOf(a.classification) - CLASSIFICATIONS.indexOf(b.classification) || new Date(b.created_at) - new Date(a.created_at);
+      if (canAdmin && filters.sort === 'hot') return CLASSIFICATIONS.indexOf(a.classification) - CLASSIFICATIONS.indexOf(b.classification) || new Date(b.created_at) - new Date(a.created_at);
       if (filters.sort === 'followup') return new Date(a.next_followup_at || 8640000000000000) - new Date(b.next_followup_at || 8640000000000000);
       if (filters.sort === 'overdue') return Number(Boolean(b.next_followup_at && new Date(b.next_followup_at).getTime() < now)) - Number(Boolean(a.next_followup_at && new Date(a.next_followup_at).getTime() < now));
       return new Date(b.created_at) - new Date(a.created_at);
@@ -51,7 +51,7 @@ export default function LeadsView({ leads, tasks, appointments, quotes = [], can
 
   return (
     <section className="space-y-6">
-      <PageHeader eyebrow="Oportunidades" title="Pacientes" subtitle="Encontrá rápidamente qué necesita cada persona y cuál es el próximo paso." action={<Button type="button" onClick={onCreateLead}><FilePlus className="h-4 w-4" />Nueva consulta</Button>} />
+      <PageHeader eyebrow="Directorio" title="Pacientes" subtitle="Encontrá rápidamente qué necesita cada persona y cuál es el próximo paso." action={<Button type="button" onClick={onCreateLead}><FilePlus className="h-4 w-4" />Nueva consulta</Button>} />
       <FilterPanel
         title="Buscar pacientes"
         description="Búsqueda, estado y tratamiento quedan visibles. El resto está en Más filtros."
@@ -70,8 +70,8 @@ export default function LeadsView({ leads, tasks, appointments, quotes = [], can
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Select label="Clasificación" value={filters.classification} onChange={(value) => setFilters({ ...filters, classification: value })} options={CLASSIFICATIONS} placeholder="Todas" />
-          <Select label="Prioridad interna" value={filters.priority} onChange={(value) => setFilters({ ...filters, priority: value })} options={PRIORITY_FILTERS} placeholder="Todas" />
+          {canAdmin ? <Select label="Clasificación interna" value={filters.classification} onChange={(value) => setFilters({ ...filters, classification: value })} options={CLASSIFICATIONS} placeholder="Todas" /> : null}
+          {canAdmin ? <Select label="Prioridad interna" value={filters.priority} onChange={(value) => setFilters({ ...filters, priority: value })} options={PRIORITY_FILTERS} placeholder="Todas" /> : null}
           <Select label="Fuente" value={filters.source} onChange={(value) => setFilters({ ...filters, source: value })} options={sourceOptions} placeholder="Todas" />
           <Select label="Encargado" value={filters.assigned} onChange={(value) => setFilters({ ...filters, assigned: value })} options={(profiles || []).map((profile) => ({ value: profile.id, label: profile.full_name }))} placeholder="Todos" />
           <Select label="Fecha de ingreso" value={filters.date} onChange={(value) => setFilters({ ...filters, date: value })} options={[{ value: 'today', label: 'Hoy' }, { value: '7d', label: 'Últimos 7 días' }, { value: 'month', label: 'Este mes' }]} placeholder="Cualquier fecha" />
@@ -79,14 +79,14 @@ export default function LeadsView({ leads, tasks, appointments, quotes = [], can
         <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
             <QuickFilter active={filters.uncontacted} onClick={() => setFilters({ ...filters, uncontacted: !filters.uncontacted })}>Sólo sin contactar</QuickFilter>
-            <QuickFilter active={filters.hotOnly} onClick={() => setFilters({ ...filters, hotOnly: !filters.hotOnly })}><Flame className="h-3.5 w-3.5" />Sólo calientes</QuickFilter>
+            {canAdmin ? <QuickFilter active={filters.hotOnly} onClick={() => setFilters({ ...filters, hotOnly: !filters.hotOnly })}><Flame className="h-3.5 w-3.5" />Sólo calientes</QuickFilter> : null}
             <QuickFilter active={filters.unassignedOnly} onClick={() => setFilters({ ...filters, unassignedOnly: !filters.unassignedOnly })}>Sin encargado</QuickFilter>
             {canAdmin ? <QuickFilter active={filters.showArchived} onClick={() => setFilters({ ...filters, showArchived: !filters.showArchived })}><Archive className="h-3.5 w-3.5" />Archivados</QuickFilter> : null}
           </div>
           <div className="flex items-center gap-2">
             <ArrowDownUp className="h-4 w-4 text-slate-400" />
             <select className="min-h-10 rounded-xl border border-slate-200 bg-input px-3 text-sm font-medium text-textSoft outline-none focus:border-mint" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })}>
-              <option value="recent">Más recientes</option><option value="hot">Más calientes</option><option value="followup">Seguimiento más próximo</option><option value="overdue">Más atrasados</option>
+              <option value="recent">Más recientes</option>{canAdmin ? <option value="hot">Más calientes</option> : null}<option value="followup">Próxima acción</option><option value="overdue">Más atrasados</option>
             </select>
             <span className="text-xs font-semibold text-slate-500">{filteredLeads.length} resultados</span>
           </div>
@@ -107,7 +107,7 @@ export default function LeadsView({ leads, tasks, appointments, quotes = [], can
                     <h3 className="truncate text-lg font-bold text-cream">{lead.name}</h3>
                     <p className="mt-1 flex items-center gap-2 text-sm text-slate-500"><Phone className="h-4 w-4 text-mint" />{lead.phone_plus || lead.phone || 'Sin teléfono'}</p>
                   </div>
-                  {quote ? <p className="text-base font-bold text-mint">{formatMoney(quote.amount)} · {quote.status === 'pending' ? 'Pendiente' : quote.status === 'accepted' ? 'Aceptado' : 'Rechazado'}</p> : null}
+                  {quote ? <p className="text-base font-bold text-mint">{formatMoney(quote.amount)} · {displayQuoteStatus(quote.status)}</p> : null}
                 </div>
                 <p className="mt-4 text-base font-semibold text-textSoft">{lead.treatment || 'Tratamiento por definir'}</p>
                 <div className="mt-4 rounded-xl border border-slate-200 bg-soft p-4">
@@ -131,6 +131,10 @@ export default function LeadsView({ leads, tasks, appointments, quotes = [], can
 
 function QuickFilter({ active, onClick, children }) {
   return <button className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition ${active ? 'border-mint/45 bg-mint/10 text-mint' : 'border-slate-200 bg-card text-textSoft hover:border-mint/30 hover:bg-elevated hover:text-cream'}`} type="button" onClick={onClick}>{children}</button>;
+}
+
+function displayQuoteStatus(status) {
+  return { pending: 'Pendiente', accepted: 'Aceptado', rejected: 'Rechazado', cancelled: 'Cancelado' }[status] || 'Sin estado';
 }
 
 export function LeadDetail({ lead, events, tasks, appointments, quotes = [], profiles, canAdmin, onBack, onEditLead, onArchiveLead, onScheduleAppointment, onRegisterOutcome, onRegisterQuote, onWhatsAppOpened, messageTemplates, clinicContext }) {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CalendarPlus, Save } from 'lucide-react';
 import { CLASSIFICATIONS, EVALUATION_OPTIONS, NEXT_ACTION_OPTIONS, SITUATION_OPTIONS, TREATMENT_OPTIONS, URGENCY_OPTIONS } from '../../lib/constants';
 import { addDaysAsuncion, formatDateTime, fromDatetimeLocalAsuncion, toDatetimeLocalAsuncion } from '../../lib/formatters';
+import { humanizeCrmError } from '../../lib/errors';
 import { MANUAL_LEAD_SOURCES, addHoursIso } from '../../lib/crmDomain';
 import { Select, Field, TextArea } from '../crm/CrmPrimitives';
 import { ModalHeader, ModalActions } from './ModalParts';
@@ -81,7 +82,7 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
     try {
       await onSubmit(form, { scheduleAfterSave });
     } catch (submitError) {
-      setFormError(submitError.message || 'No se pudo guardar la consulta.');
+      setFormError(humanizeCrmError(submitError, 'No se pudo guardar la consulta. Intentá de nuevo.'));
     }
   }
 
@@ -89,6 +90,7 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
     <ModalShell
       className="max-w-4xl p-4 sm:p-6"
       onClose={onClose}
+      closeDisabled={saving}
       titleId="lead-form-title"
       onSubmit={(event) => {
         event.preventDefault();
@@ -103,7 +105,7 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
           <div className="space-y-5">
             <FormSection number="1" title="Datos básicos" description="Sólo nombre y teléfono requieren escritura.">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <Field label="Nombre *" value={form.name} onChange={(value) => updateField('name', value)} disabled={saving} placeholder="Nombre y apellido" />
+                <Field label="Nombre *" value={form.name} onChange={(value) => updateField('name', value)} disabled={saving} placeholder="Nombre y apellido" data-autofocus />
                 <Field label="Teléfono *" value={form.phone} onChange={(value) => updateField('phone', value)} disabled={saving} placeholder="0981 000 000" />
                 {isCreate ? <Select label="Fuente *" value={form.source} onChange={(value) => updateField('source', value)} options={MANUAL_LEAD_SOURCES} disabled={saving} /> : <Field label="Teléfono internacional" value={form.phone_plus} onChange={(value) => updateField('phone_plus', value)} disabled={saving} />}
               </div>
@@ -121,7 +123,7 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
               </div>
             </FormSection>
 
-            <FormSection number="3" title="Seguimiento" description="Al guardar se genera o actualiza una tarea sin duplicados.">
+            <FormSection number="3" title="Próximo paso" description="Al guardar, el sistema prepara la primera acción sin duplicados.">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {canAdmin ? <label className="block">
                   <span className="mb-2 block text-sm font-semibold text-textMuted">Encargado</span>

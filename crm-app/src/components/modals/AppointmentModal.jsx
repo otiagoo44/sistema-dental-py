@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarCheck2 } from 'lucide-react';
 import { TREATMENT_OPTIONS } from '../../lib/constants';
 import { normalizeText, todayIsoDate, toLocalIsoDate } from '../../lib/formatters';
+import { humanizeCrmError } from '../../lib/errors';
 import { ROLE, LEAD_STATUS, APPOINTMENT_ACTIVE_STATUSES, uniqueStrings, startOfAsuncionDate } from '../../lib/crmDomain';
 import { Select } from '../crm/CrmPrimitives';
 import Button from '../ui/Button';
@@ -109,7 +110,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
         notes: form.notes.trim(),
       });
     } catch (submitError) {
-      setFormError(submitError.message || 'No se pudo guardar la consulta.');
+      setFormError(humanizeCrmError(submitError, 'No se pudo guardar la consulta. Intentá de nuevo.'));
     }
   }
 
@@ -117,6 +118,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
     <ModalShell
       className="max-w-4xl p-4 sm:p-6"
       onClose={onClose}
+      closeDisabled={saving}
       titleId="appointment-modal-title"
       onSubmit={(event) => {
         event.preventDefault();
@@ -145,7 +147,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
                 {dateOptions.map(({ iso, date }) => {
                   const selected = form.appointment_date === iso;
                   return (
-                    <button key={iso} className={`min-h-[74px] rounded-xl border px-2 py-2 text-center transition disabled:cursor-not-allowed disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500 ${selected ? 'border-mint bg-mint text-inverse shadow-sm' : 'border-slate-200 bg-card text-textSoft hover:border-mint/35 hover:bg-elevated'}`} type="button" onClick={() => { updateField('appointment_date', iso); updateField('appointment_time', ''); }} disabled={saving}>
+                    <button key={iso} className={`min-h-[74px] rounded-xl border px-2 py-2 text-center transition disabled:cursor-not-allowed disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500 ${selected ? 'border-mint bg-mint text-inverse shadow-sm' : 'border-slate-200 bg-card text-textSoft hover:border-mint/35 hover:bg-elevated'}`} type="button" onClick={() => { updateField('appointment_date', iso); updateField('appointment_time', ''); }} disabled={saving} data-autofocus={selected || undefined}>
                       <span className="block text-xs font-bold uppercase">{new Intl.DateTimeFormat('es-PY', { weekday: 'short', timeZone: 'America/Asuncion' }).format(date).replace('.', '')}</span>
                       <span className="mt-1 block text-lg font-bold">{new Intl.DateTimeFormat('es-PY', { day: '2-digit', timeZone: 'America/Asuncion' }).format(date)}</span>
                     </button>

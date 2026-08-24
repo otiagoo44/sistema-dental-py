@@ -1,0 +1,7 @@
+project_id = "sistema-dental-py"
+
+# The public form has no user session. lead-intake authenticates the request with
+# its clinic/form token and enforces origin, consent, rate limits and honeypot
+# checks before the service-role RPC. Keep this setting explicit on every deploy.
+[functions.lead-intake]
+verify_jwt = false

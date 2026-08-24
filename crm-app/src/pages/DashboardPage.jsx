@@ -21,7 +21,6 @@ function ReceptionHome({
   appointments,
   tasks,
   quotes = [],
-  profiles = [],
   onCreateLead,
   onOpenLead,
   onRegisterOutcome,
@@ -41,10 +40,6 @@ function ReceptionHome({
     [PRIORITY_GROUP.today]: queue.filter((item) => item.action.priorityGroup === PRIORITY_GROUP.today),
     [PRIORITY_GROUP.later]: queue.filter((item) => item.action.priorityGroup === PRIORITY_GROUP.later),
   }), [queue]);
-  const profileNames = useMemo(
-    () => Object.fromEntries(profiles.map((profile) => [profile.id, profile.full_name])),
-    [profiles],
-  );
   const newToday = leads.filter((lead) => toLocalIsoDate(lead.created_at) === today).length;
   const todayAppointments = appointments.filter((item) => item.appointment_date === today && APPOINTMENT_ACTIVE_STATUSES.includes(item.status)).length;
   const pendingToday = groups.now.length + groups.today.length;
@@ -79,7 +74,6 @@ function ReceptionHome({
           key={group}
           group={group}
           items={groups[group]}
-          profileNames={profileNames}
           quotes={quotes}
           onOpenLead={onOpenLead}
           onRegisterOutcome={onRegisterOutcome}
@@ -97,7 +91,6 @@ function ReceptionHome({
             group={PRIORITY_GROUP.later}
             items={groups.later}
             hideHeading
-            profileNames={profileNames}
             quotes={quotes}
             onOpenLead={onOpenLead}
             onRegisterOutcome={onRegisterOutcome}
@@ -112,7 +105,7 @@ function ReceptionHome({
   );
 }
 
-function ActionGroup({ group, items, hideHeading = false, profileNames, quotes, onOpenLead, onRegisterOutcome, onConfirmAppointment, onWhatsAppOpened, messageTemplates, clinicContext }) {
+function ActionGroup({ group, items, hideHeading = false, quotes, onOpenLead, onRegisterOutcome, onConfirmAppointment, onWhatsAppOpened, messageTemplates, clinicContext }) {
   return (
     <section className="space-y-3" aria-label={PRIORITY_GROUP_LABEL[group]}>
       {!hideHeading ? <h3 className={`text-sm font-black tracking-[0.14em] ${group === PRIORITY_GROUP.now ? 'text-danger' : 'text-mint'}`}>{PRIORITY_GROUP_LABEL[group]} · {items.length}</h3> : null}
@@ -126,9 +119,7 @@ function ActionGroup({ group, items, hideHeading = false, profileNames, quotes, 
                 <h4 className="text-lg font-bold text-cream hover:text-mint">{lead.name}</h4>
                 <p className="mt-1 text-base text-textSoft">{lead.treatment || 'Tratamiento por definir'}{quote ? ` · ${formatMoney(quote.amount)}` : ''}</p>
                 <p className="mt-3 text-base leading-6 text-cream">{action.reason}</p>
-                <p className="mt-2 text-sm text-textMuted">
-                  {action.dueAt ? formatDateTime(action.dueAt) : 'Sin fecha'} · Encargado: {profileNames[lead.assigned_to] || 'Sin asignar'}
-                </p>
+                {action.dueAt ? <p className="mt-2 text-sm font-semibold text-textMuted">{formatActionMoment(action.dueAt)}</p> : null}
               </button>
               <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
                 <WhatsAppButton lead={lead} task={task} action={action} templates={messageTemplates} clinicContext={clinicContext} onOpened={onWhatsAppOpened} />
@@ -144,4 +135,15 @@ function ActionGroup({ group, items, hideHeading = false, profileNames, quotes, 
       }) : <EmptyState title="Todo al día" text="No hay pacientes esperando en este grupo." />}
     </section>
   );
+}
+
+function formatActionMoment(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const minutes = Math.round((date.getTime() - Date.now()) / 60_000);
+  if (Math.abs(minutes) < 1) return 'Ahora';
+  if (Math.abs(minutes) < 60) return minutes < 0 ? `Hace ${Math.abs(minutes)} min` : `En ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (Math.abs(hours) < 24) return hours < 0 ? `Hace ${Math.abs(hours)} h` : `En ${hours} h`;
+  return formatDateTime(value);
 }

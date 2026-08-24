@@ -10,14 +10,20 @@ export default function ModalShell({
   onClose,
   titleId,
   descriptionId,
+  closeDisabled = false,
 }) {
   const dialogRef = useRef(null);
   const onCloseRef = useRef(onClose);
+  const closeDisabledRef = useRef(closeDisabled);
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
+
+  useEffect(() => {
+    closeDisabledRef.current = closeDisabled;
+  }, [closeDisabled]);
 
   useEffect(() => {
     const previousFocus = document.activeElement;
@@ -29,7 +35,7 @@ export default function ModalShell({
     (dialog.querySelector('[data-autofocus]') || focusable()[0] || dialog).focus();
 
     function handleKeyDown(event) {
-      if (event.key === 'Escape' && onCloseRef.current) {
+      if (event.key === 'Escape' && onCloseRef.current && !closeDisabledRef.current) {
         event.preventDefault();
         onCloseRef.current();
         return;

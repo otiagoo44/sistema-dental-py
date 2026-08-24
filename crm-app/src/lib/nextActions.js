@@ -156,7 +156,8 @@ export function getEffectiveNextAction(lead, context = {}) {
 
 export function buildNextActionQueue({ leads = [], tasks = [], appointments = [], quotes = [], now = new Date() }) {
   const groups = { now: 0, today: 1, later: 2 };
-  return leads.map((lead) => ({ lead, action: getEffectiveNextAction(lead, { tasks, appointments, quotes, now }) }))
+  const uniqueLeads = [...new Map(leads.filter((lead) => lead?.id).map((lead) => [lead.id, lead])).values()];
+  return uniqueLeads.map((lead) => ({ lead, action: getEffectiveNextAction(lead, { tasks, appointments, quotes, now }) }))
     .filter((item) => item.action)
     .sort((left, right) => groups[left.action.priorityGroup] - groups[right.action.priorityGroup]
       || (safeDate(left.action.dueAt)?.getTime() || Number.MAX_SAFE_INTEGER)

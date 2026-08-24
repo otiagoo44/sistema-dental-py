@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Ban, CalendarPlus, Check, Clock3, FileText, MessageCircleOff, Stethoscope, UserCheck } from 'lucide-react';
 import { addDaysAsuncion, toDatetimeLocalAsuncion, fromDatetimeLocalAsuncion } from '../../lib/formatters';
+import { humanizeCrmError } from '../../lib/errors';
 import ModalShell from '../ui/ModalShell';
 import Button from '../ui/Button';
 import { ModalHeader } from './ModalParts';
@@ -10,6 +11,7 @@ export default function ContactOutcomeModal({ context, saving, quotes = [], onCl
   const [note, setNote] = useState('');
   const [followupPreset, setFollowupPreset] = useState('tomorrow');
   const [customFollowup, setCustomFollowup] = useState(toDatetimeLocalAsuncion(addDaysAsuncion(1, 9)));
+  const [error, setError] = useState('');
   const lead = context?.lead;
   const pendingQuote = useMemo(() => context?.quote
     || quotes.find((quote) => quote.id === context?.action?.quoteId && quote.status === 'pending')
@@ -29,14 +31,30 @@ export default function ContactOutcomeModal({ context, saving, quotes = [], onCl
     return fromDatetimeLocalAsuncion(customFollowup);
   }
 
-  function submit(outcome, extra = {}) {
-    onSubmit({ outcome, note, followupAt: selectedFollowupAt(), quote: pendingQuote, ...extra });
+  async function submit(outcome, extra = {}) {
+    const followupAt = selectedFollowupAt();
+    if (outcome === 'quote_rejected' && !note.trim()) {
+      setError('Escribí el motivo del rechazo antes de continuar.');
+      return;
+    }
+    if (['no_response', 'follow_up', 'responded'].includes(outcome)
+      && (!followupAt || new Date(followupAt) <= new Date())) {
+      setError('Elegí una fecha futura para el próximo contacto.');
+      return;
+    }
+    setError('');
+    try {
+      await onSubmit({ outcome, note, followupAt, quote: pendingQuote, ...extra });
+    } catch (submitError) {
+      setError(humanizeCrmError(submitError, 'No pudimos guardar el cambio. Intentá de nuevo.'));
+    }
   }
 
   return (
-    <ModalShell className="max-w-2xl p-5 sm:p-6" onClose={onClose} titleId="contact-outcome-title" descriptionId="contact-outcome-description" onSubmit={(event) => event.preventDefault()}>
+    <ModalShell className="max-w-2xl p-5 sm:p-6" onClose={onClose} closeDisabled={saving} titleId="contact-outcome-title" descriptionId="contact-outcome-description" onSubmit={(event) => event.preventDefault()}>
       <ModalHeader title={`¿Qué pasó con ${lead.name}?`} subtitle="Elegí un resultado; el sistema actualizará el resto." onClose={onClose} disabled={saving} titleId="contact-outcome-title" />
-      <p id="contact-outcome-description" className="text-base leading-7 text-textMuted">No hace falta cambiar estados, completar tareas ni crear otro seguimiento.</p>
+      <p id="contact-outcome-description" className="text-base leading-7 text-textMuted">Registrá una sola vez lo que ocurrió; el sistema preparará el próximo paso.</p>
+      {error ? <div role="alert" aria-live="assertive" className="mt-4 rounded-xl border border-red-300/30 bg-red-400/10 p-3 text-sm text-red-200">{error}</div> : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {attendanceContext ? <OutcomeButton icon={UserCheck} label="Asistió" onClick={() => submit('attended')} disabled={saving} /> : null}
@@ -48,7 +66,7 @@ export default function ContactOutcomeModal({ context, saving, quotes = [], onCl
         {quoteRegistrationContext ? <OutcomeButton icon={FileText} label="Registrar presupuesto" onClick={() => submit('quote_pending')} disabled={saving} /> : null}
         {pendingQuote ? <OutcomeButton icon={Check} label="Aceptó el presupuesto" onClick={() => submit('quote_accepted')} disabled={saving} /> : null}
         {pendingQuote ? <OutcomeButton icon={Ban} label="Rechazó el presupuesto" onClick={() => submit('quote_rejected')} disabled={saving} /> : null}
-        {!pendingQuote || acceptedQuote ? <OutcomeButton icon={Stethoscope} label="Inició tratamiento" onClick={() => submit('treatment_started')} disabled={saving} /> : null}
+        {acceptedQuote ? <OutcomeButton icon={Stethoscope} label="Inició tratamiento" onClick={() => submit('treatment_started')} disabled={saving} /> : null}
         <OutcomeButton icon={Ban} label="No continuará" onClick={() => submit('no_continue')} disabled={saving} danger />
       </div>
 
@@ -71,5 +89,5 @@ export default function ContactOutcomeModal({ context, saving, quotes = [], onCl
 }
 
 function OutcomeButton({ icon: Icon, label, onClick, disabled, danger = false }) {
-  return <Button className="min-h-12 justify-start" variant={danger ? 'danger' : 'secondary'} type="button" onClick={onClick} disabled={disabled}><Icon className="h-5 w-5" />{label}</Button>;
+  return <Button className="min-h-12 justify-start" variant={danger ? 'danger' : 'secondary'} type="button" onClick={onClick} disabled={disabled} data-autofocus><Icon className="h-5 w-5" />{label}</Button>;
 }

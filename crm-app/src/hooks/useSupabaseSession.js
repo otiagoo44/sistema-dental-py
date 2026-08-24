@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { humanizeCrmError } from '../lib/errors';
 import { supabase } from '../lib/supabase';
 
 export default function useSupabaseSession() {
@@ -17,7 +18,7 @@ export default function useSupabaseSession() {
     supabase.auth.getSession().then(({ data, error: sessionError }) => {
       if (sessionError) {
         console.error('Error restoring Supabase session', sessionError);
-        if (active) setError(sessionError.message);
+        if (active) setError(humanizeCrmError(sessionError, 'No pudimos recuperar tu sesión. Volvé a ingresar.'));
       }
 
       if (active) {

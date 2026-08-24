@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Select, TextArea } from '../crm/CrmPrimitives';
 import { LOST_REASONS } from '../../lib/commercialInsights';
+import { humanizeCrmError } from '../../lib/errors';
 import { ModalHeader, ModalActions } from './ModalParts';
 import ModalShell from '../ui/ModalShell';
 
@@ -24,7 +25,7 @@ export default function ArchiveLeadModal({ lead, archive = false, saving, onClos
     try {
       await onSubmit(lead, { reason, note, archive });
     } catch (submitError) {
-      setFormError(submitError.message || 'No se pudo cerrar la oportunidad.');
+      setFormError(humanizeCrmError(submitError, 'No se pudo cerrar la oportunidad. Intentá de nuevo.'));
     }
   }
 
@@ -33,6 +34,7 @@ export default function ArchiveLeadModal({ lead, archive = false, saving, onClos
       className="max-w-xl p-5"
       overlayClassName="sm:items-center"
       onClose={onClose}
+      closeDisabled={saving}
       titleId="archive-lead-title"
       onSubmit={(event) => {
         event.preventDefault();

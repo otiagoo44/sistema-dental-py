@@ -23,7 +23,7 @@ export const NAV_ITEMS = [
   { id: 'followups', label: 'Seguimientos', description: 'Acciones pendientes para no perder oportunidades.', hiddenFromMain: true },
   { id: 'agenda', label: 'Agenda', description: 'Turnos, disponibilidad y asistencia.' },
   { id: 'tasks', label: 'Tareas', description: 'Trabajo operativo asignado a la clínica.', hiddenFromMain: true },
-  { id: 'metrics', label: 'Análisis', description: 'Análisis comercial secundario.', adminOnly: true },
+  { id: 'metrics', label: 'Análisis', description: 'Análisis comercial secundario.', adminOnly: true, hiddenFromMain: true },
   { id: 'settings', label: 'Configuración', description: 'Clínica, formulario público y accesos.', adminOnly: true },
 ];
 

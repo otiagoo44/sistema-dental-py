@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { PUBLIC_LEAD_WEBHOOK_URL, cleanOptionalText } from '../../lib/crmDomain';
+import { humanizeCrmError } from '../../lib/errors';
 import { Field, TextArea } from '../../components/crm/CrmPrimitives';
 
 export default function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
@@ -93,7 +94,7 @@ export default function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
         consentimiento_contacto: false,
       });
     } catch (submitError) {
-      setError(submitError.message || 'No se pudo enviar el formulario.');
+      setError(humanizeCrmError(submitError, 'No se pudo enviar el formulario. Intentá de nuevo.'));
     } finally {
       setSending(false);
     }

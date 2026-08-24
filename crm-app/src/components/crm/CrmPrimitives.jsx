@@ -28,11 +28,11 @@ export function Info({ label, value }) {
   );
 }
 
-export function Select({ label, value, onChange, options, placeholder, disabled = false, className = '' }) {
+export function Select({ label, value, onChange, options, placeholder, disabled = false, className = '', ...selectProps }) {
   return (
     <label className={`block ${className}`}>
       <span className="mb-2 block text-sm font-semibold text-textMuted">{label}</span>
-      <select className="input-premium" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+      <select className="input-premium" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} {...selectProps}>
         {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
         {(options || []).map((option) => {
           const optionValue = typeof option === 'object' ? option.value : option;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LockKeyhole, Mail } from 'lucide-react';
 import { hasSupabaseConfig, supabase } from '../lib/supabase';
+import { humanizeCrmError } from '../lib/errors';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -23,7 +24,7 @@ export default function Login() {
 
     if (signInError) {
       console.error('Supabase login error', signInError);
-      setError(signInError.message);
+      setError(humanizeCrmError(signInError, 'No pudimos iniciar sesión. Revisá tus datos e intentá de nuevo.'));
     }
 
     setLoading(false);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Clipboard, Eye, Loader2, RotateCcw, Save } from 'lucide-react';
 import { slugify, generatePublicToken, formatAllowedOrigins, publicFormPayloadExample, publicFormFetchSnippet, publicFormIframeSnippet } from '../lib/crmDomain';
 import { buildMessageFromTemplate, WHATSAPP_TEMPLATE_DEFINITIONS, WHATSAPP_VARIABLES } from '../lib/messages';
+import { humanizeCrmError } from '../lib/errors';
 import { Info, Field, TextArea } from '../components/crm/CrmPrimitives';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -89,7 +90,7 @@ function WhatsAppTemplatesSettings({ templates, saving, onSave, clinic, setNotic
         message: String(draft[definition.key] || '').trim(),
       })));
     } catch (saveError) {
-      setFormError(saveError.message || 'No se pudieron guardar las plantillas.');
+      setFormError(humanizeCrmError(saveError, 'No se pudieron guardar las plantillas. Intentá de nuevo.'));
     }
   }
 
@@ -125,7 +126,7 @@ function WhatsAppTemplatesSettings({ templates, saving, onSave, clinic, setNotic
         </div>
       </div>
 
-      {formError ? <div className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{formError}</div> : null}
+      {formError ? <div role="alert" aria-live="assertive" className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{formError}</div> : null}
 
       <div className="grid gap-5 xl:grid-cols-2">
         {WHATSAPP_TEMPLATE_DEFINITIONS.map((definition) => (
@@ -206,7 +207,7 @@ function PublicFormSettings({ clinic, config, saving, onSave, setNotice }) {
     try {
       await onSave(form);
     } catch (submitError) {
-      setFormError(submitError.message || 'No se pudo guardar la configuracion.');
+      setFormError(humanizeCrmError(submitError, 'No se pudo guardar la configuración. Intentá de nuevo.'));
     }
   }
 

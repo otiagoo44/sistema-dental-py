@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Ban, CalendarDays, CalendarPlus, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileText, Loader2, MessageCircle, RefreshCw, UserCheck } from 'lucide-react';
+import { Ban, CalendarDays, CalendarPlus, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileText, Loader2, RefreshCw, UserCheck } from 'lucide-react';
 import { formatDate, formatTime, fromDatetimeLocalAsuncion, todayIsoDate, toLocalIsoDate } from '../lib/formatters';
-import { buildWhatsappUrl } from '../lib/messages';
 import { APPOINTMENT_STATUS, APPOINTMENT_ACTIVE_STATUSES, canTransitionAppointment, normalizeAppointmentStatus, startOfAsuncionDate } from '../lib/crmDomain';
 import { Select } from '../components/crm/CrmPrimitives';
+import WhatsAppButton from '../components/crm/WhatsAppButton';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -15,7 +15,7 @@ function appointmentAt(appointment) {
   return fromDatetimeLocalAsuncion(`${appointment.appointment_date}T${String(appointment.appointment_time || '').slice(0, 5)}`);
 }
 
-export default function AgendaView({ appointments, quotes = [], actionId, onOutcome, onReschedule, onOpenLead, onNavigate, onRegisterQuote, onRegisterOutcome }) {
+export default function AgendaView({ appointments, quotes = [], actionId, onOutcome, onReschedule, onOpenLead, onNavigate, onRegisterQuote, onRegisterOutcome, onWhatsAppOpened, messageTemplates, clinicContext }) {
   const [selectedDate, setSelectedDate] = useState(todayIsoDate());
   const [calendarOffset, setCalendarOffset] = useState(0);
   const [mode, setMode] = useState('day');
@@ -45,7 +45,7 @@ export default function AgendaView({ appointments, quotes = [], actionId, onOutc
   return (
     <section className="space-y-6">
       <PageHeader eyebrow="Calendario operativo" title="Agenda" subtitle="Sólo aparecen acciones válidas para el momento y estado de cada cita." action={<Button type="button" onClick={() => onNavigate('leads')}><CalendarPlus className="h-4 w-4" />Agendar desde Pacientes</Button>} />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="hidden gap-4 sm:grid sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Citas en la vista" value={visibleAppointments.length} icon={CalendarDays} />
         <StatCard label="Confirmadas" value={normalizedVisible.filter((value) => value === APPOINTMENT_STATUS.confirmed).length} tone="success" icon={CheckCircle2} />
         <StatCard label="No asistieron" value={normalizedVisible.filter((value) => value === APPOINTMENT_STATUS.noShow).length} tone="danger" icon={Ban} />
@@ -53,7 +53,14 @@ export default function AgendaView({ appointments, quotes = [], actionId, onOutc
       </div>
 
       <Card className="p-4">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="sm:hidden">
+          <label className="block"><span className="mb-2 block text-sm font-semibold text-textMuted">Día</span><input className="input-premium" type="date" value={selectedDate} onChange={(event) => { setSelectedDate(event.target.value); setMode('day'); }} /></label>
+          <details className="mt-3 rounded-xl border border-slate-200 bg-soft p-3">
+            <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-textSoft">Filtrar por estado</summary>
+            <Select className="mt-3" label="Estado" value={status} onChange={setStatus} options={['Agendado', 'Confirmado', 'Asistió', 'No Asistió', 'Reprogramado', 'Cancelado']} placeholder="Todos" />
+          </details>
+        </div>
+        <div className="hidden flex-col gap-4 sm:flex xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0 flex-1">
             <div className="mb-3 flex items-center justify-between">
               <div><h3 className="font-bold text-cream">Semana visible</h3><p className="mt-1 text-sm text-textMuted">En móvil usá la lista del día; en pantallas grandes podés elegir la semana.</p></div>
@@ -63,8 +70,7 @@ export default function AgendaView({ appointments, quotes = [], actionId, onOutc
                 <button className="min-h-11 rounded-xl border border-slate-200 bg-card p-2 text-textSoft" type="button" onClick={() => setCalendarOffset((value) => value + 7)} aria-label="Semana siguiente"><ChevronRight className="h-4 w-4" /></button>
               </div>
             </div>
-            <label className="block sm:hidden"><span className="mb-2 block text-sm font-semibold text-textMuted">Día</span><input className="input-premium" type="date" value={selectedDate} onChange={(event) => { setSelectedDate(event.target.value); setMode('day'); }} /></label>
-            <div className="hidden grid-cols-7 gap-1.5 sm:grid">
+            <div className="grid grid-cols-7 gap-1.5">
               {calendarDays.map(({ iso, date }) => {
                 const count = appointments.filter((appointment) => appointment.appointment_date === iso && APPOINTMENT_ACTIVE_STATUSES.includes(normalizeAppointmentStatus(appointment.status))).length;
                 const selected = selectedDate === iso;
@@ -89,7 +95,7 @@ export default function AgendaView({ appointments, quotes = [], actionId, onOutc
         <section key={date} className="space-y-3">
           <div className="flex items-center gap-3"><h3 className="font-bold text-cream">{date === today ? `Hoy · ${formatDate(date)}` : formatDate(date)}</h3><span className="rounded-full bg-slate-200 px-2.5 py-1 text-sm font-bold text-slate-600">{dateAppointments.length}</span></div>
           <div className="grid gap-3">
-            {dateAppointments.map((appointment) => <AppointmentCard key={appointment.id} appointment={appointment} quotes={quotes} actionId={actionId} onOutcome={onOutcome} onReschedule={onReschedule} onOpenLead={onOpenLead} onRegisterQuote={onRegisterQuote} onRegisterOutcome={onRegisterOutcome} />)}
+            {dateAppointments.map((appointment) => <AppointmentCard key={appointment.id} appointment={appointment} quotes={quotes} actionId={actionId} onOutcome={onOutcome} onReschedule={onReschedule} onOpenLead={onOpenLead} onRegisterQuote={onRegisterQuote} onRegisterOutcome={onRegisterOutcome} onWhatsAppOpened={onWhatsAppOpened} messageTemplates={messageTemplates} clinicContext={clinicContext} />)}
           </div>
         </section>
       )) : <EmptyState title="No hay citas en esta vista" text="Cambiá el día o los filtros. Para crear una cita, abrí Pacientes y elegí Agendar." />}
@@ -97,7 +103,7 @@ export default function AgendaView({ appointments, quotes = [], actionId, onOutc
   );
 }
 
-function AppointmentCard({ appointment, quotes, actionId, onOutcome, onReschedule, onOpenLead, onRegisterQuote, onRegisterOutcome }) {
+function AppointmentCard({ appointment, quotes, actionId, onOutcome, onReschedule, onOpenLead, onRegisterQuote, onRegisterOutcome, onWhatsAppOpened, messageTemplates, clinicContext }) {
   const lead = appointment.leads || {};
   const status = normalizeAppointmentStatus(appointment.status);
   const dateTime = appointmentAt(appointment);
@@ -111,6 +117,8 @@ function AppointmentCard({ appointment, quotes, actionId, onOutcome, onReschedul
   const canCancel = canTransitionAppointment(status, APPOINTMENT_STATUS.cancelled, dateTime, now);
   const quote = quotes.find((item) => item.appointment_id === appointment.id) || null;
   const operationalLead = { ...lead, id: lead.id || appointment.lead_id };
+  const showWhatsApp = status === APPOINTMENT_STATUS.noShow
+    || (APPOINTMENT_ACTIVE_STATUSES.includes(status) && !isPast);
 
   return (
     <Card as="article" className="card-enter p-4">
@@ -122,12 +130,12 @@ function AppointmentCard({ appointment, quotes, actionId, onOutcome, onReschedul
           <div className="mt-2 flex flex-wrap items-center gap-2"><StatusBadge value={status} />{quote ? <span className="text-sm font-semibold text-mint">Presupuesto registrado</span> : null}</div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {status !== APPOINTMENT_STATUS.attended ? <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-mint/70 bg-mint px-4 py-2 text-sm font-bold text-inverse" href={buildWhatsappUrl(lead)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a> : null}
+          {showWhatsApp ? <WhatsAppButton lead={operationalLead} templates={messageTemplates} clinicContext={clinicContext} onOpened={onWhatsAppOpened} /> : null}
           {canConfirm ? <AgendaActionButton icon={Check} label="Confirmar" loading={actionId === `${appointment.id}:confirm`} disabled={isBusy} onClick={() => onOutcome(appointment, 'confirm')} /> : null}
           {canAttend ? <AgendaActionButton icon={UserCheck} label="Asistió" loading={actionId === `${appointment.id}:attended`} disabled={isBusy} onClick={() => onOutcome(appointment, 'attended')} /> : null}
           {canNoShow ? <AgendaActionButton icon={Ban} label="No asistió" loading={actionId === `${appointment.id}:noShow`} disabled={isBusy} onClick={() => onOutcome(appointment, 'noShow')} /> : null}
           {canReschedule ? <Button variant="secondary" type="button" onClick={() => onReschedule(appointment)} disabled={isBusy}><RefreshCw className="h-4 w-4" />Reprogramar</Button> : null}
-          {canCancel && !isPast ? <details className="relative"><summary className="flex min-h-11 cursor-pointer list-none items-center rounded-xl border border-slate-200 bg-card px-4 text-sm font-semibold text-textSoft">Más opciones</summary><div className="absolute right-0 z-10 mt-2 min-w-40 rounded-xl border border-slate-200 bg-card p-2 shadow-xl"><button className="min-h-11 w-full rounded-lg px-3 text-left text-sm font-semibold text-danger hover:bg-rose-400/10" type="button" onClick={() => onOutcome(appointment, 'cancel')}>Cancelar cita</button></div></details> : null}
+          {canCancel && !isPast ? <details className="relative"><summary className="flex min-h-11 cursor-pointer list-none items-center rounded-xl border border-slate-200 bg-card px-4 text-sm font-semibold text-textSoft">Más opciones</summary><div className="absolute right-0 z-10 mt-2 min-w-40 rounded-xl border border-slate-200 bg-card p-2 shadow-xl"><button className="min-h-11 w-full rounded-lg px-3 text-left text-sm font-semibold text-danger hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-60" type="button" onClick={() => onOutcome(appointment, 'cancel')} disabled={isBusy}>Cancelar cita</button></div></details> : null}
           {status === APPOINTMENT_STATUS.attended && !quote ? <Button type="button" onClick={() => onRegisterQuote(operationalLead, appointment)}><FileText className="h-4 w-4" />Registrar presupuesto</Button> : null}
           {status === APPOINTMENT_STATUS.noShow ? <Button variant="secondary" type="button" onClick={() => onRegisterOutcome({ lead: operationalLead, action: { actionType: 'no_show_recovery', appointmentId: appointment.id } })}>Registrar resultado</Button> : null}
         </div>
