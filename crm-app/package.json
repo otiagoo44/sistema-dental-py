@@ -5,14 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --mode staging",
+    "build:production": "vite build --mode production",
     "preview": "vite preview",
     "test": "npm run test:intake && npm run test:messages && npm run test:insights && npm run test:workflow && npm run test:owner",
     "test:intake": "node ../tests/edge-intake-contract-test.mjs",
     "test:messages": "node ../tests/whatsapp-message-test.mjs",
     "test:insights": "node ../tests/retention-insights-test.mjs",
     "test:workflow": "node ../tests/operational-workflow-test.mjs",
-    "test:owner": "node ../tests/owner-metrics-test.mjs"
+    "test:owner": "node ../tests/owner-metrics-test.mjs",
+    "test:staging": "node ../tests/staging-smoke.mjs",
+    "test:staging:http": "node ../tests/staging-http-linked-smoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

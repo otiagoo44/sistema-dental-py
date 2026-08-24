@@ -135,7 +135,11 @@ export function buildMetrics({ leads, appointments, tasks, treatmentPrices, prof
   const funnelLabels = ['Nuevo', 'Contactado', 'Agendado', 'Asistió', 'Tratamiento iniciado', 'Perdido'];
   const funnelDetails = ['Base de oportunidades', 'Con contacto registrado', 'Con cita o estado de agenda', 'Con asistencia registrada', 'Estado disponible más cercano a ganado', 'Con motivo de pérdida'];
   const funnel = funnelLabels.map((label, index) => { const denominator = index === funnelLabels.length - 1 ? funnelValues[0] : (index ? funnelValues[index - 1] : funnelValues[0]); return { label, value: funnelValues[index], rate: denominator ? Math.round((funnelValues[index] / denominator) * 100) : 0, detail: funnelDetails[index] }; });
-  const responseTimes = periodLeads.filter((lead) => lead.created_at && lead.last_contact_at).map((lead) => Math.max(0, new Date(lead.last_contact_at) - new Date(lead.created_at)) / 60000).filter(Number.isFinite);
+  const responseTimes = periodLeads
+    .map((lead) => ({ lead, firstContactAt: lead.first_contacted_at || lead.last_contact_at }))
+    .filter(({ lead, firstContactAt }) => lead.created_at && firstContactAt)
+    .map(({ lead, firstContactAt }) => Math.max(0, new Date(firstContactAt) - new Date(lead.created_at)) / 60000)
+    .filter(Number.isFinite);
   const averageMinutes = responseTimes.length ? Math.round(responseTimes.reduce((sum, value) => sum + value, 0) / responseTimes.length) : null;
   const profileNames = Object.fromEntries(profiles.map((profile) => [profile.id, profile.full_name || profile.email]));
   const responsibleRows = profiles.map((profile) => { const ownTasks = periodTasks.filter((task) => task.assigned_to === profile.id || task.completed_by === profile.id); return { label: profile.full_name || profile.email, completed: ownTasks.filter((task) => task.status === 'hecho' && task.completed_by === profile.id).length, open: ownTasks.filter(isOpenTask).length, overdue: ownTasks.filter((task) => isOpenTask(task) && task.due_at && new Date(task.due_at) < now).length, leads: leads.filter((lead) => lead.assigned_to === profile.id && !terminalStatuses.includes(lead.status)).length }; }).sort((a, b) => b.completed - a.completed || b.leads - a.leads);

@@ -13,6 +13,7 @@ import {
   todayIsoDate,
   tomorrowFollowupAsuncion,
 } from './formatters.js';
+import { publicConfig } from './publicConfig.js';
 
 export const ROLE = {
   admin: 'admin',
@@ -74,8 +75,7 @@ export const LEAD_ADMIN_EDIT_FIELDS = [
   'assigned_to',
 ];
 export const LEAD_RECEPTIONIST_EDIT_FIELDS = ['status', 'next_action', 'next_followup_at', 'contact_attempts', 'notes'];
-export const DEFAULT_PUBLIC_FORM_WEBHOOK_URL = 'https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake';
-export const PUBLIC_LEAD_WEBHOOK_URL = import.meta.env?.VITE_PUBLIC_LEAD_WEBHOOK_URL || DEFAULT_PUBLIC_FORM_WEBHOOK_URL;
+export const PUBLIC_LEAD_WEBHOOK_URL = publicConfig.publicLeadWebhookUrl;
 export const DEFAULT_EMBED_BASE_URL = typeof window === 'undefined' ? 'https://TU-CRM-REAL.vercel.app' : window.location.origin;
 
 export function cleanOptionalText(value) {

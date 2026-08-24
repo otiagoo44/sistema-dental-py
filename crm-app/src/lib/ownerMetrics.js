@@ -62,9 +62,9 @@ export function buildOwnerSummary({
       },
       {
         label: 'Contactadas',
-        value: uniqueLeadCount(periodEvents, ['lead_contacted', 'contact_responded', 'contact_attempted']),
+        value: uniqueLeadCount(periodEvents, ['lead_contacted', 'contact_responded']),
         source: 'Eventos de contacto',
-        definition: 'Oportunidades únicas con una respuesta o intento de contacto registrado durante el mes.',
+        definition: 'Oportunidades únicas con contacto real registrado durante el mes; un intento sin respuesta no cuenta.',
       },
       {
         label: 'Agendaron',

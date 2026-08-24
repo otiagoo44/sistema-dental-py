@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LockKeyhole, Mail } from 'lucide-react';
 import { hasSupabaseConfig, supabase } from '../lib/supabase';
+import { publicConfigError } from '../lib/publicConfig';
 import { humanizeCrmError } from '../lib/errors';
 
 export default function Login() {
@@ -14,7 +15,7 @@ export default function Login() {
     setError('');
 
     if (!supabase) {
-      setError('Faltan variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.');
+      setError(publicConfigError || 'La configuración de la CRM no es válida.');
       return;
     }
 
@@ -42,7 +43,7 @@ export default function Login() {
 
         {!hasSupabaseConfig ? (
           <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            Faltan variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.
+            La configuración de la CRM no es válida. Pedí ayuda al administrador.
           </div>
         ) : null}
 

@@ -1934,7 +1934,7 @@ declare
   next_type text;
   next_due_at timestamptz;
   cancelled_task_ids uuid[] := array[]::uuid[];
-  superseded_quote_ids uuid[] := array[]::uuid[];
+  preserved_pending_quote_ids uuid[] := array[]::uuid[];
 begin
   if current_user_id is null then
     raise exception using errcode = '42501', message = 'Authentication required';
@@ -1978,31 +1978,33 @@ begin
   end if;
 
   assigned_user_id := app_private.resolve_clinic_assignee(lead_record.clinic_id, lead_record.assigned_to);
-  cancelled_task_ids := app_private.cancel_open_lead_tasks(
-    quote_record.clinic_id,
-    quote_record.lead_id,
-    current_user_id,
-    array['quote_followup']
-  );
+  -- Resolve only the task linked to this quote. A patient may have independent
+  -- pending treatments, so another quote's follow-up must remain active.
+  with cancelled as (
+    update public.tasks t
+    set status = 'cancelado',
+        completed_at = now(),
+        completed_by = current_user_id,
+        updated_at = now()
+    where t.clinic_id = quote_record.clinic_id
+      and t.lead_id = quote_record.lead_id
+      and t.quote_id = quote_record.id
+      and lower(coalesce(t.type, '')) = 'quote_followup'
+      and lower(t.status) in ('pendiente', 'vencido', 'vencida')
+    returning t.id
+  )
+  select coalesce(array_agg(id), array[]::uuid[])
+  into cancelled_task_ids
+  from cancelled;
 
   if normalized_status = 'accepted' then
-    -- Other open alternatives stop being active commercial money once one is
-    -- accepted, but their rows and history are preserved as cancelled.
-    with superseded_quotes as (
-      update public.quotes q
-      set status = 'cancelled',
-          next_action_at = null,
-          updated_by = current_user_id,
-          updated_at = now()
-      where q.clinic_id = quote_record.clinic_id
-        and q.lead_id = quote_record.lead_id
-        and q.id <> quote_record.id
-        and q.status = 'pending'
-      returning q.id
-    )
-    select coalesce(array_agg(id), array[]::uuid[])
-    into superseded_quote_ids
-    from superseded_quotes;
+    select coalesce(array_agg(q.id), array[]::uuid[])
+    into preserved_pending_quote_ids
+    from public.quotes q
+    where q.clinic_id = quote_record.clinic_id
+      and q.lead_id = quote_record.lead_id
+      and q.id <> quote_record.id
+      and q.status = 'pending';
 
     next_title := 'Iniciar tratamiento';
     next_type := 'treatment_start';
@@ -2084,7 +2086,7 @@ begin
       'currency', quote_record.currency,
       'rejection_reason', normalized_reason,
       'cancelled_task_ids', to_jsonb(cancelled_task_ids),
-      'superseded_quote_ids', to_jsonb(superseded_quote_ids),
+      'preserved_pending_quote_ids', to_jsonb(preserved_pending_quote_ids),
       'remaining_quote_id', remaining_quote.id
     ),
     current_user_id
@@ -2098,7 +2100,7 @@ begin
     jsonb_build_object(
       'lead_id', quote_record.lead_id,
       'status', normalized_status,
-      'superseded_quote_ids', to_jsonb(superseded_quote_ids),
+      'preserved_pending_quote_ids', to_jsonb(preserved_pending_quote_ids),
       'remaining_quote_id', remaining_quote.id
     )
   );
