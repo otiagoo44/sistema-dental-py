@@ -55,14 +55,6 @@ const bootstrapSql = `
     select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb);
   $$;
 
-  -- This helper exists in the linked legacy project but was created outside the
-  -- checked-in migration history. Stub it so later migrations can be exercised;
-  -- the runner reports the repository reproducibility gap separately.
-  create or replace function public.rls_auto_enable()
-  returns void
-  language sql
-  as $$ select null::void; $$;
-
   create publication supabase_realtime;
 `;
 

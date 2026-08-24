@@ -201,10 +201,17 @@ begin
   );
 
   perform public.set_treatment_quote_status(quote_one.id, 'accepted', null, 'Aceptado QA');
-  perform pg_temp.assert_open_tasks(flow_lead_id, 1, 'treatment_start');
+  perform pg_temp.assert_open_tasks(flow_lead_id, 2, 'treatment_start');
   if (select status from public.quotes where id = quote_one.id) <> 'accepted'
      or (select accepted_at from public.quotes where id = quote_one.id) is null
-     or (select status from public.quotes where id = quote_alternative.id) <> 'cancelled' then
+     or (select status from public.quotes where id = quote_alternative.id) <> 'pending'
+     or not exists (
+       select 1 from public.tasks
+       where lead_id = flow_lead_id
+         and quote_id = quote_alternative.id
+         and type = 'quote_followup'
+         and lower(status) in ('pendiente', 'vencido', 'vencida')
+     ) then
     raise exception 'Flow A quote acceptance is inconsistent';
   end if;
 

@@ -99,6 +99,19 @@ assert.equal(quoteAndTaskBecomeOneAction.actionType, 'quote_followup');
 assert.equal(quoteAndTaskBecomeOneAction.taskId, 'quote-task');
 assert.equal(quoteAndTaskBecomeOneAction.quoteId, 'quote-1');
 
+const independentPendingQuoteStaysCritical = buildNextActionQueue({
+  now,
+  leads: [baseLead, { ...baseLead }],
+  tasks: [{ id: 'start-accepted-treatment', lead_id: baseLead.id, quote_id: 'quote-a', type: 'treatment_start', title: 'Iniciar tratamiento', status: 'pendiente', due_at: '2026-08-26T13:00:00.000Z' }],
+  quotes: [
+    { id: 'quote-a', lead_id: baseLead.id, treatment: 'Implante', status: 'accepted', next_action_at: null },
+    { id: 'quote-b', lead_id: baseLead.id, treatment: 'Blanqueamiento', status: 'pending', next_action_at: '2026-08-24T14:00:00.000Z' },
+  ],
+});
+assert.equal(independentPendingQuoteStaysCritical.length, 1);
+assert.equal(independentPendingQuoteStaysCritical[0].action.actionType, 'quote_followup');
+assert.equal(independentPendingQuoteStaysCritical[0].action.quoteId, 'quote-b');
+
 const todayAppointmentBeatsGenericOverdue = getEffectiveNextAction(baseLead, {
   now,
   tasks: [{ id: 'generic-overdue', lead_id: baseLead.id, title: 'Revisar nota', status: 'pendiente', due_at: '2026-08-24T14:00:00.000Z' }],

@@ -7,11 +7,13 @@ const leads = [
   { id: 'lead-open', status: 'Contactado', assigned_to: 'user-1', created_at: '2026-08-02T12:00:00.000Z' },
   { id: 'lead-unassigned', status: 'Nuevo', assigned_to: null, created_at: '2026-08-03T12:00:00.000Z' },
   { id: 'lead-terminal', status: 'Tratamiento Iniciado', assigned_to: 'user-1', created_at: '2026-08-04T12:00:00.000Z' },
+  { id: 'lead-attempt-only', status: 'No Respondió', assigned_to: 'user-1', created_at: '2026-08-04T13:00:00.000Z' },
 ];
 const workspaceEvents = [
   { id: 'event-contact-1', lead_id: 'lead-open', event_type: 'contact_attempted', created_at: '2026-08-05T12:00:00.000Z' },
   { id: 'event-contact-2', lead_id: 'lead-open', event_type: 'lead_contacted', created_at: '2026-08-06T12:00:00.000Z' },
   { id: 'event-contact-3', lead_id: 'lead-unassigned', event_type: 'contact_responded', created_at: '2026-08-06T12:00:00.000Z' },
+  { id: 'event-attempt-only', lead_id: 'lead-attempt-only', event_type: 'contact_attempted', created_at: '2026-08-06T13:00:00.000Z' },
   { id: 'event-scheduled', lead_id: 'lead-open', event_type: 'appointment_scheduled', created_at: '2026-08-07T12:00:00.000Z' },
   { id: 'event-rescheduled', lead_id: 'lead-open', event_type: 'appointment_rescheduled', created_at: '2026-08-08T12:00:00.000Z' },
   { id: 'event-attended', lead_id: 'lead-open', event_type: 'appointment_attended', created_at: '2026-08-09T12:00:00.000Z' },
@@ -32,7 +34,7 @@ const quotes = [
 ];
 
 const summary = buildOwnerSummary({ leads, tasks, quotes, workspaceEvents, now });
-assert.deepEqual(summary.funnel.map((item) => item.value), [3, 2, 1, 1, 1]);
+assert.deepEqual(summary.funnel.map((item) => item.value), [4, 2, 1, 1, 1]);
 assert.equal(summary.money.quoted, 1600);
 assert.equal(summary.money.accepted, 500);
 assert.equal(summary.money.rejected, 600);
@@ -50,5 +52,35 @@ assert.equal(
   'No pudimos conectar con el sistema. Revisá internet e intentá de nuevo.',
 );
 assert.equal(humanizeCrmError({ message: 'La cita ya no puede confirmarse' }), 'La cita ya no puede confirmarse');
+
+const controlledLeads = Array.from({ length: 20 }, (_, index) => ({
+  id: `controlled-${index + 1}`,
+  status: index < 4 ? 'Tratamiento Iniciado' : 'Contactado',
+  assigned_to: 'user-qa',
+  created_at: `2026-08-${String(index + 1).padStart(2, '0')}T12:00:00.000Z`,
+}));
+const controlledEvents = [
+  ...Array.from({ length: 15 }, (_, index) => ({ id: `contact-${index}`, lead_id: `controlled-${index + 1}`, event_type: 'lead_contacted', created_at: '2026-08-20T12:00:00.000Z' })),
+  ...Array.from({ length: 10 }, (_, index) => ({ id: `scheduled-${index}`, lead_id: `controlled-${index + 1}`, event_type: 'appointment_scheduled', created_at: '2026-08-20T13:00:00.000Z' })),
+  ...Array.from({ length: 8 }, (_, index) => ({ id: `attended-${index}`, lead_id: `controlled-${index + 1}`, event_type: 'appointment_attended', created_at: '2026-08-20T14:00:00.000Z' })),
+  ...Array.from({ length: 4 }, (_, index) => ({ id: `started-${index}`, lead_id: `controlled-${index + 1}`, event_type: 'treatment_started', created_at: '2026-08-20T15:00:00.000Z' })),
+];
+const controlledQuotes = [
+  { id: 'pending-12m', lead_id: 'controlled-5', amount: 12_000_000, status: 'pending', issued_at: '2026-08-20T12:00:00.000Z' },
+  { id: 'pending-8m', lead_id: 'controlled-6', amount: 8_000_000, status: 'pending', issued_at: '2026-08-20T12:00:00.000Z' },
+  { id: 'accepted-20m', lead_id: 'controlled-1', amount: 20_000_000, status: 'accepted', issued_at: '2026-08-20T12:00:00.000Z', accepted_at: '2026-08-21T12:00:00.000Z' },
+  { id: 'rejected-10m', lead_id: 'controlled-7', amount: 10_000_000, status: 'rejected', issued_at: '2026-08-20T12:00:00.000Z', rejected_at: '2026-08-21T12:00:00.000Z' },
+];
+const controlled = buildOwnerSummary({ leads: controlledLeads, quotes: controlledQuotes, workspaceEvents: controlledEvents, now });
+assert.deepEqual(controlled.funnel.map((item) => item.value), [20, 15, 10, 8, 4]);
+assert.deepEqual(controlled.money, {
+  quoted: 50_000_000,
+  pending: 20_000_000,
+  accepted: 20_000_000,
+  rejected: 10_000_000,
+  risk: 20_000_000,
+  riskCount: 2,
+  riskyQuoteIds: ['pending-12m', 'pending-8m'],
+});
 
 console.log('PASS owner metrics formulas, quote risk deduplication and human errors');

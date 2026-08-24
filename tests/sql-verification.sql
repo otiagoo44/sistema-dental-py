@@ -188,7 +188,8 @@ begin
     raise exception 'anon puede ejecutar create_manual_lead';
   end if;
 
-  if has_function_privilege('anon', 'public.rls_auto_enable()', 'EXECUTE') then
+  if to_regprocedure('public.rls_auto_enable()') is not null
+     and has_function_privilege('anon', 'public.rls_auto_enable()', 'EXECUTE') then
     raise exception 'anon puede ejecutar rls_auto_enable';
   end if;
 

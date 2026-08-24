@@ -184,7 +184,8 @@ begin
     );
   exception when others then
     if sqlerrm like '%Ese horario ya esta ocupado para este doctor.%'
-       or sqlerrm like '%Ese horario ya está ocupado para este doctor.%' then
+       or sqlerrm like '%Ese horario ya está ocupado para este doctor.%'
+       or sqlerrm like '%Ese horario ya está ocupado para ese profesional%' then
       booking_blocked := true;
     else
       raise;
