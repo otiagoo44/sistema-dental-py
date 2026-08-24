@@ -23,9 +23,10 @@ Variables:
 VITE_SUPABASE_URL=https://unybqqzhgqxhrwucrofm.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_xxx
 VITE_PUBLIC_LEAD_WEBHOOK_URL=https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake
+VITE_EXPECTED_SUPABASE_PROJECT_REF=unybqqzhgqxhrwucrofm
 ```
 
-Solo usar anon key en frontend. No usar service role ni salts en Vercel public env vars.
+Solo usar publishable/anon key en frontend. No usar service role ni salts en Vercel public env vars. `npm run build` genera staging; producción debe usar `npm run build:production` y configurar explícitamente su project ref esperado.
 
 ## Supabase Auth URL Configuration
 
