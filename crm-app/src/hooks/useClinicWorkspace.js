@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { normalizeRole, ROLE } from '../lib/crmDomain';
+import { supabase } from '../lib/supabase';
 import {
   getClinic,
   getClinicWorkspace,
@@ -15,6 +16,8 @@ export default function useClinicWorkspace({ session, onError }) {
   const [leads, setLeads] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [quotes, setQuotes] = useState([]);
+  const [workspaceEvents, setWorkspaceEvents] = useState([]);
   const [clinicSettings, setClinicSettings] = useState(null);
   const [treatmentPrices, setTreatmentPrices] = useState([]);
   const [leadEvents, setLeadEvents] = useState([]);
@@ -29,6 +32,8 @@ export default function useClinicWorkspace({ session, onError }) {
       setLeads([]);
       setAppointments([]);
       setTasks([]);
+      setQuotes([]);
+      setWorkspaceEvents([]);
       setClinicSettings(null);
       setTreatmentPrices([]);
       setLeadEvents([]);
@@ -95,9 +100,8 @@ export default function useClinicWorkspace({ session, onError }) {
     setPublicFormConfig(data || null);
   }
 
-  async function refreshClinicData(clinicId = profile?.clinic_id) {
+  const refreshClinicData = useCallback(async (clinicId = profile?.clinic_id) => {
     if (!clinicId) return false;
-    onError('');
 
     const { data, error } = await getClinicWorkspace(clinicId);
     if (error) {
@@ -109,12 +113,56 @@ export default function useClinicWorkspace({ session, onError }) {
     setLeads(data.leads);
     setAppointments(data.appointments);
     setTasks(data.tasks);
+    setQuotes(data.quotes);
+    setWorkspaceEvents(data.events);
     setClinicProfiles(data.profiles);
     setClinicSettings(data.settings);
     setTreatmentPrices(data.prices);
     setMessageTemplates(data.messageTemplates);
     return true;
-  }
+  }, [onError, profile?.clinic_id]);
+
+  const refreshTimerRef = useRef(null);
+
+  useEffect(() => {
+    const clinicId = profile?.clinic_id;
+    if (!clinicId) return undefined;
+
+    const scheduleRefresh = () => {
+      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = window.setTimeout(() => {
+        refreshTimerRef.current = null;
+        if (document.visibilityState === 'visible') refreshClinicData(clinicId);
+      }, 800);
+    };
+
+    const channel = supabase
+      .channel(`clinic-workspace:${clinicId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter: `clinic_id=eq.${clinicId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `clinic_id=eq.${clinicId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `clinic_id=eq.${clinicId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes', filter: `clinic_id=eq.${clinicId}` }, scheduleRefresh)
+      .subscribe();
+
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') scheduleRefresh();
+    }, 25_000);
+    const refreshVisible = () => {
+      if (document.visibilityState === 'visible') scheduleRefresh();
+    };
+
+    window.addEventListener('focus', refreshVisible);
+    document.addEventListener('visibilitychange', refreshVisible);
+
+    return () => {
+      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+      window.clearInterval(pollId);
+      window.removeEventListener('focus', refreshVisible);
+      document.removeEventListener('visibilitychange', refreshVisible);
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.clinic_id, refreshClinicData]);
 
   async function loadLeadEvents(leadId) {
     if (!profile?.clinic_id || !leadId) return false;
@@ -137,6 +185,8 @@ export default function useClinicWorkspace({ session, onError }) {
     leads,
     appointments,
     tasks,
+    quotes,
+    workspaceEvents,
     clinicSettings,
     treatmentPrices,
     leadEvents,

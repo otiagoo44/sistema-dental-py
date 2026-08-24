@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowDownUp, CalendarPlus, Check, ChevronLeft, Clipboard, Edit3, FilePlus, Flame, History, Phone, Plus, Save, Search } from 'lucide-react';
-import { CLASSIFICATIONS, LEAD_STATUSES, NEXT_ACTION_OPTIONS } from '../lib/constants';
-import { formatDateTime, formatMoney, fromDatetimeLocalAsuncion, normalizeText, todayIsoDate, toDatetimeLocalAsuncion, toLocalIsoDate } from '../lib/formatters';
-import { buildLeadMessage, selectWhatsAppTemplateKey } from '../lib/messages';
+import { useMemo, useState } from 'react';
+import { Archive, ArrowDownUp, CalendarPlus, ChevronLeft, Edit3, FilePlus, Flame, History, Phone, Search } from 'lucide-react';
+import { CLASSIFICATIONS, LEAD_STATUSES } from '../lib/constants';
+import { formatDateTime, formatMoney, normalizeText, todayIsoDate, toLocalIsoDate } from '../lib/formatters';
 import { buildCommercialTimeline, getLeadPriority, PRIORITY_FILTERS } from '../lib/commercialInsights';
-import { ARCHIVED_STATUS, LEAD_STATUS, isArchivedLead, displayConsultationReason, uniqueStrings } from '../lib/crmDomain';
-import { Info, Select, Field } from '../components/crm/CrmPrimitives';
+import { isArchivedLead, displayConsultationReason, uniqueStrings } from '../lib/crmDomain';
+import { getEffectiveNextAction } from '../lib/nextActions';
+import { Info, Select } from '../components/crm/CrmPrimitives';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -15,7 +15,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import PriorityBadge from '../components/ui/PriorityBadge';
 import WhatsAppButton from '../components/crm/WhatsAppButton';
 
-export default function LeadsView({ leads, tasks, appointments, canAdmin, onCreateLead, onEditLead, onArchiveLead, onMarkLost, onOpenLead, onUpdateLead, onScheduleAppointment, onCreateTask, onMarkContacted, onWhatsAppOpened, onMessageCopied, messageTemplates, clinicContext, profiles, setNotice }) {
+export default function LeadsView({ leads, tasks, appointments, quotes = [], canAdmin, onCreateLead, onOpenLead, onRegisterOutcome, onWhatsAppOpened, messageTemplates, clinicContext, profiles }) {
   const [filters, setFilters] = useState({ status: '', classification: '', priority: '', treatment: '', source: '', assigned: '', date: '', q: '', uncontacted: false, hotOnly: false, unassignedOnly: false, showArchived: false, sort: 'recent' });
   const treatmentOptions = useMemo(() => uniqueStrings(leads.map((lead) => lead.treatment)).sort(), [leads]);
   const sourceOptions = useMemo(() => uniqueStrings(leads.map((lead) => lead.source)).sort(), [leads]);
@@ -49,42 +49,38 @@ export default function LeadsView({ leads, tasks, appointments, canAdmin, onCrea
     });
   }, [leads, filters, canAdmin, tasks, appointments]);
 
-  async function copyMessage(lead) {
-    await navigator.clipboard.writeText(buildLeadMessage(lead, messageTemplates, clinicContext));
-    await onMessageCopied?.({ lead, templateKey: selectWhatsAppTemplateKey(lead) });
-    if (!onMessageCopied) setNotice('Mensaje copiado.');
-  }
-
   return (
     <section className="space-y-6">
-      <PageHeader eyebrow="Oportunidades" title="Leads" subtitle="Buscá, filtrá y mové cada oportunidad hacia su próxima acción." action={<Button type="button" onClick={onCreateLead}><FilePlus className="h-4 w-4" />Nuevo lead</Button>} />
+      <PageHeader eyebrow="Oportunidades" title="Pacientes" subtitle="Encontrá rápidamente qué necesita cada persona y cuál es el próximo paso." action={<Button type="button" onClick={onCreateLead}><FilePlus className="h-4 w-4" />Nueva consulta</Button>} />
       <FilterPanel
-        title="Encontrá la oportunidad correcta"
-        description="La búsqueda queda siempre visible; abrí los filtros avanzados cuando los necesites."
+        title="Buscar pacientes"
+        description="Búsqueda, estado y tratamiento quedan visibles. El resto está en Más filtros."
         alwaysContent={(
-          <label className="block">
-            <span className="mb-2 block text-xs font-semibold text-slate-500">Buscar por nombre o teléfono</span>
-            <span className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-input px-3 transition focus-within:border-mint focus-within:ring-4 focus-within:ring-mint/10">
-              <Search className="h-4 w-4 text-slate-400" />
-              <input className="w-full bg-transparent text-sm text-cream outline-none placeholder:text-slate-400" value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value })} placeholder="Ej. Laura o 0981…" />
-            </span>
-          </label>
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-textMuted">Buscar paciente</span>
+              <span className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-input px-3 transition focus-within:border-mint focus-within:ring-4 focus-within:ring-mint/10">
+                <Search className="h-4 w-4 text-slate-400" />
+                <input className="w-full bg-transparent text-base text-cream outline-none placeholder:text-slate-400" value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value })} placeholder="Nombre o teléfono" />
+              </span>
+            </label>
+            <Select label="Estado" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={LEAD_STATUSES} placeholder="Todos" />
+            <Select label="Tratamiento" value={filters.treatment} onChange={(value) => setFilters({ ...filters, treatment: value })} options={treatmentOptions} placeholder="Todos" />
+          </div>
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Select label="Estado comercial" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={LEAD_STATUSES} placeholder="Todos" />
           <Select label="Clasificación" value={filters.classification} onChange={(value) => setFilters({ ...filters, classification: value })} options={CLASSIFICATIONS} placeholder="Todas" />
-          <Select label="Semáforo" value={filters.priority} onChange={(value) => setFilters({ ...filters, priority: value })} options={PRIORITY_FILTERS} placeholder="Todos" />
-          <Select label="Tratamiento" value={filters.treatment} onChange={(value) => setFilters({ ...filters, treatment: value })} options={treatmentOptions} placeholder="Todos" />
+          <Select label="Prioridad interna" value={filters.priority} onChange={(value) => setFilters({ ...filters, priority: value })} options={PRIORITY_FILTERS} placeholder="Todas" />
           <Select label="Fuente" value={filters.source} onChange={(value) => setFilters({ ...filters, source: value })} options={sourceOptions} placeholder="Todas" />
-          <Select label="Responsable" value={filters.assigned} onChange={(value) => setFilters({ ...filters, assigned: value })} options={(profiles || []).map((profile) => ({ value: profile.id, label: profile.full_name }))} placeholder="Todos" />
+          <Select label="Encargado" value={filters.assigned} onChange={(value) => setFilters({ ...filters, assigned: value })} options={(profiles || []).map((profile) => ({ value: profile.id, label: profile.full_name }))} placeholder="Todos" />
           <Select label="Fecha de ingreso" value={filters.date} onChange={(value) => setFilters({ ...filters, date: value })} options={[{ value: 'today', label: 'Hoy' }, { value: '7d', label: 'Últimos 7 días' }, { value: 'month', label: 'Este mes' }]} placeholder="Cualquier fecha" />
         </div>
         <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
             <QuickFilter active={filters.uncontacted} onClick={() => setFilters({ ...filters, uncontacted: !filters.uncontacted })}>Sólo sin contactar</QuickFilter>
             <QuickFilter active={filters.hotOnly} onClick={() => setFilters({ ...filters, hotOnly: !filters.hotOnly })}><Flame className="h-3.5 w-3.5" />Sólo calientes</QuickFilter>
-            <QuickFilter active={filters.unassignedOnly} onClick={() => setFilters({ ...filters, unassignedOnly: !filters.unassignedOnly })}>Sin responsable</QuickFilter>
+            <QuickFilter active={filters.unassignedOnly} onClick={() => setFilters({ ...filters, unassignedOnly: !filters.unassignedOnly })}>Sin encargado</QuickFilter>
             {canAdmin ? <QuickFilter active={filters.showArchived} onClick={() => setFilters({ ...filters, showArchived: !filters.showArchived })}><Archive className="h-3.5 w-3.5" />Archivados</QuickFilter> : null}
           </div>
           <div className="flex items-center gap-2">
@@ -100,7 +96,9 @@ export default function LeadsView({ leads, tasks, appointments, canAdmin, onCrea
       {filteredLeads.length ? (
         <div className="grid gap-4 xl:grid-cols-2">
           {filteredLeads.map((lead) => {
-            const priority = getLeadPriority(lead, { tasks, appointments });
+            const action = getEffectiveNextAction(lead, { tasks, appointments, quotes });
+            const quote = quotes.filter((item) => item.lead_id === lead.id).sort((a, b) => new Date(b.issued_at) - new Date(a.issued_at))[0] || null;
+            const task = action?.taskId ? tasks.find((item) => item.id === action.taskId) : null;
             return (
             <Card key={lead.id} as="article" className="card-enter overflow-hidden">
               <button className="w-full p-5 text-left transition hover:bg-slate-50" type="button" onClick={() => onOpenLead(lead.id)}>
@@ -109,35 +107,24 @@ export default function LeadsView({ leads, tasks, appointments, canAdmin, onCrea
                     <h3 className="truncate text-lg font-bold text-cream">{lead.name}</h3>
                     <p className="mt-1 flex items-center gap-2 text-sm text-slate-500"><Phone className="h-4 w-4 text-mint" />{lead.phone_plus || lead.phone || 'Sin teléfono'}</p>
                   </div>
-                  <div className="flex flex-wrap gap-2"><PriorityBadge priority={priority} /><StatusBadge value={lead.classification} /><StatusBadge value={lead.status} /></div>
+                  {quote ? <p className="text-base font-bold text-mint">{formatMoney(quote.amount)} · {quote.status === 'pending' ? 'Pendiente' : quote.status === 'accepted' ? 'Aceptado' : 'Rechazado'}</p> : null}
                 </div>
-                <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                  <Info label="Tratamiento" value={lead.treatment || 'Sin definir'} />
-                  <Info label="Fuente" value={lead.source || 'Sin definir'} />
-                  <Info label="Responsable" value={profileNames[lead.assigned_to] || 'Sin responsable'} />
-                  <Info label="Próxima acción" value={lead.next_action || 'Definir acción'} />
-                  <Info label="Próximo seguimiento" value={lead.next_followup_at ? formatDateTime(lead.next_followup_at) : 'Sin fecha'} />
-                  <Info label="Último contacto" value={lead.last_contact_at ? formatDateTime(lead.last_contact_at) : 'Todavía no contactado'} />
+                <p className="mt-4 text-base font-semibold text-textSoft">{lead.treatment || 'Tratamiento por definir'}</p>
+                <div className="mt-4 rounded-xl border border-slate-200 bg-soft p-4">
+                  <p className="text-sm font-semibold text-textMuted">Qué hay que hacer</p>
+                  <p className="mt-1 text-base font-bold text-cream">{action?.title || 'Sin acciones pendientes'}</p>
+                  <p className="mt-1 text-sm leading-6 text-textMuted">{action?.dueAt ? formatDateTime(action.dueAt) : 'Sin fecha'} · Encargado: {profileNames[lead.assigned_to] || 'Sin asignar'}</p>
                 </div>
               </button>
-              <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/60 p-4">
-                <Button size="sm" type="button" onClick={() => onOpenLead(lead.id)}>Ver detalle</Button>
-                {['Nuevo', 'No Contactado', 'No Respondió'].includes(lead.status) ? <Button size="sm" variant="secondary" type="button" onClick={() => onMarkContacted(lead)}><Check className="h-4 w-4" />Contactado</Button> : null}
-                <Button size="sm" variant="secondary" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button>
-                <WhatsAppButton lead={lead} templates={messageTemplates} clinicContext={clinicContext} onOpened={onWhatsAppOpened} />
-                <Button size="sm" variant="ghost" type="button" onClick={() => copyMessage(lead)}><Clipboard className="h-4 w-4" />Copiar mensaje</Button>
-                {canAdmin ? <Button size="sm" variant="ghost" type="button" onClick={() => onCreateTask(lead)}><Plus className="h-4 w-4" />Crear tarea</Button> : null}
-                <Button size="sm" variant="ghost" type="button" onClick={() => onEditLead(lead)}><Edit3 className="h-4 w-4" />Editar</Button>
-                <select className="min-h-9 rounded-xl border border-slate-200 bg-input px-3 py-2 text-xs font-semibold text-textSoft outline-none focus:border-mint" value={lead.status} aria-label={`Estado comercial de ${lead.name}`} onChange={(event) => { const nextStatus = event.target.value; if (nextStatus === LEAD_STATUS.scheduled && nextStatus !== lead.status) onScheduleAppointment(lead); else if (nextStatus === 'Perdido' && nextStatus !== lead.status) onMarkLost(lead); else onUpdateLead(lead.id, { status: nextStatus }); }}>
-                  {LEAD_STATUSES.filter((status) => status !== ARCHIVED_STATUS).map((status) => <option key={status}>{status}</option>)}
-                </select>
-                {canAdmin && !isArchivedLead(lead) ? <Button size="sm" variant="danger" type="button" onClick={() => onArchiveLead(lead)}><Archive className="h-4 w-4" />Archivar</Button> : null}
+              <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 p-4 sm:flex-row sm:justify-end">
+                <WhatsAppButton lead={lead} task={task} action={action} templates={messageTemplates} clinicContext={clinicContext} onOpened={onWhatsAppOpened} />
+                {action ? <Button variant="secondary" type="button" onClick={() => onRegisterOutcome({ lead, action, task })}>Registrar resultado</Button> : null}
               </div>
             </Card>
             );
           })}
         </div>
-      ) : <EmptyState title="No hay leads para estos filtros" text="Quitá uno o más filtros o registrá una nueva oportunidad." action={<Button type="button" onClick={onCreateLead}>Nuevo lead</Button>} />}
+      ) : <EmptyState title="No hay pacientes para estos filtros" text="Quitá uno o más filtros o registrá una nueva consulta." action={<Button type="button" onClick={onCreateLead}>Nueva consulta</Button>} />}
     </section>
   );
 }
@@ -146,55 +133,17 @@ function QuickFilter({ active, onClick, children }) {
   return <button className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition ${active ? 'border-mint/45 bg-mint/10 text-mint' : 'border-slate-200 bg-card text-textSoft hover:border-mint/30 hover:bg-elevated hover:text-cream'}`} type="button" onClick={onClick}>{children}</button>;
 }
 
-export function LeadDetail({ lead, events, tasks, appointments, profiles, canAdmin, onBack, onEditLead, onArchiveLead, onMarkLost, onSave, onMarkContacted, onScheduleAppointment, onWhatsAppOpened, onMessageCopied, messageTemplates, clinicContext, setNotice }) {
-  const [form, setForm] = useState(null);
-
-  useEffect(() => {
-    if (lead) {
-      setForm({
-        status: lead.status || 'Nuevo',
-        notes: lead.notes || '',
-        next_action: lead.next_action || '',
-        next_followup_at: toDatetimeLocalAsuncion(lead.next_followup_at),
-      });
-    }
-  }, [lead]);
-
-  if (!lead || !form) {
-    return <EmptyState title="Lead no encontrado" text="Volver a Leads y seleccionar un registro." />;
-  }
-
-  async function copyMessage() {
-    await navigator.clipboard.writeText(buildLeadMessage(lead, messageTemplates, clinicContext));
-    await onMessageCopied?.({ lead, templateKey: selectWhatsAppTemplateKey(lead) });
-    if (!onMessageCopied) setNotice('Mensaje copiado.');
-  }
-
-  function saveForm() {
-    onSave(lead.id, {
-      status: form.status,
-      notes: form.notes,
-      next_action: form.next_action,
-      next_followup_at: fromDatetimeLocalAsuncion(form.next_followup_at),
-    });
-  }
-
-  function handleStatusChange(value) {
-    if (value === LEAD_STATUS.scheduled && value !== lead.status) {
-      onScheduleAppointment(lead);
-      return;
-    }
-
-    if (value === 'Perdido' && value !== lead.status) {
-      onMarkLost(lead);
-      return;
-    }
-
-    setForm({ ...form, status: value });
+export function LeadDetail({ lead, events, tasks, appointments, quotes = [], profiles, canAdmin, onBack, onEditLead, onArchiveLead, onScheduleAppointment, onRegisterOutcome, onRegisterQuote, onWhatsAppOpened, messageTemplates, clinicContext }) {
+  if (!lead) {
+    return <EmptyState title="Paciente no encontrado" text="Volvé a Pacientes y seleccioná un registro." />;
   }
 
   const priority = getLeadPriority(lead, { tasks, appointments });
   const timeline = buildCommercialTimeline({ lead, events, tasks, appointments, profiles });
+  const leadQuotes = quotes.filter((quote) => quote.lead_id === lead.id).sort((a, b) => new Date(b.issued_at) - new Date(a.issued_at));
+  const effectiveAction = getEffectiveNextAction(lead, { tasks, appointments, quotes });
+  const actionTask = effectiveAction?.taskId ? tasks.find((task) => task.id === effectiveAction.taskId) : null;
+  const latestAppointment = appointments.filter((appointment) => appointment.lead_id === lead.id).at(-1) || null;
 
   return (
     <section className="grid gap-5 xl:grid-cols-[1fr_380px]">
@@ -202,7 +151,7 @@ export function LeadDetail({ lead, events, tasks, appointments, profiles, canAdm
         <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-5 md:flex-row md:items-start md:justify-between">
           <div>
             <button className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-mint hover:text-goldHover" type="button" onClick={onBack}>
-              <ChevronLeft className="h-4 w-4" />Volver a leads
+              <ChevronLeft className="h-4 w-4" />Volver a pacientes
             </button>
             <h2 className="text-2xl font-semibold">{lead.name}</h2>
             <p className="mt-1 text-slate-500">{lead.phone_plus || lead.phone || 'Sin teléfono'}</p>
@@ -231,7 +180,7 @@ export function LeadDetail({ lead, events, tasks, appointments, profiles, canAdm
           <Info label="Situacion" value={lead.situation || 'Sin dato'} />
           <Info label="Evaluacion previa" value={lead.evaluation_previous || 'Sin dato'} />
           <Info label="Motivo consulta" value={displayConsultationReason(lead)} />
-          <Info label="Valor estimado" value={formatMoney(lead.estimated_value)} />
+          <Info label="Estimación por tratamiento (no es presupuesto)" value={formatMoney(lead.estimated_value)} />
           <Info label="Fuente" value={lead.source || 'Sin dato'} />
           <Info label="Pagina" value={lead.page || 'Sin dato'} />
           <Info label="Ultimo contacto" value={lead.last_contact_at ? formatDateTime(lead.last_contact_at) : 'Sin registro'} />
@@ -240,41 +189,31 @@ export function LeadDetail({ lead, events, tasks, appointments, profiles, canAdm
           {lead.lost_reason ? <Info label="Motivo de pérdida" value={`${lead.lost_reason}${lead.lost_reason_note ? ` · ${lead.lost_reason_note}` : ''}`} /> : null}
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Select label="Estado comercial" value={form.status} onChange={handleStatusChange} options={isArchivedLead(lead) ? LEAD_STATUSES : LEAD_STATUSES.filter((status) => status !== ARCHIVED_STATUS)} />
-          <Select label="Próxima acción" value={form.next_action} onChange={(value) => setForm({ ...form, next_action: value })} options={NEXT_ACTION_OPTIONS} />
-          <Field label="Próximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => setForm({ ...form, next_followup_at: value })} />
-          <label className="block md:col-span-2">
-            <span className="mb-2 block text-xs font-semibold text-slate-500">Notas</span>
-            <textarea className="input-premium min-h-32" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-          </label>
-        </div>
+        {leadQuotes.length ? (
+          <section className="mt-6 rounded-2xl border border-mint/20 bg-mint/[0.05] p-4">
+            <h3 className="font-bold text-cream">Presupuestos reales</h3>
+            <div className="mt-3 space-y-2">
+              {leadQuotes.map((quote) => <div key={quote.id} className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-card p-3 sm:flex-row sm:items-center"><span><strong className="text-cream">{quote.treatment}</strong><span className="mt-1 block text-sm text-textMuted">{formatDateTime(quote.issued_at)} · {quote.professional_name || 'Profesional no indicado'}</span></span><span className="flex flex-wrap items-center gap-2"><strong className="text-mint">{formatMoney(quote.amount)} · {quote.status === 'pending' ? 'Pendiente' : quote.status === 'accepted' ? 'Aceptado' : quote.status === 'rejected' ? 'Rechazado' : 'Cancelado'}</strong>{quote.status === 'pending' ? <Button size="sm" variant="secondary" type="button" onClick={() => onRegisterOutcome({ lead, quote, action: { actionType: 'quote_followup', quoteId: quote.id } })}>Registrar resultado</Button> : null}</span></div>)}
+            </div>
+          </section>
+        ) : null}
+
+        {effectiveAction ? <div className="mt-6 rounded-2xl border border-slate-200 bg-soft p-4"><p className="text-sm font-semibold text-textMuted">Qué hacer después</p><p className="mt-1 text-lg font-bold text-cream">{effectiveAction.title}</p><p className="mt-1 text-sm text-textMuted">{effectiveAction.dueAt ? formatDateTime(effectiveAction.dueAt) : 'Sin fecha'}</p></div> : null}
 
         <div className="mt-5 flex flex-wrap gap-2">
-          <Button type="button" onClick={saveForm}>
-            <Save className="h-4 w-4" />
-            Guardar cambios
-          </Button>
-          <Button variant="secondary" type="button" onClick={() => onMarkContacted(lead)}>
-            <Check className="h-4 w-4" />Registrar contacto
-          </Button>
-          <Button variant="secondary" type="button" onClick={() => onSave(lead.id, { contact_attempts: Number(lead.contact_attempts || 0) + 1 })}>
-            <Plus className="h-4 w-4" />
-            Aumentar intentos
-          </Button>
-          <Button variant="secondary" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button>
           <WhatsAppButton
             lead={lead}
+            task={actionTask}
+            action={effectiveAction}
             templates={messageTemplates}
             clinicContext={clinicContext}
             onOpened={onWhatsAppOpened}
             label="Abrir WhatsApp"
             className="min-h-11 px-4 py-2.5 text-sm"
           />
-          <Button variant="ghost" type="button" onClick={copyMessage}>
-            <Clipboard className="h-4 w-4" />
-            Copiar mensaje
-          </Button>
+          {effectiveAction ? <Button variant="secondary" type="button" onClick={() => onRegisterOutcome({ lead, action: effectiveAction, task: actionTask })}>Registrar resultado</Button> : null}
+          {['Asistió', 'Presupuesto Enviado'].includes(lead.status) ? <Button variant="secondary" type="button" onClick={() => onRegisterQuote(lead, latestAppointment)}><FilePlus className="h-4 w-4" />{leadQuotes.length ? 'Otro presupuesto' : 'Registrar presupuesto'}</Button> : null}
+          {canAdmin ? <Button variant="ghost" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button> : null}
         </div>
       </Card>
 
@@ -297,7 +236,7 @@ export function LeadDetail({ lead, events, tasks, appointments, profiles, canAdm
             ))}
           </div>
         ) : (
-          <EmptyState title="Sin actividad comercial" text="Las acciones, tareas y citas de este lead aparecerán acá." />
+          <EmptyState title="Sin actividad comercial" text="Las acciones, citas y próximos pasos de este paciente aparecerán acá." />
         )}
       </aside>
     </section>

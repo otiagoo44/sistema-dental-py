@@ -180,36 +180,9 @@ function nextActionFor(classification: string) {
 }
 
 function nextFollowupFor(classification: string) {
-  if (classification === "Lead Caliente") return addTimeIso(2, "hours");
-  if (classification === "Lead Medio") return addTimeIso(1, "days");
+  if (classification === "Lead Caliente") return addTimeIso(5, "minutes");
+  if (classification === "Lead Medio") return addTimeIso(0, "minutes");
   return addTimeIso(3, "days");
-}
-
-function taskFor(classification: string) {
-  if (classification === "Lead Caliente") {
-    return {
-      title: "Contactar lead caliente",
-      type: "contact",
-      priority: "Alta",
-      due_at: addTimeIso(5, "minutes"),
-    };
-  }
-
-  if (classification === "Lead Medio") {
-    return {
-      title: "Contactar lead medio",
-      type: "contact",
-      priority: "Media",
-      due_at: addTimeIso(0, "hours"),
-    };
-  }
-
-  return {
-    title: "Seguimiento lead fr\u00edo",
-    type: "followup",
-    priority: "Baja",
-    due_at: addTimeIso(3, "days"),
-  };
 }
 
 Deno.serve(async (req) => {
@@ -339,8 +312,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const allowedOrigins = Array.isArray(publicForm.allowed_origins)
-      ? publicForm.allowed_origins.filter(Boolean)
+    const formConfig = publicForm;
+
+    const allowedOrigins = Array.isArray(formConfig.allowed_origins)
+      ? formConfig.allowed_origins.filter(Boolean)
       : [];
 
     const clientIp = getClientIp(req);
@@ -349,8 +324,8 @@ Deno.serve(async (req) => {
 
     async function insertSubmissionLog(status: "accepted" | "rate_limited" | "invalid_token" | "spam" | "error") {
       const { error: logError } = await supabase.from("form_submission_logs").insert({
-        clinic_public_form_id: publicForm.id,
-        clinic_id: publicForm.clinic_id,
+        clinic_public_form_id: formConfig.id,
+        clinic_id: formConfig.clinic_id,
         ip_hash: ipHash,
         phone_hash: phoneHash,
         status,
@@ -413,7 +388,7 @@ Deno.serve(async (req) => {
       const { count, error } = await supabase
         .from("form_submission_logs")
         .select("id", { count: "exact", head: true })
-        .eq("clinic_public_form_id", publicForm.id)
+        .eq("clinic_public_form_id", formConfig.id)
         .eq(column, hash)
         .gte("created_at", windowStart);
 
@@ -466,203 +441,57 @@ Deno.serve(async (req) => {
     );
     const whatsappLink = `https://wa.me/${phoneResult.phone}?text=${whatsappMessage}`;
 
-    const { data: existingLead, error: existingLeadError } = await supabase
-      .from("leads")
-      .select("id, status, contact_attempts, next_action")
-      .eq("clinic_id", publicForm.clinic_id)
-      .eq("phone_plus", phoneResult.phonePlus)
-      .maybeSingle();
-
-    if (existingLeadError) throw existingLeadError;
-
-    let leadId: string;
-    let eventType = "lead_created_from_landing";
-    let eventTitle = "Lead creado desde landing";
-
-    if (existingLead?.id) {
-      eventType = "lead_duplicate_submission";
-      eventTitle = "Lead actualizado desde landing";
-
-      const updatePayload: Record<string, unknown> = {
-        name,
-        treatment,
-        urgency,
-        score,
-        classification,
-        situation,
-        evaluation_previous: evaluationPrevious,
-        consultation_reason: consultationReason,
-        estimated_value: estimatedValue,
-        source,
-        page,
-        whatsapp_link: whatsappLink,
-        consent_contact: true,
-        consent_at: consentAt,
-        consent_source: source,
-        consent_page: page,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (!existingLead.next_action) {
-        updatePayload.next_action = nextAction;
-      }
-
-      const { data: updatedLead, error: updateError } = await supabase
-        .from("leads")
-        .update(updatePayload)
-        .eq("id", existingLead.id)
-        .eq("clinic_id", publicForm.clinic_id)
-        .select("id")
-        .single();
-
-      if (updateError) throw updateError;
-      leadId = updatedLead.id;
-    } else {
-      const { data: createdLead, error: insertLeadError } = await supabase
-        .from("leads")
-        .insert({
-          clinic_id: publicForm.clinic_id,
-          name,
-          phone: phoneResult.phone,
-          phone_plus: phoneResult.phonePlus,
-          treatment,
-          urgency,
-          score,
-          classification,
-          status: "Nuevo",
-          situation,
-          evaluation_previous: evaluationPrevious,
-          consultation_reason: consultationReason,
-          estimated_value: estimatedValue,
-          next_action: nextAction,
-          next_followup_at: nextFollowupAt,
-          contact_attempts: 0,
-          whatsapp_link: whatsappLink,
-          source,
-          page,
-          notes,
-          consent_contact: true,
-          consent_at: consentAt,
-          consent_source: source,
-          consent_page: page,
-        })
-        .select("id")
-        .single();
-
-      if (insertLeadError) throw insertLeadError;
-      leadId = createdLead.id;
-    }
-
-    const eventMetadata = {
-      score,
-      classification,
-      treatment,
-      urgency,
-      source,
-      page,
-      form_id: publicForm.id,
-      consent_contact: true,
-      consent_at: consentAt,
-    };
-
-    async function insertLeadEvent(payload: Record<string, unknown>) {
-      let { error: eventInsertError } = await supabase.from("lead_events").insert(payload);
-
-      if (eventInsertError && dbErrorMessage(eventInsertError).includes("metadata")) {
-        const legacyPayload = { ...payload };
-        delete legacyPayload.metadata;
-        const retry = await supabase.from("lead_events").insert(legacyPayload);
-        eventInsertError = retry.error;
-      }
-
-      if (eventInsertError) {
-        console.error("lead-intake lead event failed", dbErrorMessage(eventInsertError));
-      }
-    }
-
-    await insertLeadEvent({
-      clinic_id: publicForm.clinic_id,
-      lead_id: leadId,
-      event_type: eventType,
-      title: eventTitle,
-      description: existingLead?.id
-        ? "Nueva submission publica para telefono existente"
-        : "Lead creado desde formulario publico",
-      metadata: eventMetadata,
-    });
-
-    const task = taskFor(classification);
-    const { data: existingTask, error: existingTaskError } = await supabase
-      .from("tasks")
-      .select("id")
-      .eq("clinic_id", publicForm.clinic_id)
-      .eq("lead_id", leadId)
-      .eq("type", task.type)
-      .in("status", ["pendiente", "Pendiente", "vencido", "Vencida"])
-      .limit(1)
-      .maybeSingle();
-
-    if (existingTaskError) {
-      console.error("lead-intake task lookup failed", dbErrorMessage(existingTaskError));
-    } else if (!existingTask?.id) {
-      const { error: taskError } = await supabase.from("tasks").insert({
-        clinic_id: publicForm.clinic_id,
-        lead_id: leadId,
-        title: task.title,
-        type: task.type,
-        priority: task.priority,
-        status: "Pendiente",
-        due_at: task.due_at,
-      });
-
-      if (taskError) {
-        console.error("lead-intake task insert failed", dbErrorMessage(taskError));
-      }
-    }
-
-    const jobs = [
+    // All domain writes happen in one Postgres transaction. The Edge Function
+    // remains responsible for HTTP, origin, token, consent, anti-spam and rate limits.
+    const { data: intakeResult, error: intakeError } = await supabase.rpc(
+      "create_public_lead_intake",
       {
-        clinic_id: publicForm.clinic_id,
-        lead_id: leadId,
-        workflow_name: "lead_created",
-        status: "pending",
-        payload: {
-          lead_id: leadId,
-          clinic_id: publicForm.clinic_id,
-          classification,
-          score,
-        },
+        p_form_id: formConfig.id,
+        p_clinic_slug: clinicSlug,
+        p_public_token: landingToken,
+        p_name: name,
+        p_phone: phoneResult.phone,
+        p_phone_plus: phoneResult.phonePlus,
+        p_treatment: treatment,
+        p_urgency: urgency,
+        p_score: score,
+        p_classification: classification,
+        p_situation: situation,
+        p_evaluation_previous: evaluationPrevious,
+        p_consultation_reason: consultationReason,
+        p_estimated_value: estimatedValue,
+        p_next_action: nextAction,
+        p_next_followup_at: nextFollowupAt,
+        p_whatsapp_link: whatsappLink,
+        p_source: source,
+        p_page: page,
+        p_notes: notes,
+        p_consent_at: consentAt,
+        p_ip_hash: ipHash,
+        p_phone_hash: phoneHash,
       },
-    ];
+    );
 
-    if (classification === "Lead Caliente") {
-      jobs.push({
-        clinic_id: publicForm.clinic_id,
-        lead_id: leadId,
-        workflow_name: "lead_hot_alert",
-        status: "pending",
-        payload: {
-          lead_id: leadId,
-          clinic_id: publicForm.clinic_id,
-          classification,
-          score,
-        },
-      });
-    }
+    if (intakeError) throw intakeError;
 
-    const { error: jobsError } = await supabase.from("automation_jobs").insert(jobs);
-    if (jobsError) {
-      console.error("lead-intake automation jobs failed", dbErrorMessage(jobsError));
-    }
-
-    await insertSubmissionLog("accepted");
+    const result = (intakeResult || {}) as {
+      lead_id?: string;
+      classification?: string;
+      score?: number;
+      assigned_to?: string | null;
+      created?: boolean;
+      new_after_terminal?: boolean;
+    };
 
     return jsonResponse(responseOrigin, 200, {
       success: true,
       message: "Datos enviados correctamente",
-      classification,
-      score,
-      lead_id: leadId,
+      classification: result.classification || classification,
+      score: result.score ?? score,
+      lead_id: result.lead_id,
+      assigned: Boolean(result.assigned_to),
+      created: Boolean(result.created),
+      new_after_terminal: Boolean(result.new_after_terminal),
       clinic_slug: clinicSlug,
     });
   } catch (error) {

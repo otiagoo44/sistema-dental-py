@@ -9,7 +9,7 @@ const variants = {
 };
 
 export default function Button({ children, variant = 'primary', size = 'md', loading = false, className = '', disabled, ...props }) {
-  const sizes = size === 'sm' ? 'min-h-9 px-3 py-2 text-xs' : 'min-h-11 px-4 py-2.5 text-sm';
+  const sizes = size === 'sm' ? 'min-h-10 px-3 py-2 text-sm' : 'min-h-11 px-4 py-2.5 text-sm';
   return (
     <motion.button
       className={`inline-flex items-center justify-center gap-2 rounded-xl font-bold transition duration-200 disabled:pointer-events-none disabled:cursor-not-allowed ${sizes} ${variants[variant] || variants.primary} ${className}`}

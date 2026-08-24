@@ -32,13 +32,15 @@ export default function ArchiveLeadModal({ lead, archive = false, saving, onClos
     <ModalShell
       className="max-w-xl p-5"
       overlayClassName="sm:items-center"
+      onClose={onClose}
+      titleId="archive-lead-title"
       onSubmit={(event) => {
         event.preventDefault();
         handleSubmit();
       }}
     >
-        <ModalHeader title={archive ? 'Archivar oportunidad' : 'Registrar oportunidad perdida'} subtitle={lead?.name || 'Lead'} onClose={onClose} disabled={saving} />
-        {formError ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
+        <ModalHeader title={archive ? 'Archivar oportunidad' : 'Marcar como no continuó'} subtitle={lead?.name || 'Paciente'} onClose={onClose} disabled={saving} titleId="archive-lead-title" />
+        {formError ? <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
         <div className="grid gap-4">
           <Select label="Motivo obligatorio" value={reason} onChange={setReason} options={LOST_REASONS} placeholder="Seleccionar motivo" disabled={saving} />
           <TextArea label={reason === 'Otro' ? 'Nota obligatoria' : 'Nota opcional'} value={note} onChange={setNote} disabled={saving} placeholder="Contexto útil para entender por qué se perdió" />

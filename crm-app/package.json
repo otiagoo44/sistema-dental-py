@@ -7,8 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "npm run test:messages && npm run test:insights && npm run test:workflow",
     "test:messages": "node ../tests/whatsapp-message-test.mjs",
-    "test:insights": "node ../tests/retention-insights-test.mjs"
+    "test:insights": "node ../tests/retention-insights-test.mjs",
+    "test:workflow": "node ../tests/operational-workflow-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

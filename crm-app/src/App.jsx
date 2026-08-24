@@ -47,6 +47,7 @@ const AppointmentModal = lazy(() => import('./components/modals/AppointmentModal
 const ArchiveLeadModal = lazy(() => import('./components/modals/ArchiveLeadModal'));
 const ContactOutcomeModal = lazy(() => import('./components/modals/ContactOutcomeModal'));
 const LeadFormModal = lazy(() => import('./components/modals/LeadFormModal'));
+const QuoteModal = lazy(() => import('./components/modals/QuoteModal'));
 const TaskFormModal = lazy(() => import('./components/modals/TaskFormModal'));
 const AgendaView = lazy(() => import('./pages/AgendaPage'));
 const Dashboard = lazy(() => import('./pages/DashboardPage'));
@@ -69,6 +70,8 @@ export default function App() {
     leads,
     appointments,
     tasks,
+    quotes,
+    workspaceEvents,
     clinicSettings,
     treatmentPrices,
     leadEvents,
@@ -94,6 +97,8 @@ export default function App() {
   const [templateSaving, setTemplateSaving] = useState(false);
   const [contactOutcomeModal, setContactOutcomeModal] = useState(null);
   const [contactOutcomeSaving, setContactOutcomeSaving] = useState(false);
+  const [quoteModal, setQuoteModal] = useState(null);
+  const [quoteSaving, setQuoteSaving] = useState(false);
 
   useEffect(() => {
     if (authError) setError(authError);
@@ -114,6 +119,8 @@ export default function App() {
     setTemplateSaving(false);
     setContactOutcomeModal(null);
     setContactOutcomeSaving(false);
+    setQuoteModal(null);
+    setQuoteSaving(false);
   }, [session]);
 
   const selectedLead = useMemo(() => leads.find((lead) => lead.id === selectedLeadId) || null, [leads, selectedLeadId]);
@@ -172,7 +179,7 @@ export default function App() {
 
     if (statusChanged && patch.status === LEAD_STATUS.scheduled) {
       if (!before) {
-        setError('No se pudo encontrar el lead para agendar la consulta.');
+        setError('No se pudo encontrar al paciente para agendar la consulta.');
         return;
       }
 
@@ -180,7 +187,24 @@ export default function App() {
       return;
     }
 
-    if (statusChanged && patch.status !== 'Tratamiento Iniciado') {
+    if (statusChanged && patch.status === 'Tratamiento Iniciado') {
+      const { error: treatmentError } = await supabase.rpc('register_lead_outcome', {
+        p_lead_id: leadId,
+        p_outcome: 'treatment_started',
+        p_note: cleanOptionalText(patch.notes),
+        p_followup_at: null,
+      });
+      if (treatmentError) {
+        setError(treatmentError.message || 'No se pudo registrar el inicio del tratamiento.');
+        return;
+      }
+      await refreshClinicData();
+      if (selectedLeadId === leadId) await loadLeadEvents(leadId);
+      setNotice('Tratamiento iniciado; se cerraron las acciones comerciales abiertas.');
+      return;
+    }
+
+    if (statusChanged) {
       const taskConfig = taskConfigForLeadStatus({ ...before, ...leadPatch }, patch.status);
       const workflowSaved = await saveLeadFollowup(before, {
         status: patch.status,
@@ -235,7 +259,7 @@ export default function App() {
 
       if (eventError) {
         console.error('Error creating lead event', eventError);
-        eventErrorMessage = `El lead se actualizo, pero no se pudo crear el evento: ${eventError.message}`;
+        eventErrorMessage = `El paciente se actualizó, pero no se pudo crear el evento: ${eventError.message}`;
       }
     }
 
@@ -246,7 +270,7 @@ export default function App() {
       );
 
       if (taskError) {
-        eventErrorMessage = eventErrorMessage || `El lead se actualizo, pero no se pudo sincronizar la tarea: ${taskError.message}`;
+        eventErrorMessage = eventErrorMessage || `El paciente se actualizó, pero no se pudo sincronizar la próxima acción: ${taskError.message}`;
       }
     }
 
@@ -256,12 +280,12 @@ export default function App() {
       setError(eventErrorMessage);
       return;
     }
-    setNotice('Lead actualizado.');
+    setNotice('Paciente actualizado.');
   }
 
   function openAppointmentModal(lead, appointment = null, mode = 'schedule') {
     if (!lead?.id) {
-      setError('No se pudo identificar el lead para agendar la consulta.');
+      setError('No se pudo identificar al paciente para agendar la consulta.');
       return;
     }
 
@@ -273,7 +297,7 @@ export default function App() {
     const leadFromState = leads.find((lead) => lead.id === appointment.lead_id);
     const leadFromAppointment = appointment.leads
       ? { ...appointment.leads, id: appointment.leads.id || appointment.lead_id }
-      : { id: appointment.lead_id, name: 'Lead asociado' };
+      : { id: appointment.lead_id, name: 'Paciente asociado' };
 
     openAppointmentModal(leadFromState || leadFromAppointment, appointment, 'reschedule');
   }
@@ -392,7 +416,7 @@ export default function App() {
 
     await refreshClinicData();
     if (selectedLeadId === lead.id) await loadLeadEvents(lead.id);
-    setNotice('Lead contactado; la tarea de contacto se cerró y quedó creado el próximo seguimiento.');
+    setNotice('Contacto registrado; la acción anterior se cerró y quedó creado el próximo paso.');
     return true;
   }
 
@@ -416,7 +440,7 @@ export default function App() {
 
   function openArchiveLeadModal(lead) {
     if (!canAdmin) {
-      setError('Solo un admin puede archivar leads.');
+      setError('Sólo owner/admin puede archivar pacientes.');
       return;
     }
 
@@ -449,7 +473,7 @@ export default function App() {
 
     const name = String(form.name || '').trim();
     if (!name) {
-      throw new Error('El nombre del lead es obligatorio.');
+      throw new Error('El nombre del paciente es obligatorio.');
     }
 
     if (!MANUAL_LEAD_SOURCES.includes(form.source)) {
@@ -487,7 +511,7 @@ export default function App() {
 
       const createdLead = Array.isArray(data) ? data[0] : data;
       if (!createdLead?.id) {
-        throw new Error('La RPC no devolvió el lead creado.');
+        throw new Error('No se pudo recuperar la consulta creada.');
       }
 
       await refreshClinicData();
@@ -501,7 +525,7 @@ export default function App() {
         setActiveView('lead-detail');
       }
 
-      setNotice(scheduleAfterSave ? 'Lead creado. Elegí un horario para agendarlo.' : 'Lead creado y tarea de seguimiento generada.');
+      setNotice(scheduleAfterSave ? 'Consulta creada. Elegí un horario para agendarla.' : 'Consulta creada y próxima acción generada.');
     } finally {
       setLeadFormSaving(false);
     }
@@ -512,13 +536,16 @@ export default function App() {
 
     const editableFields = canAdmin ? LEAD_ADMIN_EDIT_FIELDS : LEAD_RECEPTIONIST_EDIT_FIELDS;
     const patch = buildLeadFormPatch(form, editableFields);
+    const requestedAssignee = patch.assigned_to;
+    const assignmentChanged = canAdmin && requestedAssignee && requestedAssignee !== lead.assigned_to;
+    delete patch.assigned_to;
 
     if (canAdmin && !patch.name) {
-      throw new Error('El nombre del lead es obligatorio.');
+      throw new Error('El nombre del paciente es obligatorio.');
     }
 
     if (patch.status === ARCHIVED_STATUS && !isArchivedLead(lead)) {
-      throw new Error('Para archivar un lead usa el boton Archivar y registra el motivo.');
+      throw new Error('Para archivar un paciente usá el botón Archivar y registrá el motivo.');
     }
 
     if (patch.status === 'Perdido' && patch.status !== lead.status) {
@@ -552,9 +579,16 @@ export default function App() {
 
           await createLeadEvent(lead.id, {
             event_type: 'lead_updated',
-            title: 'Lead editado',
-            description: 'Datos del lead actualizados',
+            title: 'Paciente editado',
+            description: 'Datos del paciente actualizados',
           });
+          if (assignmentChanged) {
+            const { error: reassignmentError } = await supabase.rpc('reassign_lead_owner', {
+              p_lead_id: lead.id,
+              p_assigned_to: requestedAssignee,
+            });
+            if (reassignmentError) throw new Error(reassignmentError.message);
+          }
           await refreshClinicData();
         } finally {
           setLeadFormSaving(false);
@@ -563,6 +597,33 @@ export default function App() {
 
       setLeadModal(null);
       openAppointmentModal({ ...lead, ...patchWithoutStatus });
+      return;
+    }
+
+    if (statusChanged && patch.status === 'Tratamiento Iniciado') {
+      setLeadFormSaving(true);
+      try {
+        const { error: treatmentError } = await supabase.rpc('register_lead_outcome', {
+          p_lead_id: lead.id,
+          p_outcome: 'treatment_started',
+          p_note: cleanOptionalText(patch.notes),
+          p_followup_at: null,
+        });
+        if (treatmentError) throw new Error(treatmentError.message);
+        if (assignmentChanged) {
+          const { error: reassignmentError } = await supabase.rpc('reassign_lead_owner', {
+            p_lead_id: lead.id,
+            p_assigned_to: requestedAssignee,
+          });
+          if (reassignmentError) throw new Error(reassignmentError.message);
+        }
+        await refreshClinicData();
+        if (selectedLeadId === lead.id) await loadLeadEvents(lead.id);
+        setLeadModal(null);
+        setNotice('Tratamiento iniciado; se cerraron las acciones comerciales abiertas.');
+      } finally {
+        setLeadFormSaving(false);
+      }
       return;
     }
 
@@ -591,7 +652,7 @@ export default function App() {
           await refreshClinicData();
         }
         setLeadModal(null);
-        setNotice('Lead actualizado y seguimiento sincronizado.');
+        setNotice('Paciente actualizado y próxima acción sincronizada.');
       } finally {
         setLeadFormSaving(false);
       }
@@ -613,10 +674,18 @@ export default function App() {
         throw new Error(updateError.message);
       }
 
+      if (assignmentChanged) {
+        const { error: reassignmentError } = await supabase.rpc('reassign_lead_owner', {
+          p_lead_id: lead.id,
+          p_assigned_to: requestedAssignee,
+        });
+        if (reassignmentError) throw new Error(reassignmentError.message);
+      }
+
       const { error: eventError } = await createLeadEvent(lead.id, {
         event_type: 'lead_updated',
-        title: 'Lead editado',
-        description: 'Datos del lead actualizados',
+        title: 'Paciente editado',
+        description: 'Datos del paciente actualizados',
       });
 
       const mergedLead = { ...lead, ...patch, clinic_id: profile.clinic_id };
@@ -630,16 +699,16 @@ export default function App() {
       setLeadModal(null);
 
       if (eventError) {
-        setError(`El lead fue actualizado, pero no se pudo registrar el evento: ${eventError.message}`);
+        setError(`El paciente fue actualizado, pero no se pudo registrar el evento: ${eventError.message}`);
         return;
       }
 
       if (taskError) {
-        setError(`El lead fue actualizado, pero no se pudo sincronizar la tarea: ${taskError.message}`);
+        setError(`El paciente fue actualizado, pero no se pudo sincronizar la próxima acción: ${taskError.message}`);
         return;
       }
 
-      setNotice('Lead editado.');
+      setNotice('Paciente editado.');
     } finally {
       setLeadFormSaving(false);
     }
@@ -647,7 +716,7 @@ export default function App() {
 
   async function saveLeadLoss(lead, { reason, note, archive }) {
     if (!profile?.clinic_id || !lead?.id) throw new Error('No se pudo identificar la oportunidad.');
-    if (archive && !canAdmin) throw new Error('Solo owner/admin puede archivar leads.');
+    if (archive && !canAdmin) throw new Error('Sólo owner/admin puede archivar pacientes.');
 
     setArchiveSaving(true);
     setError('');
@@ -794,7 +863,7 @@ export default function App() {
     const lead = modal?.lead;
 
     if (!profile?.clinic_id || !lead?.id) {
-      throw new Error('No se pudo identificar la clinica o el lead para guardar la consulta.');
+      throw new Error('No se pudo identificar la clínica o el paciente para guardar la consulta.');
     }
 
     const isReschedule = modal.mode === 'reschedule';
@@ -838,8 +907,8 @@ export default function App() {
 
   async function updateAppointmentOutcome(appointment, action) {
     if (!profile?.clinic_id || !appointment?.id || !appointment?.lead_id) {
-      setError('No se pudo identificar el turno o el lead asociado.');
-      return;
+      setError('No se pudo identificar la cita o el paciente asociado.');
+      return false;
     }
 
     const configs = {
@@ -855,10 +924,14 @@ export default function App() {
         outcome: APPOINTMENT_STATUS.noShow,
         notice: 'Inasistencia registrada.',
       },
+      cancel: {
+        outcome: APPOINTMENT_STATUS.cancelled,
+        notice: 'Cita cancelada y recuperación programada.',
+      },
     };
 
     const config = configs[action];
-    if (!config) return;
+    if (!config) return false;
 
     setAppointmentActionId(`${appointment.id}:${action}`);
     setError('');
@@ -873,7 +946,7 @@ export default function App() {
       console.error('Error updating appointment outcome', outcomeError);
       setError(outcomeError.message || 'No se pudo actualizar el resultado del turno.');
       setAppointmentActionId('');
-      return;
+      return false;
     }
 
     await refreshClinicData();
@@ -883,6 +956,69 @@ export default function App() {
 
     setAppointmentActionId('');
     setNotice(config.notice);
+    return true;
+  }
+
+  async function confirmAppointmentById(appointmentId) {
+    const appointment = appointments.find((item) => item.id === appointmentId);
+    if (!appointment) {
+      setError('No se encontró la cita para confirmar.');
+      return;
+    }
+    await updateAppointmentOutcome(appointment, 'confirm');
+  }
+
+  function openRegisterOutcome(context) {
+    if (!context?.lead?.id) return;
+    setError('');
+    setContactOutcomeModal({ ...context, source: context.source || 'manual' });
+  }
+
+  function openQuoteModal(lead, appointment = null, quote = null) {
+    if (!lead?.id) {
+      setError('No se pudo identificar el paciente del presupuesto.');
+      return;
+    }
+    setError('');
+    setQuoteModal({ lead, appointment, quote });
+  }
+
+  async function saveQuote(form) {
+    const context = quoteModal;
+    if (!context?.lead?.id) throw new Error('No se pudo identificar el paciente.');
+    setQuoteSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      const request = context.quote
+        ? supabase.rpc('update_treatment_quote', {
+            p_quote_id: context.quote.id,
+            p_treatment: form.treatment,
+            p_amount: form.amount,
+            p_currency: 'PYG',
+            p_professional_name: cleanOptionalText(form.professional_name),
+            p_next_action_at: form.next_action_at,
+            p_notes: cleanOptionalText(form.notes),
+          })
+        : supabase.rpc('create_treatment_quote', {
+            p_lead_id: context.lead.id,
+            p_appointment_id: context.appointment?.id || null,
+            p_treatment: form.treatment,
+            p_amount: form.amount,
+            p_currency: 'PYG',
+            p_professional_name: cleanOptionalText(form.professional_name),
+            p_next_action_at: form.next_action_at,
+            p_notes: cleanOptionalText(form.notes),
+          });
+      const { error: quoteError } = await request;
+      if (quoteError) throw new Error(quoteError.message);
+      await refreshClinicData();
+      if (selectedLeadId === context.lead.id) await loadLeadEvents(context.lead.id);
+      setQuoteModal(null);
+      setNotice(context.quote ? 'Presupuesto actualizado.' : 'Presupuesto registrado y seguimiento creado.');
+    } finally {
+      setQuoteSaving(false);
+    }
   }
 
   async function completeTask(taskId) {
@@ -892,7 +1028,7 @@ export default function App() {
     if (task && isContactTask(task)) {
       const lead = leads.find((item) => item.id === task.lead_id) || task.leads;
       if (!lead) {
-        setError('La tarea de contacto no tiene un lead disponible.');
+        setError('La acción de contacto no tiene un paciente disponible.');
         return;
       }
       setContactOutcomeModal({ lead, task, source: 'task' });
@@ -913,11 +1049,11 @@ export default function App() {
     setNotice('Tarea marcada como hecha.');
   }
 
-  async function handleWhatsAppOpened({ lead, task = null, templateKey }) {
+  async function handleWhatsAppOpened({ lead, task = null, action = null, templateKey }) {
     const linkedTask = task || tasks.find((item) => item.lead_id === lead.id
       && isContactTask(item)
       && isOpenTask(item));
-    setContactOutcomeModal({ lead, task: linkedTask || null, templateKey, source: 'whatsapp' });
+    setContactOutcomeModal({ lead, task: linkedTask || null, action, templateKey, source: 'whatsapp' });
 
     const { error: eventError } = await supabase.rpc('record_whatsapp_opened', {
       p_lead_id: lead.id,
@@ -945,56 +1081,84 @@ export default function App() {
     setNotice('Mensaje copiado y acción registrada.');
   }
 
-  async function submitContactOutcome(outcome, note) {
+  async function submitContactOutcome({ outcome, note, followupAt, quote }) {
     const context = contactOutcomeModal;
     if (!context?.lead?.id) return;
+
+    if (outcome === 'schedule') {
+      const linkedAppointment = appointments.find((item) => item.id === context.action?.appointmentId) || null;
+      setContactOutcomeModal(null);
+      openAppointmentModal(context.lead, linkedAppointment, linkedAppointment ? 'reschedule' : 'schedule');
+      return;
+    }
+    if (outcome === 'attended' || outcome === 'no_show') {
+      const linkedAppointment = appointments.find((item) => item.id === context.action?.appointmentId);
+      if (!linkedAppointment) {
+        setError('No se encontró la cita para registrar la asistencia.');
+        return;
+      }
+      const saved = await updateAppointmentOutcome(linkedAppointment, outcome === 'attended' ? 'attended' : 'noShow');
+      if (saved) setContactOutcomeModal(null);
+      return;
+    }
+    if (outcome === 'quote_pending') {
+      const appointment = appointments.find((item) => item.id === context.action?.appointmentId)
+        || appointments.filter((item) => item.lead_id === context.lead.id && item.status === APPOINTMENT_STATUS.attended).at(-1)
+        || null;
+      setContactOutcomeModal(null);
+      openQuoteModal(context.lead, appointment);
+      return;
+    }
+    if (outcome === 'no_continue') {
+      setContactOutcomeModal(null);
+      openLostLeadModal(context.lead);
+      return;
+    }
+
     setContactOutcomeSaving(true);
     setError('');
     setNotice('');
 
     try {
-      if (context.task?.id) {
-        const { error: outcomeError } = await supabase.rpc('complete_contact_task', {
-          p_task_id: context.task.id,
-          p_outcome: outcome,
+      if (outcome === 'quote_accepted' || outcome === 'quote_rejected') {
+        if (!quote?.id) throw new Error('No se encontró un presupuesto pendiente.');
+        if (outcome === 'quote_rejected' && !cleanOptionalText(note)) throw new Error('Escribí el motivo del rechazo.');
+        const { error: quoteStatusError } = await supabase.rpc('set_treatment_quote_status', {
+          p_quote_id: quote.id,
+          p_status: outcome === 'quote_accepted' ? 'accepted' : 'rejected',
+          p_rejection_reason: outcome === 'quote_rejected' ? cleanOptionalText(note) : null,
+          p_notes: cleanOptionalText(note),
+        });
+        if (quoteStatusError) throw quoteStatusError;
+      } else {
+        const rpcOutcome = {
+          responded: 'responded',
+          no_response: 'no_response',
+          follow_up: 'follow_up',
+          treatment_started: 'treatment_started',
+        }[outcome];
+        if (!rpcOutcome) throw new Error('Resultado no reconocido.');
+        const { error: outcomeError } = await supabase.rpc('register_lead_outcome', {
+          p_lead_id: context.lead.id,
           p_note: cleanOptionalText(note),
+          p_outcome: rpcOutcome,
+          p_followup_at: outcome === 'treatment_started' ? null : followupAt,
         });
         if (outcomeError) throw outcomeError;
-      } else if (outcome === 'respondio') {
-        const { error: contactedError } = await supabase.rpc('mark_lead_contacted', {
-          p_lead_id: context.lead.id,
-          p_contact_channel: context.source === 'whatsapp' ? 'whatsapp' : 'manual',
-          p_note: cleanOptionalText(note),
-          p_next_action: 'Hacer seguimiento',
-          p_next_followup_at: tomorrowFollowupAsuncion(),
-        });
-        if (contactedError) throw contactedError;
-      } else if (outcome === 'posponer') {
-        const { error: postponeError } = await supabase.rpc('save_lead_followup', {
-          p_lead_id: context.lead.id,
-          p_status: null,
-          p_next_action: context.lead.next_action || 'Reintentar contacto',
-          p_next_followup_at: addDaysAsuncion(1, 9),
-        });
-        if (postponeError) throw postponeError;
-      } else {
-        const { error: attemptError } = await supabase.rpc('record_contact_attempt', {
-          p_lead_id: context.lead.id,
-          p_outcome: outcome,
-          p_note: cleanOptionalText(note),
-          p_contact_channel: context.source === 'whatsapp' ? 'whatsapp' : 'manual',
-        });
-        if (attemptError) throw attemptError;
       }
 
       await refreshClinicData();
       if (selectedLeadId === context.lead.id) await loadLeadEvents(context.lead.id);
       setContactOutcomeModal(null);
-      setNotice(outcome === 'respondio'
-        ? 'Contacto confirmado y tareas sincronizadas.'
-        : outcome === 'posponer'
-          ? 'Contacto pospuesto para mañana.'
-          : 'Intento registrado y próximo contacto programado.');
+      const notices = {
+        responded: 'Respuesta registrada y próximo paso programado.',
+        no_response: 'Intento registrado y reintento programado.',
+        follow_up: 'Próximo contacto programado.',
+        quote_accepted: 'Presupuesto aceptado. No se registró ningún cobro.',
+        quote_rejected: 'Presupuesto rechazado y próximo paso creado.',
+        treatment_started: 'Tratamiento iniciado; se cerraron las acciones comerciales abiertas.',
+      };
+      setNotice(notices[outcome] || 'Resultado registrado.');
     } catch (outcomeError) {
       console.error('Error saving contact outcome', outcomeError);
       setError(outcomeError.message || 'No se pudo guardar el resultado del contacto.');
@@ -1070,6 +1234,8 @@ export default function App() {
           leads={activeLeads}
           appointments={appointments}
           tasks={tasks}
+          quotes={quotes}
+          workspaceEvents={workspaceEvents}
           profiles={clinicProfiles}
           canAdmin={canAdmin}
           onCreateLead={openCreateLeadModal}
@@ -1079,6 +1245,9 @@ export default function App() {
           onMarkContacted={markLeadContacted}
           onPostpone={postponeLeadFollowup}
           onWhatsAppOpened={handleWhatsAppOpened}
+          onRegisterOutcome={openRegisterOutcome}
+          onConfirmAppointment={confirmAppointmentById}
+          onRefresh={() => refreshClinicData()}
           messageTemplates={messageTemplates}
           clinicContext={clinicContext}
           onNavigate={setActiveView}
@@ -1106,6 +1275,7 @@ export default function App() {
           leads={leads}
           appointments={appointments}
           tasks={tasks}
+          quotes={quotes}
           canAdmin={canAdmin}
           onCreateLead={openCreateLeadModal}
           onEditLead={openEditLeadModal}
@@ -1116,6 +1286,7 @@ export default function App() {
           onScheduleAppointment={openAppointmentModal}
           onCreateTask={openCreateTaskModal}
           onMarkContacted={markLeadContacted}
+          onRegisterOutcome={openRegisterOutcome}
           profiles={clinicProfiles}
           onWhatsAppOpened={handleWhatsAppOpened}
           onMessageCopied={handleMessageCopied}
@@ -1130,30 +1301,31 @@ export default function App() {
           events={leadEvents}
           tasks={tasks}
           appointments={appointments}
+          quotes={quotes}
           profiles={clinicProfiles}
           canAdmin={canAdmin}
           onBack={() => setActiveView('leads')}
           onEditLead={openEditLeadModal}
           onArchiveLead={openArchiveLeadModal}
-          onMarkLost={openLostLeadModal}
-          onSave={updateLead}
-          onMarkContacted={markLeadContacted}
           onScheduleAppointment={openAppointmentModal}
+          onRegisterOutcome={openRegisterOutcome}
+          onRegisterQuote={openQuoteModal}
           onWhatsAppOpened={handleWhatsAppOpened}
-          onMessageCopied={handleMessageCopied}
           messageTemplates={messageTemplates}
           clinicContext={clinicContext}
-          setNotice={setNotice}
         />
       ) : null}
       {activeView === 'agenda' ? (
         <AgendaView
           appointments={appointments}
+          quotes={quotes}
           actionId={appointmentActionId}
           onOutcome={updateAppointmentOutcome}
           onReschedule={openRescheduleModal}
           onOpenLead={handleLeadSelect}
           onNavigate={setActiveView}
+          onRegisterQuote={openQuoteModal}
+          onRegisterOutcome={openRegisterOutcome}
         />
       ) : null}
       {activeView === 'tasks' ? (
@@ -1215,8 +1387,18 @@ export default function App() {
           key="contact-outcome-modal"
           context={contactOutcomeModal}
           saving={contactOutcomeSaving}
+          quotes={quotes}
           onClose={() => setContactOutcomeModal(null)}
           onSubmit={submitContactOutcome}
+        />
+      ) : null}
+      {quoteModal ? (
+        <QuoteModal
+          key="quote-modal"
+          context={quoteModal}
+          saving={quoteSaving}
+          onClose={() => setQuoteModal(null)}
+          onSubmit={saveQuote}
         />
       ) : null}
       </AnimatePresence>

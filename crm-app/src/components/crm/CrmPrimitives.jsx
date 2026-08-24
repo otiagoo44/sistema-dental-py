@@ -22,16 +22,16 @@ export function LeadMiniCard({ lead, onOpenLead }) {
 export function Info({ label, value }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
       <p className="mt-1 break-words text-sm font-medium leading-5 text-slate-700">{value === null || value === undefined || value === '' ? 'Sin dato' : value}</p>
     </div>
   );
 }
 
-export function Select({ label, value, onChange, options, placeholder, disabled = false }) {
+export function Select({ label, value, onChange, options, placeholder, disabled = false, className = '' }) {
   return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-semibold text-slate-500">{label}</span>
+    <label className={`block ${className}`}>
+      <span className="mb-2 block text-sm font-semibold text-textMuted">{label}</span>
       <select className="input-premium" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
         {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
         {(options || []).map((option) => {
@@ -44,11 +44,11 @@ export function Select({ label, value, onChange, options, placeholder, disabled 
   );
 }
 
-export function Field({ label, value, onChange, type = 'text', disabled = false, placeholder = '' }) {
+export function Field({ label, value, onChange, type = 'text', disabled = false, placeholder = '', className = '', ...inputProps }) {
   return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-semibold text-slate-500">{label}</span>
-      <input className="input-premium" type={type} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} />
+    <label className={`block ${className}`}>
+      <span className="mb-2 block text-sm font-semibold text-textMuted">{label}</span>
+      <input className="input-premium" type={type} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} {...inputProps} />
     </label>
   );
 }
@@ -56,7 +56,7 @@ export function Field({ label, value, onChange, type = 'text', disabled = false,
 export function TextArea({ label, value, onChange, disabled = false, className = '', placeholder = '' }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-2 block text-xs font-semibold text-slate-500">{label}</span>
+      <span className="mb-2 block text-sm font-semibold text-textMuted">{label}</span>
       <textarea className="input-premium min-h-24" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} />
     </label>
   );

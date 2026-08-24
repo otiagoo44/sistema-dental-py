@@ -241,7 +241,7 @@ textarea:focus-visible {
   }
 
   .input-premium {
-    @apply min-h-11 w-full rounded-xl border border-slate-200 bg-input px-3 py-2 text-sm text-cream outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-mint focus:ring-4 focus:ring-mint/10 disabled:cursor-not-allowed disabled:border-slate-200/60;
+    @apply min-h-11 w-full rounded-xl border border-slate-200 bg-input px-3 py-2 text-base text-cream outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-mint focus:ring-4 focus:ring-mint/10 disabled:cursor-not-allowed disabled:border-slate-200/60;
   }
 
   .modal-premium {

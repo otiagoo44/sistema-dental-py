@@ -18,12 +18,12 @@ export const LEAD_STATUSES = [
 export const CLASSIFICATIONS = ['Lead Caliente', 'Lead Medio', 'Lead Frío'];
 
 export const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', description: 'Lo que necesita atención ahora.' },
-  { id: 'leads', label: 'Leads', description: 'Buscá y gestioná oportunidades.' },
-  { id: 'followups', label: 'Seguimientos', description: 'Acciones pendientes para no perder oportunidades.' },
+  { id: 'dashboard', label: 'Inicio', adminLabel: 'Resumen', description: 'Lo que necesita atención ahora.' },
+  { id: 'leads', label: 'Pacientes', description: 'Buscá y gestioná oportunidades.' },
+  { id: 'followups', label: 'Seguimientos', description: 'Acciones pendientes para no perder oportunidades.', hiddenFromMain: true },
   { id: 'agenda', label: 'Agenda', description: 'Turnos, disponibilidad y asistencia.' },
-  { id: 'tasks', label: 'Tareas', description: 'Trabajo operativo asignado a la clínica.' },
-  { id: 'metrics', label: 'Métricas', description: 'Rendimiento y valor comercial bajo seguimiento.', adminOnly: true },
+  { id: 'tasks', label: 'Tareas', description: 'Trabajo operativo asignado a la clínica.', hiddenFromMain: true },
+  { id: 'metrics', label: 'Análisis', description: 'Análisis comercial secundario.', adminOnly: true },
   { id: 'settings', label: 'Configuración', description: 'Clínica, formulario público y accesos.', adminOnly: true },
 ];
 

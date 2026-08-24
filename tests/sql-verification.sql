@@ -4,7 +4,7 @@
 do $$
 declare
   expected_tables text[] := array[
-    'clinics','profiles','leads','lead_events','appointments','tasks',
+    'clinics','profiles','leads','lead_events','appointments','tasks','quotes',
     'clinic_public_forms','form_submission_logs','clinic_settings',
     'automation_jobs','audit_logs','campaigns','messages','treatment_prices',
     'message_templates','daily_reports'
@@ -43,7 +43,9 @@ begin
     'create_manual_lead','schedule_lead_appointment','update_appointment_outcome',
     'complete_task','mark_lead_contacted','complete_contact_task',
     'record_contact_attempt','record_whatsapp_opened','record_message_copied',
-    'mark_lead_lost'
+    'mark_lead_lost','create_public_lead_intake','reassign_lead_owner',
+    'register_lead_outcome','create_treatment_quote','update_treatment_quote',
+    'set_treatment_quote_status'
   ]) as name
   where not exists (
     select 1
@@ -70,8 +72,8 @@ begin
     raise exception 'Falta el indice de doble reserva appointments_active_slot_unique_idx';
   end if;
 
-  if to_regclass('public.leads_clinic_phone_plus_unique') is null then
-    raise exception 'Falta el indice unico de duplicados por clinica y telefono';
+  if to_regclass('public.leads_clinic_open_phone_plus_unique_idx') is null then
+    raise exception 'Falta el indice de oportunidades abiertas por clinica y telefono';
   end if;
 
   if to_regclass('public.message_templates_clinic_key_unique_idx') is null then
@@ -122,6 +124,8 @@ begin
     select clinic_id, phone_plus
     from public.leads
     where phone_plus is not null
+      and coalesce(is_archived, false) is false
+      and coalesce(status, 'Nuevo') not in ('Perdido', 'Tratamiento Iniciado', 'Archivado')
     group by clinic_id, phone_plus
     having count(*) > 1
   ) duplicates;
@@ -212,7 +216,7 @@ join pg_namespace n on n.oid = c.relnamespace
 left join pg_policies p on p.schemaname = n.nspname and p.tablename = c.relname
 where n.nspname = 'public'
   and c.relname in (
-    'clinics','profiles','leads','lead_events','appointments','tasks',
+    'clinics','profiles','leads','lead_events','appointments','tasks','quotes',
     'clinic_public_forms','form_submission_logs','clinic_settings',
     'automation_jobs','audit_logs','campaigns','messages','treatment_prices',
     'message_templates','daily_reports'
@@ -254,7 +258,7 @@ from pg_indexes
 where schemaname = 'public'
   and indexname in (
     'appointments_active_slot_unique_idx',
-    'leads_clinic_phone_plus_unique',
+    'leads_clinic_open_phone_plus_unique_idx',
     'tasks_open_lead_type_unique_idx'
   )
 order by indexname;

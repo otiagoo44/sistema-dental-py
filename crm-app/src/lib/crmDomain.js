@@ -34,8 +34,9 @@ export const APPOINTMENT_STATUS = {
   attended: 'Asistió',
   noShow: 'No Asistió',
   rescheduled: 'Reprogramado',
+  cancelled: 'Cancelado',
 };
-export const APPOINTMENT_ACTIVE_STATUSES = [APPOINTMENT_STATUS.scheduled, APPOINTMENT_STATUS.confirmed, APPOINTMENT_STATUS.rescheduled];
+export const APPOINTMENT_ACTIVE_STATUSES = [APPOINTMENT_STATUS.scheduled, 'Consulta Agendada', 'Pendiente', APPOINTMENT_STATUS.confirmed, APPOINTMENT_STATUS.rescheduled];
 export const APPOINTMENT_OUTCOME_LEAD_STATUSES = [LEAD_STATUS.confirmed, LEAD_STATUS.attended, LEAD_STATUS.noShow];
 export const TASK_OPEN_STATUSES = ['pendiente', 'vencido', 'Pendiente', 'Vencida'];
 export const TASK_PRIORITY_BY_CLASSIFICATION = {
@@ -70,6 +71,7 @@ export const LEAD_ADMIN_EDIT_FIELDS = [
   'next_action',
   'next_followup_at',
   'notes',
+  'assigned_to',
 ];
 export const LEAD_RECEPTIONIST_EDIT_FIELDS = ['status', 'next_action', 'next_followup_at', 'contact_attempts', 'notes'];
 export const DEFAULT_PUBLIC_FORM_WEBHOOK_URL = 'https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake';
@@ -83,6 +85,67 @@ export function cleanOptionalText(value) {
 
 export function normalizeRole(role) {
   return role === ROLE.admin || role === ROLE.owner ? ROLE.admin : ROLE.receptionist;
+}
+
+const normalizedLeadStatuses = new Map([
+  ['nuevo', 'Nuevo'],
+  ['no contactado', 'No Contactado'],
+  ['contactado', 'Contactado'],
+  ['respondio', 'Respondió'],
+  ['consulta agendada', 'Consulta Agendada'],
+  ['agendado', 'Consulta Agendada'],
+  ['confirmado', 'Confirmado'],
+  ['asistio', 'Asistió'],
+  ['presupuesto enviado', 'Presupuesto Enviado'],
+  ['tratamiento iniciado', 'Tratamiento Iniciado'],
+  ['no respondio', 'No Respondió'],
+  ['perdido', 'Perdido'],
+  ['reactivar 30d', 'Reactivar 30d'],
+  ['no asistio', 'No Asistió'],
+  ['archivado', 'Archivado'],
+]);
+
+export function normalizeLeadStatus(status) {
+  const key = normalizeText(String(status || '')
+    .replace(/Ã³/g, 'o')
+    .replace(/Ã­/g, 'i'));
+  return normalizedLeadStatuses.get(key) || String(status || '').trim();
+}
+
+export function normalizeAppointmentStatus(status) {
+  const normalized = normalizeLeadStatus(status);
+  if (normalized === 'Consulta Agendada') return APPOINTMENT_STATUS.scheduled;
+  return normalized;
+}
+
+export function normalizeTaskStatus(status) {
+  const value = normalizeText(status);
+  if (['hecho', 'completada', 'completado'].includes(value)) return 'done';
+  if (['cancelado', 'cancelada'].includes(value)) return 'cancelled';
+  if (['vencido', 'vencida'].includes(value)) return 'overdue';
+  if (['pendiente', 'pending'].includes(value)) return 'open';
+  return value || 'open';
+}
+
+export function isTerminalLeadStatus(status) {
+  return terminalStatuses.includes(normalizeLeadStatus(status));
+}
+
+export function canTransitionAppointment(status, outcome, appointmentAt, now = new Date()) {
+  const current = normalizeAppointmentStatus(status);
+  const target = normalizeAppointmentStatus(outcome);
+  const moment = appointmentAt ? new Date(appointmentAt) : null;
+  const isPast = moment && !Number.isNaN(moment.getTime()) ? moment.getTime() <= now.getTime() : false;
+  const activeUnconfirmed = [APPOINTMENT_STATUS.scheduled, 'Pendiente', APPOINTMENT_STATUS.rescheduled];
+  const active = [...activeUnconfirmed, APPOINTMENT_STATUS.confirmed];
+
+  if (current === target) return false;
+  if (target === APPOINTMENT_STATUS.confirmed) return activeUnconfirmed.includes(current) && !isPast;
+  if ([APPOINTMENT_STATUS.attended, APPOINTMENT_STATUS.noShow].includes(target)) return active.includes(current) && isPast;
+  if (target === APPOINTMENT_STATUS.cancelled) return active.includes(current);
+  if (target === APPOINTMENT_STATUS.rescheduled) return active.includes(current)
+    || [APPOINTMENT_STATUS.noShow, APPOINTMENT_STATUS.cancelled].includes(current);
+  return false;
 }
 
 export function isArchivedLead(lead) {
@@ -105,7 +168,7 @@ export function getTreatmentOptions(clinicSettings, treatmentPrices = []) {
 }
 
 export function isOpenTask(task) {
-  return !['hecho', 'completada', 'cancelado', 'cancelada'].includes(normalizeText(task?.status));
+  return !['done', 'cancelled'].includes(normalizeTaskStatus(task?.status));
 }
 
 export function isContactTask(task) {
@@ -352,6 +415,7 @@ export function buildLeadFormPatch(form, fields) {
   if (allowed.has('next_action')) patch.next_action = cleanOptionalText(form.next_action);
   if (allowed.has('next_followup_at')) patch.next_followup_at = fromDatetimeLocalAsuncion(form.next_followup_at);
   if (allowed.has('notes')) patch.notes = cleanOptionalText(form.notes);
+  if (allowed.has('assigned_to')) patch.assigned_to = cleanOptionalText(form.assigned_to);
 
   return patch;
 }

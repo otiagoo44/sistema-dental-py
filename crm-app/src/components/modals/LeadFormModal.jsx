@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CalendarPlus, Save } from 'lucide-react';
-import { CLASSIFICATIONS, EVALUATION_OPTIONS, LEAD_STATUSES, NEXT_ACTION_OPTIONS, SITUATION_OPTIONS, TREATMENT_OPTIONS, URGENCY_OPTIONS } from '../../lib/constants';
+import { CLASSIFICATIONS, EVALUATION_OPTIONS, NEXT_ACTION_OPTIONS, SITUATION_OPTIONS, TREATMENT_OPTIONS, URGENCY_OPTIONS } from '../../lib/constants';
 import { addDaysAsuncion, formatDateTime, fromDatetimeLocalAsuncion, toDatetimeLocalAsuncion } from '../../lib/formatters';
-import { ARCHIVED_STATUS, MANUAL_LEAD_SOURCES, isArchivedLead, addHoursIso } from '../../lib/crmDomain';
+import { MANUAL_LEAD_SOURCES, addHoursIso } from '../../lib/crmDomain';
 import { Select, Field, TextArea } from '../crm/CrmPrimitives';
 import { ModalHeader, ModalActions } from './ModalParts';
 import Button from '../ui/Button';
@@ -45,11 +45,6 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
   const [followupPreset, setFollowupPreset] = useState(lead ? 'custom' : 'today');
   const isCreate = mode === 'create';
   const fullEdit = isCreate || canAdmin;
-  const statusOptions = useMemo(() => {
-    const options = LEAD_STATUSES.filter((status) => status !== ARCHIVED_STATUS);
-    return isArchivedLead(lead) ? [...options, ARCHIVED_STATUS] : options;
-  }, [lead]);
-
   useEffect(() => {
     setForm(getLeadFormDefaults(lead, currentUserId));
     setFormError('');
@@ -62,17 +57,17 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
 
   async function handleSubmit(scheduleAfterSave = false) {
     if ((isCreate || fullEdit) && !String(form.name || '').trim()) {
-      setFormError('El nombre del lead es obligatorio.');
+      setFormError('El nombre del paciente es obligatorio.');
       return;
     }
 
     if (isCreate && !String(form.phone || '').trim() && !String(form.phone_plus || '').trim()) {
-      setFormError('El teléfono del lead es obligatorio.');
+      setFormError('El teléfono del paciente es obligatorio.');
       return;
     }
 
     if (isCreate && !form.source) {
-      setFormError('Elegí cómo llegó el lead.');
+      setFormError('Elegí cómo llegó la consulta.');
       return;
     }
 
@@ -86,21 +81,23 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
     try {
       await onSubmit(form, { scheduleAfterSave });
     } catch (submitError) {
-      setFormError(submitError.message || 'No se pudo guardar el lead.');
+      setFormError(submitError.message || 'No se pudo guardar la consulta.');
     }
   }
 
   return (
     <ModalShell
       className="max-w-4xl p-4 sm:p-6"
+      onClose={onClose}
+      titleId="lead-form-title"
       onSubmit={(event) => {
         event.preventDefault();
         handleSubmit(false);
       }}
     >
-        <ModalHeader title={isCreate ? 'Nuevo lead' : 'Editar lead'} subtitle={isCreate ? 'Carga rápida · menos de 45 segundos' : lead?.name || 'Lead'} onClose={onClose} disabled={saving} />
+        <ModalHeader title={isCreate ? 'Nueva consulta' : 'Editar paciente'} subtitle={isCreate ? 'Carga rápida · menos de 45 segundos' : lead?.name || 'Paciente'} onClose={onClose} disabled={saving} titleId="lead-form-title" />
 
-        {formError ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
+        {formError ? <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
 
         {fullEdit ? (
           <div className="space-y-5">
@@ -118,28 +115,28 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
                 <Select label="Urgencia" value={form.urgency} onChange={(value) => updateField('urgency', value)} options={URGENCY_OPTIONS} disabled={saving} />
                 <Select label="Evaluación previa" value={form.evaluation_previous} onChange={(value) => updateField('evaluation_previous', value)} options={EVALUATION_OPTIONS} disabled={saving} />
                 <Select label="Situación" value={form.situation} onChange={(value) => updateField('situation', value)} options={SITUATION_OPTIONS} disabled={saving} />
-                <Select label="Clasificación" value={form.classification} onChange={(value) => updateField('classification', value)} options={CLASSIFICATIONS} disabled={saving} />
-                {!isCreate ? <Select label="Estado comercial" value={form.status} onChange={(value) => updateField('status', value)} options={statusOptions} disabled={saving} /> : null}
+                {canAdmin ? <Select label="Clasificación interna" value={form.classification} onChange={(value) => updateField('classification', value)} options={CLASSIFICATIONS} disabled={saving} /> : null}
+                {!isCreate ? <div className="rounded-xl border border-slate-200 bg-soft p-3"><p className="text-sm font-semibold text-textMuted">Estado actual</p><p className="mt-1 font-bold text-cream">{form.status}</p></div> : null}
                 <TextArea label="Motivo o nota breve (opcional)" value={form.consultation_reason} onChange={(value) => updateField('consultation_reason', value)} disabled={saving} className="md:col-span-2 xl:col-span-3" placeholder="Contexto comercial mínimo, sin información clínica sensible." />
               </div>
             </FormSection>
 
             <FormSection number="3" title="Seguimiento" description="Al guardar se genera o actualiza una tarea sin duplicados.">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold text-slate-500">Responsable</span>
-                  <select className="input-premium" value={form.assigned_to} onChange={(event) => updateField('assigned_to', event.target.value)} disabled={saving || !isCreate}>
+                {canAdmin ? <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-textMuted">Encargado</span>
+                  <select className="input-premium" value={form.assigned_to} onChange={(event) => updateField('assigned_to', event.target.value)} disabled={saving || (!isCreate && !canAdmin)}>
                     {(profiles || []).map((clinicProfile) => <option key={clinicProfile.id} value={clinicProfile.id}>{clinicProfile.full_name} · {clinicProfile.role}</option>)}
                   </select>
-                </label>
-                <Select label="Próxima acción" value={form.next_action} onChange={(value) => updateField('next_action', value)} options={NEXT_ACTION_OPTIONS} disabled={saving} />
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold text-slate-500">Próximo seguimiento</span>
+                </label> : isCreate ? <div className="rounded-xl border border-mint/20 bg-mint/[0.06] p-3 md:col-span-2"><p className="text-sm text-textSoft">El sistema asignará esta consulta y creará automáticamente la primera acción.</p></div> : null}
+                {isCreate && canAdmin ? <Select label="Qué hacer después" value={form.next_action} onChange={(value) => updateField('next_action', value)} options={NEXT_ACTION_OPTIONS} disabled={saving} /> : !isCreate ? <div className="rounded-xl border border-slate-200 bg-soft p-3 md:col-span-2"><p className="text-sm font-semibold text-textMuted">Próxima acción actual</p><p className="mt-1 font-bold text-cream">{form.next_action || 'Sin definir'}</p><p className="mt-1 text-sm text-textMuted">Usá “Registrar resultado” para cambiar el flujo.</p></div> : null}
+                {isCreate && canAdmin ? <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-textMuted">Próximo seguimiento</span>
                   <select className="input-premium" value={followupPreset} onChange={(event) => { const preset = event.target.value; setFollowupPreset(preset); const value = followupPresetValue(preset); if (value) updateField('next_followup_at', value); }} disabled={saving}>
                     <option value="today">Hoy</option><option value="tomorrow">Mañana</option><option value="3d">En 3 días</option><option value="7d">En 7 días</option><option value="custom">Fecha personalizada</option>
                   </select>
-                </label>
-                {followupPreset === 'custom' ? <Field label="Fecha y hora personalizada" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} /> : <div className="rounded-xl border border-sky-400/20 bg-sky-400/10 p-3 text-sm text-sky-300 md:col-span-2 xl:col-span-3">Seguimiento programado para {formatDateTime(fromDatetimeLocalAsuncion(form.next_followup_at))}.</div>}
+                </label> : null}
+                {isCreate && canAdmin ? followupPreset === 'custom' ? <Field label="Fecha y hora personalizada" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} /> : <div className="rounded-xl border border-sky-400/20 bg-sky-400/10 p-3 text-sm text-sky-300 md:col-span-2 xl:col-span-3">Seguimiento programado para {formatDateTime(fromDatetimeLocalAsuncion(form.next_followup_at))}.</div> : null}
                 <TextArea label={isCreate ? 'Nota interna (opcional)' : 'Notas'} value={form.notes} onChange={(value) => updateField('notes', value)} disabled={saving} className="md:col-span-2 xl:col-span-3" />
                 {canAdmin && !isCreate ? <><Field label="Score" type="number" value={form.score} onChange={(value) => updateField('score', value)} disabled={saving} /><Field label="Valor potencial estimado" type="number" value={form.estimated_value} onChange={(value) => updateField('estimated_value', value)} disabled={saving} /></> : null}
               </div>
@@ -147,11 +144,9 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
             </FormSection>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Select label="Estado comercial" value={form.status} onChange={(value) => updateField('status', value)} options={statusOptions} disabled={saving} />
-            <Select label="Próxima acción" value={form.next_action} onChange={(value) => updateField('next_action', value)} options={NEXT_ACTION_OPTIONS} disabled={saving} />
-            <Field label="Próximo seguimiento" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} />
-            <TextArea label="Notas" value={form.notes} onChange={(value) => updateField('notes', value)} disabled={saving} className="md:col-span-2" />
+          <div className="grid gap-4">
+            <div className="rounded-xl border border-slate-200 bg-soft p-4"><p className="text-sm font-semibold text-textMuted">Qué hacer después</p><p className="mt-1 font-bold text-cream">{form.next_action || 'Sin definir'}</p><p className="mt-1 text-sm text-textMuted">Los cambios operativos se realizan con “Registrar resultado”.</p></div>
+            <TextArea label="Notas" value={form.notes} onChange={(value) => updateField('notes', value)} disabled={saving} />
           </div>
         )}
 
@@ -159,7 +154,7 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
           <div className="mt-5 flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
             <Button variant="ghost" type="button" onClick={onClose} disabled={saving}>Cancelar</Button>
             <Button variant="secondary" type="button" onClick={() => handleSubmit(true)} disabled={saving}><CalendarPlus className="h-4 w-4" />Guardar y agendar</Button>
-            <Button type="submit" loading={saving}>{!saving ? <Save className="h-4 w-4" /> : null}Guardar lead</Button>
+            <Button type="submit" loading={saving}>{!saving ? <Save className="h-4 w-4" /> : null}Guardar consulta</Button>
           </div>
         ) : <ModalActions saving={saving} onClose={onClose} submitLabel="Guardar cambios" />}
     </ModalShell>
@@ -171,7 +166,7 @@ function FormSection({ number, title, description, children }) {
     <section className="rounded-2xl border border-slate-200 p-4 sm:p-5">
       <div className="mb-4 flex items-start gap-3">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-mint/25 bg-mint/10 text-xs font-bold text-mint">{number}</span>
-        <div><h3 className="font-bold text-cream">{title}</h3><p className="mt-1 text-xs text-slate-500">{description}</p></div>
+        <div><h3 className="font-bold text-cream">{title}</h3><p className="mt-1 text-sm text-textMuted">{description}</p></div>
       </div>
       {children}
     </section>

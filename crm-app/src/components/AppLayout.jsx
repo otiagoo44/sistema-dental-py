@@ -28,15 +28,17 @@ function NavButton({ item, activeView, count, onSelect, compact = false }) {
       <Icon className={`h-4 w-4 ${selected || item.id === 'metrics' ? 'text-mint' : 'text-textFaint group-hover:text-cream'}`} />
       <span>{item.label}</span>
       {Number(count) > 0 ? (
-        <span className="ml-auto rounded-full bg-mint px-2 py-0.5 text-[11px] text-inverse">{count}</span>
+        <span className="ml-auto rounded-full bg-mint px-2 py-0.5 text-xs text-inverse">{count}</span>
       ) : null}
     </button>
   );
 }
 
 export default function AppLayout({ activeView, setActiveView, clinic, profile, isAdmin = false, navCounts = {}, onLogout, children }) {
-  const visibleNavItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
-  const activeItem = NAV_ITEMS.find((item) => item.id === activeView) || (activeView === 'lead-detail' ? NAV_ITEMS.find((item) => item.id === 'leads') : null);
+  const roleLabel = (item) => ({ ...item, label: isAdmin && item.adminLabel ? item.adminLabel : item.label });
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.hiddenFromMain && (!item.adminOnly || isAdmin)).map(roleLabel);
+  const activeItemRaw = NAV_ITEMS.find((item) => item.id === activeView) || (activeView === 'lead-detail' ? NAV_ITEMS.find((item) => item.id === 'leads') : null);
+  const activeItem = activeItemRaw ? roleLabel(activeItemRaw) : null;
   const initials = String(profile?.full_name || profile?.email || 'U')
     .split(/\s+/)
     .slice(0, 2)
@@ -68,7 +70,7 @@ export default function AppLayout({ activeView, setActiveView, clinic, profile, 
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3">
-            <span className="rounded-full border border-mint/25 bg-mint/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-textSoft">{isAdmin ? 'Owner / admin' : 'Recepción'}</span>
+            <span className="rounded-full border border-mint/25 bg-mint/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-textSoft">{isAdmin ? 'Owner / admin' : 'Recepción'}</span>
             <button className="rounded-lg p-2 text-textMuted transition hover:bg-elevated hover:text-danger" type="button" onClick={onLogout} aria-label="Cerrar sesión">
               <LogOut className="h-4 w-4" />
             </button>
@@ -80,7 +82,7 @@ export default function AppLayout({ activeView, setActiveView, clinic, profile, 
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-soft/95 px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl md:px-8 lg:hidden">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-[11px] font-bold uppercase tracking-[0.16em] text-mint">Dental CRM · {clinic?.name || 'Sistema Dental'}</p>
+              <p className="truncate text-xs font-bold uppercase tracking-[0.16em] text-mint">Dental CRM · {clinic?.name || 'Sistema Dental'}</p>
               <h1 className="truncate text-lg font-bold text-cream">{activeItem?.label || 'CRM Dental'}</h1>
             </div>
             <button className="rounded-xl border border-slate-200 bg-card p-2.5 text-textMuted transition hover:border-mint/30 hover:bg-elevated hover:text-cream" type="button" onClick={onLogout} aria-label="Cerrar sesión">

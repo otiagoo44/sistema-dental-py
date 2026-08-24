@@ -75,7 +75,7 @@ declare
   direct_lead_blocked boolean := false;
   wrong_assignee_blocked boolean := false;
   scheduled public.appointments;
-  completed public.tasks;
+  confirmed public.appointments;
   manual_lead public.leads;
 begin
   if exists (select 1 from public.leads where clinic_id <> '00000000-0000-0000-0000-000000000101') then
@@ -197,16 +197,20 @@ begin
     raise exception 'Receptionist no pudo agendar por RPC';
   end if;
 
-  select * into completed
-  from public.complete_task((
-    select id
-    from public.tasks
-    where lead_id = scheduled.lead_id and type = 'confirm' and status = 'pendiente'
-    limit 1
-  ));
+  select * into confirmed
+  from public.update_appointment_outcome(scheduled.id, 'Confirmado', null, null, null);
 
-  if completed.status <> 'hecho' or completed.completed_at is null then
-    raise exception 'Receptionist no pudo completar task por RPC';
+  if confirmed.status <> 'Confirmado'
+     or exists (
+       select 1 from public.tasks
+       where lead_id = scheduled.lead_id and type = 'confirm'
+         and status in ('pendiente', 'vencido', 'Pendiente', 'Vencida')
+     )
+     or not exists (
+       select 1 from public.tasks
+       where lead_id = scheduled.lead_id and type = 'attendance' and status = 'pendiente'
+     ) then
+    raise exception 'Confirmar cita no sincronizo las acciones operativas';
   end if;
 end
 $$;

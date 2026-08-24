@@ -36,7 +36,7 @@ export function getLeadEvents(clinicId, leadId) {
 }
 
 export async function getClinicWorkspace(clinicId) {
-  const [leadsResult, appointmentsResult, tasksResult, profilesResult, settingsResult, pricesResult, templatesResult] = await Promise.all([
+  const [leadsResult, appointmentsResult, tasksResult, quotesResult, eventsResult, profilesResult, settingsResult, pricesResult, templatesResult] = await Promise.all([
     supabase
       .from('leads')
       .select('*')
@@ -53,6 +53,16 @@ export async function getClinicWorkspace(clinicId) {
       .select('*, leads(id, name, phone, phone_plus, treatment, urgency, situation, evaluation_previous, status, whatsapp_link)')
       .eq('clinic_id', clinicId)
       .order('due_at', { ascending: true, nullsFirst: false }),
+    supabase
+      .from('quotes')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .order('issued_at', { ascending: false }),
+    supabase
+      .from('lead_events')
+      .select('id, clinic_id, lead_id, event_type, title, description, metadata, created_by, created_at')
+      .eq('clinic_id', clinicId)
+      .order('created_at', { ascending: false }),
     supabase
       .from('profiles')
       .select('id, full_name, email, role, active')
@@ -76,9 +86,12 @@ export async function getClinicWorkspace(clinicId) {
       .order('name', { ascending: true }),
   ]);
 
+  const quoteRelationPending = quotesResult.error && ['42P01', 'PGRST205'].includes(quotesResult.error.code);
   const error = leadsResult.error
     || appointmentsResult.error
     || tasksResult.error
+    || (quoteRelationPending ? null : quotesResult.error)
+    || eventsResult.error
     || profilesResult.error
     || settingsResult.error
     || pricesResult.error
@@ -91,6 +104,8 @@ export async function getClinicWorkspace(clinicId) {
       leads: leadsResult.data || [],
       appointments: appointmentsResult.data || [],
       tasks: tasksResult.data || [],
+      quotes: quoteRelationPending ? [] : quotesResult.data || [],
+      events: eventsResult.data || [],
       profiles: profilesResult.data || [],
       settings: settingsResult.data || null,
       prices: pricesResult.data || [],

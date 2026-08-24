@@ -48,18 +48,20 @@ export default function TaskFormModal({ mode, task, initialLeadId, leads, saving
     <ModalShell
       className="max-w-2xl p-5"
       overlayClassName="sm:items-center"
+      onClose={onClose}
+      titleId="task-form-title"
       onSubmit={(event) => {
         event.preventDefault();
         handleSubmit();
       }}
     >
-        <ModalHeader title={isCreate ? 'Crear tarea' : 'Editar tarea'} subtitle="Tareas CRM" onClose={onClose} disabled={saving} />
-        {formError ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
+        <ModalHeader title={isCreate ? 'Crear tarea' : 'Editar tarea'} subtitle="Tareas CRM" onClose={onClose} disabled={saving} titleId="task-form-title" />
+        {formError ? <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Titulo" value={form.title} onChange={(value) => updateField('title', value)} disabled={saving} />
           <label className="block">
-            <span className="mb-2 block text-xs text-cream/55">Lead asociado</span>
+            <span className="mb-2 block text-sm font-semibold text-textMuted">Paciente asociado</span>
             <select className="input-premium" value={form.lead_id} onChange={(event) => updateField('lead_id', event.target.value)} disabled={saving}>
               <option value="">Sin lead</option>
               {leads.map((lead) => (

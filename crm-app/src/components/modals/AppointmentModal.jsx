@@ -18,11 +18,22 @@ function getAppointmentFormDefaults({ clinic, lead, appointment }) {
   };
 }
 
-function buildTimeSlots() {
-  const periods = [[8, 12], [14, 18]];
+function buildTimeSlots(openingHours, selectedDate) {
+  const fallback = [[8 * 60, 12 * 60], [14 * 60, 18 * 60]];
+  const day = selectedDate ? new Date(`${selectedDate}T12:00:00Z`).getUTCDay() : 1;
+  const segments = String(openingHours || '').split(';').map((value) => value.trim()).filter(Boolean);
+  const selectedSegment = day === 6
+    ? segments.find((value) => /s[aá]bado/i.test(value))
+    : day === 0
+      ? segments.find((value) => /domingo/i.test(value))
+      : segments.find((value) => /lunes|viernes|semana/i.test(value)) || segments[0];
+  const ranges = [...String(selectedSegment || '').matchAll(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/g)]
+    .map((match) => [Number(match[1]) * 60 + Number(match[2]), Number(match[3]) * 60 + Number(match[4])])
+    .filter(([start, end]) => start >= 0 && end <= 24 * 60 && end > start);
+  const periods = ranges.length ? ranges : fallback;
   return periods.flatMap(([start, end]) => {
     const slots = [];
-    for (let minutes = start * 60; minutes < end * 60; minutes += 30) {
+    for (let minutes = start; minutes < end; minutes += 30) {
       slots.push(`${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`);
     }
     return slots;
@@ -33,7 +44,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
   const [form, setForm] = useState(() => getAppointmentFormDefaults({ clinic, lead, appointment }));
   const [formError, setFormError] = useState('');
   const isReschedule = mode === 'reschedule';
-  const timeSlots = useMemo(buildTimeSlots, []);
+  const timeSlots = useMemo(() => buildTimeSlots(clinicSettings?.opening_hours, form.appointment_date), [clinicSettings?.opening_hours, form.appointment_date]);
   const dateOptions = useMemo(() => Array.from({ length: 14 }, (_, index) => {
     const date = startOfAsuncionDate(index);
     return { iso: toLocalIsoDate(date), date };
@@ -78,7 +89,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
     }
 
     if (!form.doctor_assigned.trim()) {
-      setFormError('Elegí el profesional o responsable del turno.');
+      setFormError('Elegí el profesional de la cita.');
       return;
     }
 
@@ -105,6 +116,8 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
   return (
     <ModalShell
       className="max-w-4xl p-4 sm:p-6"
+      onClose={onClose}
+      titleId="appointment-modal-title"
       onSubmit={(event) => {
         event.preventDefault();
         handleSubmit();
@@ -113,13 +126,13 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
         <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-mint">{isReschedule ? 'Reprogramar' : 'Nuevo turno'}</p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-cream">{isReschedule ? 'Reprogramar consulta' : 'Agendar consulta'}</h2>
-            <p className="mt-1 text-sm text-slate-500">{lead?.name || 'Lead asociado'} · elegí día, profesional y horario.</p>
+            <h2 id="appointment-modal-title" className="mt-1 text-2xl font-bold tracking-tight text-cream">{isReschedule ? 'Reprogramar consulta' : 'Agendar consulta'}</h2>
+            <p className="mt-1 text-sm text-slate-500">{lead?.name || 'Paciente asociado'} · elegí día, profesional y horario.</p>
           </div>
           <StatusBadge value={LEAD_STATUS.scheduled} />
         </div>
 
-        {formError ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
+        {formError ? <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div> : null}
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-5">
@@ -133,7 +146,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
                   const selected = form.appointment_date === iso;
                   return (
                     <button key={iso} className={`min-h-[74px] rounded-xl border px-2 py-2 text-center transition disabled:cursor-not-allowed disabled:border-slate-200/60 disabled:bg-soft disabled:text-slate-500 ${selected ? 'border-mint bg-mint text-inverse shadow-sm' : 'border-slate-200 bg-card text-textSoft hover:border-mint/35 hover:bg-elevated'}`} type="button" onClick={() => { updateField('appointment_date', iso); updateField('appointment_time', ''); }} disabled={saving}>
-                      <span className="block text-[10px] font-bold uppercase">{new Intl.DateTimeFormat('es-PY', { weekday: 'short', timeZone: 'America/Asuncion' }).format(date).replace('.', '')}</span>
+                      <span className="block text-xs font-bold uppercase">{new Intl.DateTimeFormat('es-PY', { weekday: 'short', timeZone: 'America/Asuncion' }).format(date).replace('.', '')}</span>
                       <span className="mt-1 block text-lg font-bold">{new Intl.DateTimeFormat('es-PY', { day: '2-digit', timeZone: 'America/Asuncion' }).format(date)}</span>
                     </button>
                   );
@@ -142,7 +155,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Select label="2. Profesional / responsable" value={form.doctor_assigned} onChange={(value) => { updateField('doctor_assigned', value); updateField('appointment_time', ''); }} options={doctorOptions} disabled={saving} />
+              <Select label="2. Profesional" value={form.doctor_assigned} onChange={(value) => { updateField('doctor_assigned', value); updateField('appointment_time', ''); }} options={doctorOptions} disabled={saving} />
               <Select label="Tratamiento agendado" value={form.treatment_scheduled} onChange={(value) => updateField('treatment_scheduled', value)} options={treatmentOptions} placeholder="Seleccionar tratamiento" disabled={saving} />
             </div>
             <label className="block">
@@ -166,7 +179,7 @@ export default function AppointmentModal({ clinic, lead, appointment, appointmen
               })}
             </div>
             <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-mint" />Seleccionado</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-card ring-1 ring-slate-300" />Disponible</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-rose-400/50" />Ocupado</span></div>
-            {clinicSettings?.opening_hours ? <p className="mt-4 rounded-xl border border-slate-200 bg-soft p-3 text-xs leading-5 text-slate-500">Horario configurado: {clinicSettings.opening_hours}. Los slots visuales usan 08:00–12:00 y 14:00–18:00; la restricción de base sigue siendo la autoridad final.</p> : null}
+            {clinicSettings?.opening_hours ? <p className="mt-4 rounded-xl border border-slate-200 bg-soft p-3 text-sm leading-6 text-textMuted">Horario configurado: {clinicSettings.opening_hours}. Si el formato no puede interpretarse, se usa el horario compatible 08:00–12:00 y 14:00–18:00.</p> : null}
           </div>
         </div>
 

@@ -22,12 +22,11 @@ set local role authenticated;
 do $$
 declare
   scheduled public.appointments;
-  no_show public.appointments;
-  recovery_task public.tasks;
   manual_lead public.leads;
   attempt_lead public.leads;
   attempted_task public.tasks;
   booking_blocked boolean := false;
+  early_no_show_blocked boolean := false;
 begin
   if (select count(*) from public.clinics) <> 1 then
     raise exception 'DentalPro owner no ve exactamente una clinica';
@@ -196,36 +195,14 @@ begin
     raise exception 'La doble reserva no fue bloqueada';
   end if;
 
-  select * into no_show
-  from public.update_appointment_outcome(scheduled.id, 'No Asistió', null, null, null);
+  begin
+    perform public.update_appointment_outcome(scheduled.id, 'No Asistió', null, null, null);
+  exception when sqlstate '22023' then
+    early_no_show_blocked := true;
+  end;
 
-  if no_show.status <> 'No Asistió' then
-    raise exception 'update_appointment_outcome no guardo No Asistio';
-  end if;
-
-  if not exists (
-    select 1
-    from public.leads
-    where id = scheduled.lead_id
-      and status = 'No Asistió'
-      and (next_followup_at at time zone 'America/Asuncion')::date
-        = (now() at time zone 'America/Asuncion')::date + 1
-      and (next_followup_at at time zone 'America/Asuncion')::time = time '09:00'
-  ) then
-    raise exception 'No-show no dejo seguimiento manana 09:00 America/Asuncion';
-  end if;
-
-  select * into recovery_task
-  from public.complete_task((
-    select id from public.tasks
-    where lead_id = scheduled.lead_id
-      and type = 'no_show_recovery'
-      and status = 'pendiente'
-    limit 1
-  ));
-
-  if recovery_task.status <> 'hecho' or recovery_task.completed_at is null then
-    raise exception 'complete_task no completo la tarea';
+  if not early_no_show_blocked then
+    raise exception 'Una cita futura pudo marcarse como No Asistió';
   end if;
 end
 $$;
@@ -239,7 +216,7 @@ declare
   archived_blocked boolean := false;
   direct_appointment_blocked boolean := false;
   scheduled public.appointments;
-  completed public.tasks;
+  confirmed public.appointments;
   templates_updated integer := 0;
 begin
   if exists (select 1 from public.leads where clinic_id <> '00000000-0000-0000-0000-000000000101') then
@@ -332,15 +309,20 @@ begin
     null
   );
 
-  select * into completed
-  from public.complete_task((
-    select id from public.tasks
-    where lead_id = scheduled.lead_id and type = 'confirm' and status = 'pendiente'
-    limit 1
-  ));
+  select * into confirmed
+  from public.update_appointment_outcome(scheduled.id, 'Confirmado', null, null, null);
 
-  if completed.status <> 'hecho' then
-    raise exception 'Receptionist no pudo completar task por RPC';
+  if confirmed.status <> 'Confirmado'
+     or exists (
+       select 1 from public.tasks
+       where lead_id = scheduled.lead_id and type = 'confirm'
+         and status in ('pendiente', 'vencido', 'Pendiente', 'Vencida')
+     )
+     or not exists (
+       select 1 from public.tasks
+       where lead_id = scheduled.lead_id and type = 'attendance' and status = 'pendiente'
+     ) then
+    raise exception 'Confirmar cita no cerro confirmacion o no creo registro de asistencia';
   end if;
 end
 $$;

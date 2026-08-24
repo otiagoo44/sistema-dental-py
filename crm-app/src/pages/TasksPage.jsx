@@ -68,7 +68,7 @@ export default function TasksView({ tasks, leads, appointments, canAdmin, onCrea
                 {task.description ? <p className="mt-2 text-sm text-slate-500">{task.description}</p> : null}
                 <div className="mt-3 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
                   <span>Vence: {task.due_at ? formatDateTime(task.due_at) : 'Sin vencimiento'}</span>
-                  <span>Paciente: {lead?.name || 'Sin lead asociado'}</span>
+                  <span>Paciente: {lead?.name || 'Sin paciente asociado'}</span>
                 </div>
               </div>
 
