@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Clipboard, Eye, Loader2, RotateCcw, Save } from 'lucide-react';
+import { Clipboard, Eye, Loader2, Plus, RotateCcw, Save } from 'lucide-react';
 import { slugify, generatePublicToken, formatAllowedOrigins, publicFormPayloadExample, publicFormFetchSnippet, publicFormIframeSnippet } from '../lib/crmDomain';
 import { buildMessageFromTemplate, WHATSAPP_TEMPLATE_DEFINITIONS, WHATSAPP_VARIABLES } from '../lib/messages';
 import { humanizeCrmError } from '../lib/errors';
@@ -18,6 +18,9 @@ export default function SettingsView({
   messageTemplates,
   savingTemplates,
   onSaveMessageTemplates,
+  treatmentPrices,
+  savingPrices,
+  onSaveTreatmentPrice,
   setNotice,
 }) {
   const [section, setSection] = useState('clinic');
@@ -28,6 +31,7 @@ export default function SettingsView({
         {[["clinic", "Clínica"], ["templates", "Plantillas"], ["system", "Sistema"]].map(([id, label]) => (
           <button key={id} type="button" onClick={() => setSection(id)} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${section === id ? 'bg-mint text-inverse' : 'text-textSoft hover:bg-elevated hover:text-cream'}`}>{label}</button>
         ))}
+        <button type="button" onClick={() => setSection('treatments')} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${section === 'treatments' ? 'bg-mint text-inverse' : 'text-textSoft hover:bg-elevated hover:text-cream'}`}>Tratamientos y precios</button>
       </div>
       {section === 'clinic' ? <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
@@ -60,6 +64,61 @@ export default function SettingsView({
         clinic={clinic}
         setNotice={setNotice}
       /> : null}
+      {section === 'treatments' ? <TreatmentPricesSettings prices={treatmentPrices} saving={savingPrices} onSave={onSaveTreatmentPrice} /> : null}
+    </section>
+  );
+}
+
+function TreatmentPricesSettings({ prices = [], saving, onSave }) {
+  const [drafts, setDrafts] = useState(() => Object.fromEntries(prices.map((price) => [price.id, { treatment: price.treatment || '', estimated_price: price.estimated_price ?? '' }])));
+  const [newTreatment, setNewTreatment] = useState('');
+  const [newPrice, setNewPrice] = useState('');
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    setDrafts(Object.fromEntries(prices.map((price) => [price.id, { treatment: price.treatment || '', estimated_price: price.estimated_price ?? '' }])));
+  }, [prices]);
+
+  async function saveExisting(id) {
+    setFormError('');
+    try { await onSave(drafts[id]); } catch (saveError) { setFormError(saveError.message || 'No se pudo guardar el precio.'); }
+  }
+
+  async function addTreatment() {
+    setFormError('');
+    try {
+      await onSave({ treatment: newTreatment, estimated_price: newPrice });
+      setNewTreatment('');
+      setNewPrice('');
+    } catch (saveError) { setFormError(saveError.message || 'No se pudo agregar el tratamiento.'); }
+  }
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-card p-5 text-cream shadow-glow">
+      <div className="mb-5 border-b border-slate-200 pb-4">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-mint">Configuración comercial</p>
+        <h2 className="mt-1 text-xl font-semibold">Tratamientos y precios</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-textMuted">Son precios de referencia para autocompletar presupuestos. Cada presupuesto puede modificarse y conserva su monto histórico.</p>
+      </div>
+      {formError ? <div role="alert" className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{formError}</div> : null}
+      <div className="space-y-3">
+        {prices.map((price) => (
+          <div key={price.id} className="grid gap-3 rounded-xl border border-slate-200 bg-soft p-3 md:grid-cols-[1fr_220px_auto] md:items-end">
+            <Field label="Tratamiento" value={drafts[price.id]?.treatment || ''} onChange={(value) => setDrafts((current) => ({ ...current, [price.id]: { ...current[price.id], treatment: value } }))} disabled={saving} />
+            <Field label="Precio de referencia (Gs.)" type="number" min="0" value={drafts[price.id]?.estimated_price ?? ''} onChange={(value) => setDrafts((current) => ({ ...current, [price.id]: { ...current[price.id], estimated_price: value } }))} disabled={saving} />
+            <Button size="sm" type="button" onClick={() => saveExisting(price.id)} loading={saving}><Save className="h-4 w-4" />Guardar</Button>
+          </div>
+        ))}
+        {!prices.length ? <p className="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-textMuted">Todavía no hay precios configurados. Agregá el primero abajo.</p> : null}
+      </div>
+      <div className="mt-5 rounded-xl border border-mint/20 bg-mint/[0.05] p-4">
+        <h3 className="font-semibold text-cream">Agregar tratamiento</h3>
+        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_220px_auto] md:items-end">
+          <Field label="Tratamiento" value={newTreatment} onChange={setNewTreatment} disabled={saving} placeholder="Ej. Implantes" />
+          <Field label="Precio de referencia (Gs.)" type="number" min="1" value={newPrice} onChange={setNewPrice} disabled={saving} placeholder="Ej. 8500000" />
+          <Button size="sm" type="button" onClick={addTreatment} loading={saving}><Plus className="h-4 w-4" />Agregar</Button>
+        </div>
+      </div>
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Archive, ArrowDownUp, CalendarPlus, ChevronLeft, Edit3, FilePlus, Flame, History, Phone, Search } from 'lucide-react';
+import { Archive, ArrowDownUp, BellPlus, CalendarPlus, ChevronLeft, Edit3, FilePlus, Flame, History, Phone, Search } from 'lucide-react';
 import { CLASSIFICATIONS, LEAD_STATUSES } from '../lib/constants';
 import { formatDateTime, formatMoney, normalizeText, todayIsoDate, toLocalIsoDate } from '../lib/formatters';
 import { buildCommercialTimeline, getLeadPriority, PRIORITY_FILTERS } from '../lib/commercialInsights';
@@ -137,7 +137,7 @@ function displayQuoteStatus(status) {
   return { pending: 'Pendiente', accepted: 'Aceptado', rejected: 'Rechazado', cancelled: 'Cancelado' }[status] || 'Sin estado';
 }
 
-export function LeadDetail({ lead, events, tasks, appointments, quotes = [], profiles, canAdmin, onBack, onEditLead, onArchiveLead, onScheduleAppointment, onRegisterOutcome, onRegisterQuote, onWhatsAppOpened, messageTemplates, clinicContext }) {
+export function LeadDetail({ lead, events, tasks, appointments, quotes = [], profiles, canAdmin, onBack, onEditLead, onArchiveLead, onScheduleAppointment, onCreateTask, onRegisterOutcome, onRegisterQuote, onWhatsAppOpened, messageTemplates, clinicContext }) {
   if (!lead) {
     return <EmptyState title="Paciente no encontrado" text="Volvé a Pacientes y seleccioná un registro." />;
   }
@@ -218,6 +218,12 @@ export function LeadDetail({ lead, events, tasks, appointments, quotes = [], pro
           {effectiveAction ? <Button variant="secondary" type="button" onClick={() => onRegisterOutcome({ lead, action: effectiveAction, task: actionTask })}>Registrar resultado</Button> : null}
           {['Asistió', 'Presupuesto Enviado'].includes(lead.status) ? <Button variant="secondary" type="button" onClick={() => onRegisterQuote(lead, latestAppointment)}><FilePlus className="h-4 w-4" />{leadQuotes.length ? 'Otro presupuesto' : 'Registrar presupuesto'}</Button> : null}
           {canAdmin ? <Button variant="ghost" type="button" onClick={() => onScheduleAppointment(lead)}><CalendarPlus className="h-4 w-4" />Agendar</Button> : null}
+          {canAdmin && onCreateTask ? <details className="relative">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-textMuted transition hover:border-mint/30 hover:bg-elevated hover:text-cream"><BellPlus className="h-4 w-4" />Más</summary>
+            <div className="absolute right-0 z-10 mt-2 w-64 rounded-xl border border-slate-200 bg-card p-2 shadow-xl">
+              <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-textMuted hover:bg-elevated hover:text-cream" onClick={() => onCreateTask(lead)}>Crear recordatorio adicional</button>
+            </div>
+          </details> : null}
         </div>
       </Card>
 

@@ -96,6 +96,7 @@ export default function App() {
   const [taskFormSaving, setTaskFormSaving] = useState(false);
   const [publicFormSaving, setPublicFormSaving] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
+  const [priceSaving, setPriceSaving] = useState(false);
   const [contactOutcomeModal, setContactOutcomeModal] = useState(null);
   const [contactOutcomeSaving, setContactOutcomeSaving] = useState(false);
   const [quoteModal, setQuoteModal] = useState(null);
@@ -118,6 +119,7 @@ export default function App() {
     setTaskFormSaving(false);
     setPublicFormSaving(false);
     setTemplateSaving(false);
+    setPriceSaving(false);
     setContactOutcomeModal(null);
     setContactOutcomeSaving(false);
     setQuoteModal(null);
@@ -1199,6 +1201,28 @@ export default function App() {
     }
   }
 
+  async function saveTreatmentPrice(price) {
+    if (!profile?.clinic_id || !canAdmin) throw new Error('Solo owner/admin puede editar precios.');
+    const treatment = String(price?.treatment || '').trim();
+    const estimatedPrice = Number(price?.estimated_price);
+    if (!treatment) throw new Error('El nombre del tratamiento es obligatorio.');
+    if (!Number.isFinite(estimatedPrice) || estimatedPrice <= 0) throw new Error('El precio debe ser mayor que cero.');
+
+    setPriceSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      const { error: priceError } = await supabase
+        .from('treatment_prices')
+        .upsert({ clinic_id: profile.clinic_id, treatment, estimated_price: estimatedPrice }, { onConflict: 'clinic_id,treatment' });
+      if (priceError) throw priceError;
+      await refreshClinicData();
+      setNotice(`Precio de referencia de “${treatment}” guardado.`);
+    } finally {
+      setPriceSaving(false);
+    }
+  }
+
   async function handleLogout() {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -1311,6 +1335,7 @@ export default function App() {
           onEditLead={openEditLeadModal}
           onArchiveLead={openArchiveLeadModal}
           onScheduleAppointment={openAppointmentModal}
+          onCreateTask={openCreateTaskModal}
           onRegisterOutcome={openRegisterOutcome}
           onRegisterQuote={openQuoteModal}
           onWhatsAppOpened={handleWhatsAppOpened}
@@ -1341,7 +1366,7 @@ export default function App() {
         <MetricsView leads={leads} appointments={appointments} tasks={tasks} treatmentPrices={treatmentPrices} profiles={clinicProfiles} clinic={clinic} />
       ) : null}
       {activeView === 'settings' && canAdmin ? (
-        <SettingsView clinic={clinic} profile={profile} publicFormConfig={publicFormConfig} savingPublicForm={publicFormSaving} onSavePublicForm={savePublicFormConfig} messageTemplates={messageTemplates} savingTemplates={templateSaving} onSaveMessageTemplates={saveMessageTemplates} setNotice={setNotice} />
+        <SettingsView clinic={clinic} profile={profile} publicFormConfig={publicFormConfig} savingPublicForm={publicFormSaving} onSavePublicForm={savePublicFormConfig} messageTemplates={messageTemplates} savingTemplates={templateSaving} onSaveMessageTemplates={saveMessageTemplates} treatmentPrices={treatmentPrices} savingPrices={priceSaving} onSaveTreatmentPrice={saveTreatmentPrice} setNotice={setNotice} />
       ) : null}
       </Suspense>
       <Suspense fallback={null}>
@@ -1402,6 +1427,7 @@ export default function App() {
         <QuoteModal
           key="quote-modal"
           context={quoteModal}
+          treatmentPrices={treatmentPrices}
           saving={quoteSaving}
           onClose={() => setQuoteModal(null)}
           onSubmit={saveQuote}
