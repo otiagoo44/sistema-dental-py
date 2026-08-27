@@ -1,93 +1,69 @@
-# Sistema Anti-Perdida de Pacientes de Alto Ticket
+# Dental CRM
 
-CRM odontologico multi-clinica para capturar, priorizar y dar seguimiento a consultas de implantes, ortodoncia, urgencias, estetica y tratamientos de alto valor.
+Producto CRM odontologico multi-clinica, preparado para vivir en un repositorio independiente de cualquier landing comercial.
 
 ## Arquitectura
 
 ```text
-Landing / iframe publico
-  -> Supabase Edge Function lead-intake
-  -> Supabase Postgres con RLS
-  -> CRM React/Vite en Vercel
-  -> n8n asincronico desde automation_jobs
+CRM React/Vite
+  -> Supabase Auth + Postgres + RLS + Realtime
+  -> Edge Functions
+  <- Landings externas por lead-intake publico
 ```
 
-Landing real actual: `https://sistema-dental-py.vercel.app` (sin slash final).
+Supabase es el unico backend del producto. Cada landing usa un `clinic_slug`, un `landing_token` y un origin registrado; el navegador nunca envia un `clinic_id` confiable ni contiene claves privadas.
 
-Regla central: Supabase guarda primero el lead. n8n automatiza despues. Si n8n, email, WhatsApp o cualquier alerta falla, el lead ya queda en Supabase y visible en el CRM.
+## Repositorio CRM objetivo
 
-## Carpetas
+```text
+dental-crm/
+  crm-app/
+  supabase/
+    functions/
+    migrations/
+    config.toml
+  tests/
+  docs/
+  README.md
+```
 
-- `crm-app/`: CRM React/Vite.
-- `js/lead-intake-form.js`: formulario publico de la landing.
-- `supabase/migrations/`: migraciones no destructivas.
-- `supabase/functions/lead-intake/`: Edge Function de intake.
-- `tests/`: pruebas PowerShell y SQL de verificacion.
-- `docs/`: onboarding, recepcion, produccion y n8n asincronico.
+El mapa exacto para separar este repositorio mixto esta en [`docs/CRM_STANDALONE.md`](docs/CRM_STANDALONE.md).
 
-## Desarrollo Local
+## Desarrollo
 
 ```powershell
 cd crm-app
 npm install
 npm run dev
+```
+
+Variables de `crm-app/.env.local`:
+
+```env
+VITE_SUPABASE_URL=https://PROJECT_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_xxx
+```
+
+La URL de `lead-intake` se deriva del mismo proyecto Supabase. No poner `SUPABASE_SERVICE_ROLE_KEY`, `FORM_HASH_SALT` ni secretos en frontend.
+
+## Verificacion y build
+
+```powershell
+cd crm-app
+npm test
 npm run build
 ```
 
-Variables locales del CRM:
+Vercel: Root Directory `crm-app`, Framework `Vite`, Build Command `npm run build`, Output Directory `dist`.
 
-```text
-VITE_SUPABASE_URL=https://unybqqzhgqxhrwucrofm.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_xxx
-VITE_PUBLIC_LEAD_WEBHOOK_URL=https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake
-```
+## Supabase
 
-No poner `SUPABASE_SERVICE_ROLE_KEY`, `FORM_HASH_SALT` ni secretos en frontend.
-
-## Deploy
-
-1. Confirmar que el repo esta linkeado a `unybqqzhgqxhrwucrofm` y aplicar migraciones.
-2. Configurar secrets de Edge Function.
-3. Deployar `lead-intake`.
-4. Configurar Vercel con root `crm-app`.
-5. Configurar Auth URLs del CRM en Supabase cuando exista dominio CRM.
-6. Configurar `allowed_origins` del formulario publico con `https://sistema-dental-py.vercel.app` y `http://localhost:5173`.
-7. Probar consentimiento, token correcto/falso, telefono invalido, duplicado, origins y rate limit.
-
-El formulario es exclusivamente comercial: solicita consentimiento para contacto y advierte que no se comparta informacion medica sensible. No reemplaza una consulta odontologica ni es una historia clinica.
-
-## Checklist Antes De Vender
-
-- RLS activo en tablas multi-clinica.
-- Edge Function deployada y con secrets.
-- Landing apunta a Edge Function, no a n8n.
-- CRM publicado en Vercel sin sourcemaps.
-- Usuarios `admin/owner` y `receptionist` creados.
-- Recepcionista no archiva ni edita configuracion.
-- Lead aparece en Supabase y CRM.
-- `automation_jobs` queda poblada para n8n.
-
-Ver detalle en `docs/checklist-produccion.md`.
-
-## Tests
+La carpeta `supabase/` contiene migraciones, RLS, RPCs, Realtime y `functions/lead-intake`. Flujo habitual:
 
 ```powershell
-$env:TOKEN = "lf_TOKEN_REAL"
-$env:SLUG = "dentalpro"
-$env:LANDING_ORIGIN = "https://sistema-dental-py.vercel.app"
-.\tests\lead-intake-test.ps1
-.\tests\load-30-leads.ps1
+npx.cmd supabase db push --dry-run --linked
+npx.cmd supabase db push --linked
+npx.cmd supabase functions deploy lead-intake --no-verify-jwt --project-ref PROJECT_REF
 ```
 
-`tests/sql-verification.sql` se ejecuta en Supabase SQL Editor para confirmar RLS, policies, duplicados, tareas, eventos, jobs y logs.
-
-`tests/rls-rpc-transactional.sql` prueba aislamiento multi-clinica, permisos por rol, RPCs, doble reserva, no-show y task completed dentro de una transaccion que termina en `ROLLBACK`.
-
-`tests/rls-real-users.sql` repite el aislamiento y los permisos usando los UUID Auth QA permanentes, tambien con `ROLLBACK`.
-
-Documentacion operativa:
-
-- `docs/privacidad-y-seguridad-operativa.md`
-- `docs/qa-rls-multiclinica.md`
-- `docs/qa-manual-release.md`
-- `docs/vercel-staging.md`
+Configurar `FORM_HASH_SALT` solo como secret de Edge Functions. El intake publico valida token, origin, consentimiento, honeypot y rate limit antes de ejecutar la RPC transaccional.

@@ -16,6 +16,7 @@ for (const marker of [
   'MAX_IP_SUBMISSIONS',
   'MAX_PHONE_SUBMISSIONS',
   'allowedOrigins.includes(origin)',
+  '.eq("clinic_slug", clinicSlug)',
   '.eq("public_token", landingToken)',
 ]) {
   const position = source.indexOf(marker);
@@ -24,6 +25,7 @@ for (const marker of [
 
 assert.equal(/\.from\(["']leads["']\)\s*\.(insert|update|upsert)/s.test(source), false, 'Edge Function must not write leads outside the transaction RPC');
 assert.equal(/\.from\(["']tasks["']\)\s*\.(insert|update|upsert)/s.test(source), false, 'Edge Function must not write tasks outside the transaction RPC');
+assert.equal(/body\.clinic_id|body\[\s*["']clinic_id["']\s*\]/.test(source), false, 'Edge Function must never trust clinic_id from a landing');
 assert.equal(/serviceRoleKey[^\n]*(message|payload|response)/i.test(source), false, 'service role must not be exposed in a response');
 assert.match(config, /\[functions\.lead-intake\][\s\S]*verify_jwt\s*=\s*false/, 'public intake auth mode must remain explicit in Supabase config');
 

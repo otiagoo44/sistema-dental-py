@@ -19,10 +19,10 @@ Clasificación: dependencia accidental de una migración histórica sobre estado
 | Entorno | Comando | Configuración |
 |---|---|---|
 | development | `npm run dev` | Variables locales ignoradas por Git; localhost permitido |
-| staging | `npm run build` | `--mode staging`; ref esperado fijado a staging y validado contra URL/webhook |
-| production | `npm run build:production` | exige `VITE_EXPECTED_SUPABASE_PROJECT_REF` de producción |
+| staging | `npm run build:staging` | `--mode staging` con las variables públicas del proyecto QA |
+| production | `npm run build` | build Vite estándar listo para Vercel |
 
-Variables públicas: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_PUBLIC_LEAD_WEBHOOK_URL`, `VITE_EXPECTED_SUPABASE_PROJECT_REF`. Secretos Edge: `SUPABASE_SERVICE_ROLE_KEY` y `FORM_HASH_SALT`; nunca deben entrar en Vite/Vercel público.
+Variables públicas: `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`. La URL de `lead-intake` se deriva del mismo origin Supabase. Secretos Edge: `SUPABASE_SERVICE_ROLE_KEY` y `FORM_HASH_SALT`; nunca deben entrar en Vite/Vercel público.
 
 ## Preflight y dry-run
 
@@ -40,7 +40,7 @@ Continuar sólo si la ref linked es la de staging y el plan contiene exclusivame
 $env:PGLITE_ENTRY='RUTA_ABSOLUTA_A_PGLITE_DIST_INDEX_JS'
 node tests/postgres-migration-smoke.mjs
 npm.cmd --prefix crm-app test
-npm.cmd --prefix crm-app run build
+npm.cmd --prefix crm-app run build:staging
 ```
 
 Para staging real, configurar las variables QA descritas por `tests/staging-smoke.mjs`; no guardar sus valores. Ejecutar además `tests/operational-integrity.sql`, `tests/operational-workflows-e2e.sql`, `tests/rls-real-users.sql` y `tests/rls-rpc-transactional.sql` dentro de transacciones con rollback.

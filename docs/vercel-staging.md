@@ -16,7 +16,7 @@ Deployment inmutable asociado a las mejoras de retención y scorecard: `https://
 
 - Root Directory: `crm-app`
 - Framework: Vite
-- Build Command: `npm run build`
+- Build Command: `npm run build:staging`
 - Output Directory: `dist`
 
 Variables:
@@ -24,7 +24,6 @@ Variables:
 ```env
 VITE_SUPABASE_URL=https://unybqqzhgqxhrwucrofm.supabase.co
 VITE_SUPABASE_ANON_KEY=PEGAR_PUBLISHABLE_KEY
-VITE_PUBLIC_LEAD_WEBHOOK_URL=https://unybqqzhgqxhrwucrofm.supabase.co/functions/v1/lead-intake
 ```
 
 No agregar `SUPABASE_SERVICE_ROLE_KEY` ni `FORM_HASH_SALT` a Vercel.

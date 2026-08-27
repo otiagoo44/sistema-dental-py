@@ -71,7 +71,7 @@ Repetir con teléfono abierto, terminal, token inválido, honeypot, dos recepcio
 ```bash
 cd crm-app
 npm test
-npm run build
+npm run build:staging
 ```
 
 Publicar `crm-app/dist` usando el procedimiento habitual del hosting de staging, con las variables públicas de Supabase de staging. No desplegar el frontend antes de que las verificaciones anteriores pasen.

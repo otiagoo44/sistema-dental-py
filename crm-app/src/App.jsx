@@ -1322,7 +1322,6 @@ export default function App() {
           onEditLead={openEditLeadModal}
           onArchiveLead={openArchiveLeadModal}
           onMarkLost={openLostLeadModal}
-          onMarkLost={openLostLeadModal}
           onOpenLead={handleLeadSelect}
           onUpdateLead={updateLead}
           onScheduleAppointment={openAppointmentModal}
