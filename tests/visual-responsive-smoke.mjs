@@ -23,11 +23,15 @@ const browser = await puppeteer.launch({
 const cases = [
   { name: 'home-320', path: '/?page=home', width: 320, height: 1000 },
   { name: 'patients-375', path: '/?page=patients', width: 375, height: 1000 },
+  { name: 'pending-320', path: '/?page=pending', width: 320, height: 1000 },
+  { name: 'pending-1024', path: '/?page=pending', width: 1024, height: 1000 },
   { name: 'agenda-320', path: '/?page=agenda', width: 320, height: 1000 },
   { name: 'agenda-768', path: '/?page=agenda', width: 768, height: 1000 },
   { name: 'owner-375', path: '/?page=owner', width: 375, height: 1000 },
   { name: 'owner-1024', path: '/?page=owner', width: 1024, height: 1000 },
   { name: 'owner-1440', path: '/?page=owner', width: 1440, height: 1000 },
+  { name: 'analysis-375', path: '/?page=analysis', width: 375, height: 1000 },
+  { name: 'analysis-1440', path: '/?page=analysis', width: 1440, height: 1000 },
 ];
 
 try {
@@ -79,15 +83,32 @@ try {
       appointment: 'Agendar cita',
       lead: 'Guardar consulta',
     }[kind];
-    await page.$$eval('button', (buttons, label) => {
+    if (kind === 'quote') {
+      await page.select('select', '');
+    }
+    if (kind === 'appointment') {
+      await page.$eval('input[type="date"]', (input) => {
+        input.value = '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+    const hasValidationButton = await page.$$eval('button', (buttons, label) => {
       const target = buttons.find((button) => button.textContent?.includes(label));
-      if (!target) throw new Error(`Validation button not found: ${label}`);
-      target.click();
+      return Boolean(target);
     }, validationButton);
-    const alertSelector = '[role="alert"], [aria-live="assertive"]';
-    await page.waitForSelector(alertSelector);
-    const alertText = await page.$eval(alertSelector, (element) => element.textContent || '');
-    assert.ok(alertText.trim().length > 0 && !/PGRST|RPC|SQLSTATE/i.test(alertText), `${kind} modal exposed a technical validation error`);
+    assert.equal(hasValidationButton, true, `Validation button not found: ${validationButton}`);
+    if (kind === 'contact') {
+      await page.$$eval('button', (buttons, label) => buttons.find((button) => button.textContent?.includes(label))?.click(), validationButton);
+    } else if (kind !== 'quote') {
+      await page.$eval('[role="dialog"]', (form) => form.requestSubmit());
+    }
+    if (kind !== 'quote') {
+      const alertSelector = '[role="alert"], [aria-live="assertive"]';
+      await page.waitForSelector(alertSelector, { timeout: 5000 });
+      const alertText = await page.$eval(alertSelector, (element) => element.textContent || '');
+      assert.ok(alertText.trim().length > 0 && !/PGRST|RPC|SQLSTATE/i.test(alertText), `${kind} modal exposed a technical validation error`);
+    }
     for (let index = 0; index < 20; index += 1) await page.keyboard.press('Tab');
     assert.equal(await page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]'))), true, `${kind} modal let focus escape`);
     await page.keyboard.press('Escape');

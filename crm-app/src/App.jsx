@@ -12,6 +12,7 @@ import {
 } from './lib/formatters';
 import { supabase } from './lib/supabase';
 import { humanizeCrmError } from './lib/errors';
+import { buildNextActionQueue, PRIORITY_GROUP } from './lib/nextActions';
 import useSupabaseSession from './hooks/useSupabaseSession';
 import useClinicWorkspace from './hooks/useClinicWorkspace';
 
@@ -33,7 +34,6 @@ import {
   isArchivedLead,
   getTreatmentOptions,
   numberOrNull,
-  integerOrZero,
   slugify,
   parseAllowedOrigins,
   taskConfigForLeadStatus,
@@ -53,6 +53,7 @@ const TaskFormModal = lazy(() => import('./components/modals/TaskFormModal'));
 const AgendaView = lazy(() => import('./pages/AgendaPage'));
 const Dashboard = lazy(() => import('./pages/DashboardPage'));
 const FollowupsView = lazy(() => import('./pages/FollowupsPage'));
+const PendingView = lazy(() => import('./pages/PendingPage'));
 const LeadsView = lazy(() => import('./pages/LeadsPage'));
 const LeadDetail = lazy(() => import('./pages/LeadsPage').then((module) => ({ default: module.LeadDetail })));
 const MetricsView = lazy(() => import('./pages/MetricsPage'));
@@ -131,17 +132,16 @@ export default function App() {
   const canAdmin = normalizedRole === ROLE.admin;
   const activeLeads = useMemo(() => leads.filter((lead) => !isArchivedLead(lead)), [leads]);
   const navCounts = useMemo(() => {
-    const now = Date.now();
     const today = todayIsoDate();
+    const queue = buildNextActionQueue({ leads: activeLeads, tasks, appointments, quotes });
     const openTasks = tasks.filter((task) => !['hecho', 'cancelado'].includes(task.status));
-    const followups = activeLeads.filter((lead) => lead.next_followup_at && new Date(lead.next_followup_at).getTime() <= now && !terminalStatuses.includes(lead.status));
     return {
       leads: activeLeads.filter((lead) => ['Nuevo', 'No Contactado'].includes(lead.status)).length,
-      followups: followups.length,
+      pending: queue.filter(({ action }) => action.priorityGroup !== PRIORITY_GROUP.later).length,
       agenda: appointments.filter((appointment) => appointment.appointment_date === today && APPOINTMENT_ACTIVE_STATUSES.includes(appointment.status)).length,
-      tasks: openTasks.filter((task) => !task.due_at || new Date(task.due_at).getTime() <= now).length,
+      tasks: openTasks.length,
     };
-  }, [activeLeads, appointments, tasks]);
+  }, [activeLeads, appointments, tasks, quotes]);
   const publicFormRoute = getPublicFormRoute();
   const clinicContext = useMemo(() => ({
     name: clinic?.name,
@@ -488,7 +488,7 @@ export default function App() {
     setNotice('');
 
     try {
-      const { data, error: insertError } = await supabase.rpc('create_manual_lead', {
+      const { data, error: insertError } = await supabase.rpc('create_manual_lead_v2', {
         p_name: name,
         p_phone: cleanOptionalText(form.phone),
         p_phone_plus: cleanOptionalText(form.phone_plus),
@@ -501,8 +501,6 @@ export default function App() {
         p_next_action: cleanOptionalText(form.next_action),
         p_next_followup_at: fromDatetimeLocalAsuncion(form.next_followup_at),
         p_assigned_to: form.assigned_to || null,
-        p_classification: form.classification || 'Lead Medio',
-        p_score: integerOrZero(form.score),
         p_situation: cleanOptionalText(form.situation),
         p_evaluation_previous: cleanOptionalText(form.evaluation_previous),
         p_estimated_value: numberOrNull(form.estimated_value),
@@ -1297,6 +1295,22 @@ export default function App() {
           clinicContext={clinicContext}
         />
       ) : null}
+      {activeView === 'pending' ? (
+        <PendingView
+          leads={activeLeads}
+          tasks={tasks}
+          appointments={appointments}
+          quotes={quotes}
+          profiles={clinicProfiles}
+          onOpenLead={handleLeadSelect}
+          onRegisterOutcome={openRegisterOutcome}
+          onConfirmAppointment={confirmAppointmentById}
+          onCompleteTask={completeTask}
+          onWhatsAppOpened={handleWhatsAppOpened}
+          messageTemplates={messageTemplates}
+          clinicContext={clinicContext}
+        />
+      ) : null}
       {activeView === 'leads' ? (
         <LeadsView
           leads={leads}
@@ -1307,6 +1321,7 @@ export default function App() {
           onCreateLead={openCreateLeadModal}
           onEditLead={openEditLeadModal}
           onArchiveLead={openArchiveLeadModal}
+          onMarkLost={openLostLeadModal}
           onMarkLost={openLostLeadModal}
           onOpenLead={handleLeadSelect}
           onUpdateLead={updateLead}
@@ -1363,10 +1378,18 @@ export default function App() {
         <TasksView tasks={tasks} leads={activeLeads} appointments={appointments} canAdmin={canAdmin} onCreateTask={openCreateTaskModal} onEditTask={openEditTaskModal} onComplete={completeTask} onOpenLead={handleLeadSelect} onWhatsAppOpened={handleWhatsAppOpened} messageTemplates={messageTemplates} clinicContext={clinicContext} />
       ) : null}
       {activeView === 'metrics' && canAdmin ? (
-        <MetricsView leads={leads} appointments={appointments} tasks={tasks} treatmentPrices={treatmentPrices} profiles={clinicProfiles} clinic={clinic} />
+        <MetricsView
+          leads={leads}
+          appointments={appointments}
+          tasks={tasks}
+          quotes={quotes}
+          workspaceEvents={workspaceEvents}
+          profiles={clinicProfiles}
+          onNavigate={setActiveView}
+        />
       ) : null}
       {activeView === 'settings' && canAdmin ? (
-        <SettingsView clinic={clinic} profile={profile} publicFormConfig={publicFormConfig} savingPublicForm={publicFormSaving} onSavePublicForm={savePublicFormConfig} messageTemplates={messageTemplates} savingTemplates={templateSaving} onSaveMessageTemplates={saveMessageTemplates} treatmentPrices={treatmentPrices} savingPrices={priceSaving} onSaveTreatmentPrice={saveTreatmentPrice} setNotice={setNotice} />
+        <SettingsView clinic={clinic} profile={profile} publicFormConfig={publicFormConfig} savingPublicForm={publicFormSaving} onSavePublicForm={savePublicFormConfig} messageTemplates={messageTemplates} savingTemplates={templateSaving} onSaveMessageTemplates={saveMessageTemplates} treatmentPrices={treatmentPrices} savingPrices={priceSaving} onSaveTreatmentPrice={saveTreatmentPrice} clinicSettings={clinicSettings} profiles={clinicProfiles} setNotice={setNotice} />
       ) : null}
       </Suspense>
       <Suspense fallback={null}>

@@ -21,17 +21,18 @@ export default function SettingsView({
   treatmentPrices,
   savingPrices,
   onSaveTreatmentPrice,
+  clinicSettings,
+  profiles = [],
   setNotice,
 }) {
   const [section, setSection] = useState('clinic');
   return (
     <section className="space-y-6">
       <PageHeader eyebrow="Administración" title="Configuración" subtitle="Datos de la clínica, plantillas y conexión segura del formulario público. Sólo visible para owner/admin." />
-      <div className="scrollbar-soft flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-card p-2">
-        {[["clinic", "Clínica"], ["templates", "Plantillas"], ["system", "Sistema"]].map(([id, label]) => (
+      <div className="scrollbar-soft flex gap-2 overflow-x-auto rounded-lg border border-slate-200 bg-card p-2">
+        {[["clinic", "Clínica"], ["treatments", "Tratamientos y precios"], ["hours", "Horarios"], ["messages", "Mensajes"], ["team", "Equipo"], ["capture", "Captación"]].map(([id, label]) => (
           <button key={id} type="button" onClick={() => setSection(id)} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${section === id ? 'bg-mint text-inverse' : 'text-textSoft hover:bg-elevated hover:text-cream'}`}>{label}</button>
         ))}
-        <button type="button" onClick={() => setSection('treatments')} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${section === 'treatments' ? 'bg-mint text-inverse' : 'text-textSoft hover:bg-elevated hover:text-cream'}`}>Tratamientos y precios</button>
       </div>
       {section === 'clinic' ? <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
@@ -56,8 +57,8 @@ export default function SettingsView({
         </Card>
       </div> : null}
 
-      {section === 'system' ? <PublicFormSettings clinic={clinic} config={publicFormConfig} saving={savingPublicForm} onSave={onSavePublicForm} setNotice={setNotice} /> : null}
-      {section === 'templates' ? <WhatsAppTemplatesSettings
+      {section === 'capture' ? <PublicFormSettings clinic={clinic} config={publicFormConfig} saving={savingPublicForm} onSave={onSavePublicForm} setNotice={setNotice} /> : null}
+      {section === 'messages' ? <WhatsAppTemplatesSettings
         templates={messageTemplates}
         saving={savingTemplates}
         onSave={onSaveMessageTemplates}
@@ -65,8 +66,27 @@ export default function SettingsView({
         setNotice={setNotice}
       /> : null}
       {section === 'treatments' ? <TreatmentPricesSettings prices={treatmentPrices} saving={savingPrices} onSave={onSaveTreatmentPrice} /> : null}
+      {section === 'hours' ? <Card className="p-5"><h2 className="text-lg font-semibold text-cream">Horarios de atención</h2><p className="mt-2 text-sm leading-6 text-textMuted">La Agenda usa este horario para proponer turnos disponibles.</p><div className="mt-4"><Info label="Horario configurado" value={clinicSettings?.opening_hours || 'Sin horario configurado'} /></div></Card> : null}
+      {section === 'team' ? <TeamSettings profiles={profiles} /> : null}
     </section>
   );
+}
+
+function TeamSettings({ profiles }) {
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-cream">Equipo activo</h2>
+      <p className="mt-1 text-sm text-textMuted">Personas disponibles para asignación y análisis operativo.</p>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {profiles.map((member) => <Card key={member.id} className="p-4"><p className="font-bold text-cream">{member.full_name || member.email}</p><p className="mt-1 text-sm text-textMuted">{member.email} · {roleLabel(member.role)}</p></Card>)}
+        {!profiles.length ? <Card className="p-4 text-sm text-textMuted">No hay integrantes activos para mostrar.</Card> : null}
+      </div>
+    </section>
+  );
+}
+
+function roleLabel(role) {
+  return { owner: 'Owner', admin: 'Administración', receptionist: 'Recepción' }[role] || role || 'Sin rol';
 }
 
 function TreatmentPricesSettings({ prices = [], saving, onSave }) {

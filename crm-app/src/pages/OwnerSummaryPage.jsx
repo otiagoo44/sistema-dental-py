@@ -1,67 +1,75 @@
 import { useMemo } from 'react';
-import { AlertTriangle, ArrowRight, BarChart3, Info } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowRight, BarChart3, CircleDollarSign } from 'lucide-react';
 import { formatMoney } from '../lib/formatters';
 import { buildOwnerSummary } from '../lib/ownerMetrics';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 
-export default function OwnerSummaryPage({ leads, appointments, tasks, quotes = [], workspaceEvents = [], onNavigate }) {
-  const summary = useMemo(() => buildOwnerSummary({ leads, appointments, tasks, quotes, workspaceEvents }), [leads, appointments, tasks, quotes, workspaceEvents]);
+export default function OwnerSummaryPage({ leads, appointments, tasks, quotes = [], workspaceEvents = [], profiles = [], onNavigate }) {
+  const summary = useMemo(() => buildOwnerSummary({ leads, appointments, tasks, quotes, workspaceEvents, profiles }), [leads, appointments, tasks, quotes, workspaceEvents, profiles]);
 
   return (
     <section className="space-y-6">
-      <PageHeader eyebrow="Resumen del dueño" title="Salud comercial de la clínica" subtitle={`Resultados operativos de ${summary.monthLabel}. Los montos son presupuestos, no cobros.`} />
-      <Card className="p-5 sm:p-6">
-        <h2 className="text-lg font-bold text-cream">Este mes</h2>
-        <div className="mt-5 grid gap-3 md:grid-cols-5">
-          {summary.funnel.map((item, index) => (
-            <div key={item.label} className="relative rounded-2xl border border-slate-200 bg-soft p-4" title={item.definition}>
-              <p className="text-3xl font-black text-cream">{item.value}</p>
-              <p className="mt-1 text-base font-semibold text-textSoft">{item.label}</p>
-              {index < summary.funnel.length - 1 ? <ArrowRight className="absolute -right-3 top-1/2 z-10 hidden h-5 w-5 text-mint md:block" /> : null}
+      <PageHeader eyebrow="Resumen" title="Cómo está funcionando la clínica" subtitle="Últimos 30 días. Los montos son presupuestos, no cobros." action={<Button variant="secondary" type="button" onClick={() => onNavigate('metrics')}><BarChart3 className="h-4 w-4" />Abrir análisis</Button>} />
+
+      <Card className="overflow-hidden">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-bold text-cream">Embudo comercial</h2>
+          <p className="mt-1 text-sm text-textMuted">Cada tasa usa como denominador la etapa anterior.</p>
+        </div>
+        <div className="scrollbar-soft flex overflow-x-auto">
+          {summary.funnel.map((step, index) => (
+            <div key={step.label} className="relative min-w-[150px] flex-1 border-r border-slate-200 px-4 py-5 last:border-r-0">
+              <p className="text-2xl font-black text-cream">{step.value}</p>
+              <p className="mt-1 text-sm font-semibold text-textSoft">{step.label}</p>
+              {index ? <p className="mt-3 flex items-center gap-1 text-xs font-bold text-mint"><ArrowDown className="h-3.5 w-3.5" />{step.rate}% avanzó</p> : <p className="mt-3 text-xs text-textMuted">Base del período</p>}
             </div>
           ))}
         </div>
-        <p className="mt-4 text-sm text-textMuted">Cada etapa cuenta oportunidades únicas por el evento ocurrido durante el período. “Consultas” usa la fecha de creación de la oportunidad.</p>
       </Card>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MoneyCard label="Presupuestado este mes" value={summary.money.quoted} />
-        <MoneyCard label="Pendiente actualmente" value={summary.money.pending} />
-        <MoneyCard label="Aceptado este mes" value={summary.money.accepted} note="Aceptado no significa cobrado" />
-        <MoneyCard label="Rechazado este mes" value={summary.money.rejected} />
-      </div>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card className="border-amber-400/30 bg-amber-400/[0.05] p-5 sm:p-6">
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="border-amber-400/30 bg-amber-400/[0.05] p-5">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-amber-300" />
-            <div>
-              <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.12em] text-amber-200">Monto cotizado que necesita atención <Info className="h-4 w-4" title="Suma de presupuestos pendientes asociados a pacientes que tienen una acción vencida, no tienen encargado o necesitan seguimiento." aria-label="Suma de presupuestos pendientes asociados a pacientes que tienen una acción vencida, no tienen encargado o necesitan seguimiento." /></p>
-              <p className="mt-3 text-3xl font-black text-cream">{formatMoney(summary.money.risk)}</p>
-              <p className="mt-1 text-base text-textSoft">{summary.money.riskCount} {summary.money.riskCount === 1 ? 'paciente' : 'pacientes'}</p>
-              <p className="mt-3 text-sm leading-6 text-textMuted">Presupuestos pendientes con seguimiento vencido, sin próxima acción o sin encargado. Cada presupuesto se cuenta una vez.</p>
-              <Button className="mt-4" variant="secondary" type="button" onClick={() => onNavigate('leads')}>Ver pacientes</Button>
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase text-amber-200">Principal punto a revisar</p>
+              {summary.bottleneck ? (
+                <>
+                  <h2 className="mt-2 text-2xl font-black text-cream">{summary.bottleneck.stage}</h2>
+                  <p className="mt-2 text-base leading-6 text-textSoft">{summary.bottleneck.message}</p>
+                  <p className="mt-2 text-sm text-textMuted">Conversión: {summary.bottleneck.rate}% · caída de {summary.bottleneck.drop} pacientes.</p>
+                  {summary.bottleneck.denominator < 10 ? <p className="mt-2 text-xs text-amber-200">Muestra pequeña; no representa todavía una tendencia definitiva.</p> : null}
+                </>
+              ) : <p className="mt-2 text-base text-textMuted">Todavía no hay suficiente volumen para calcular una caída.</p>}
+              <Button className="mt-4" variant="secondary" type="button" onClick={() => onNavigate('metrics')}>Ver definición<ArrowRight className="h-4 w-4" /></Button>
             </div>
           </div>
         </Card>
-        <Card className="p-5 sm:p-6">
-          <h2 className="text-lg font-bold text-cream">Principales fugas este mes</h2>
-          <div className="mt-4 space-y-3">
-            {summary.lossRows.map((row) => (
-              <div key={row.label} className="flex min-h-12 items-center justify-between rounded-xl border border-slate-200 bg-soft px-4 py-3">
-                <span className="text-base text-textSoft">{row.label}</span><strong className="text-xl text-cream">{row.count}</strong>
-              </div>
-            ))}
+
+        <Card className="p-5">
+          <div className="flex items-start gap-3">
+            <CircleDollarSign className="mt-0.5 h-5 w-5 shrink-0 text-mint" />
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase text-mint">Presupuestos que necesitan atención</p>
+              <p className="mt-2 text-2xl font-black text-cream">{formatMoney(summary.money.attention)}</p>
+              <p className="mt-2 text-sm text-textMuted">{summary.money.attentionCount} pacientes con presupuesto pendiente y acción inmediata. Aceptado no significa cobrado.</p>
+              <Button className="mt-4" variant="secondary" type="button" onClick={() => onNavigate('pending')}>Ver pendientes<ArrowRight className="h-4 w-4" /></Button>
+            </div>
           </div>
         </Card>
       </div>
-      <div className="flex justify-end">
-        <Button variant="ghost" type="button" onClick={() => onNavigate('metrics')}><BarChart3 className="h-4 w-4" />Ver análisis detallado</Button>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MoneySignal label="Monto presupuestado" value={summary.money.quoted} />
+        <MoneySignal label="Monto pendiente actual" value={summary.money.pending} />
+        <MoneySignal label="Monto aceptado" value={summary.money.accepted} note="No equivale a cobrado" />
       </div>
     </section>
   );
 }
 
-function MoneyCard({ label, value, note }) {
-  return <Card className="p-5"><p className="text-sm font-semibold text-textMuted">{label}</p><p className="mt-3 text-2xl font-black text-cream">{formatMoney(value)}</p>{note ? <p className="mt-2 text-sm text-amber-200">{note}</p> : null}</Card>;
+function MoneySignal({ label, value, note }) {
+  return <Card className="p-4"><p className="text-sm font-semibold text-textMuted">{label}</p><p className="mt-2 text-xl font-black text-cream">{formatMoney(value)}</p>{note ? <p className="mt-1 text-xs text-amber-200">{note}</p> : null}</Card>;
 }

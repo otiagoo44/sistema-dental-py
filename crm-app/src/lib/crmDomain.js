@@ -1,5 +1,4 @@
 import {
-  CLASSIFICATIONS,
   CONTACT_ATTEMPT_STATUSES,
   CONTACTED_STATUSES,
   NEXT_ACTION_OPTIONS,
@@ -62,8 +61,6 @@ export const LEAD_ADMIN_EDIT_FIELDS = [
   'phone_plus',
   'treatment',
   'urgency',
-  'classification',
-  'score',
   'status',
   'situation',
   'evaluation_previous',
@@ -215,11 +212,6 @@ export function numberOrNull(value) {
   if (value === '' || value === null || value === undefined) return null;
   const number = Number(value);
   return Number.isNaN(number) ? null : number;
-}
-
-export function integerOrZero(value) {
-  const number = Number(value);
-  return Number.isNaN(number) ? 0 : Math.max(0, Math.round(number));
 }
 
 export function slugify(value) {
@@ -403,8 +395,6 @@ export function buildLeadFormPatch(form, fields) {
   if (allowed.has('phone_plus')) patch.phone_plus = cleanOptionalText(form.phone_plus);
   if (allowed.has('treatment')) patch.treatment = cleanOptionalText(form.treatment);
   if (allowed.has('urgency')) patch.urgency = cleanOptionalText(form.urgency);
-  if (allowed.has('classification')) patch.classification = form.classification || 'Lead Medio';
-  if (allowed.has('score')) patch.score = integerOrZero(form.score);
   if (allowed.has('status')) patch.status = form.status || 'Nuevo';
   if (allowed.has('situation')) patch.situation = cleanOptionalText(form.situation);
   if (allowed.has('evaluation_previous')) patch.evaluation_previous = cleanOptionalText(form.evaluation_previous);

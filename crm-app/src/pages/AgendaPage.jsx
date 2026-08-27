@@ -7,6 +7,7 @@ import WhatsAppButton from '../components/crm/WhatsAppButton';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import FilterSheet, { ActiveFilterChips } from '../components/ui/FilterSheet';
 import PageHeader from '../components/ui/PageHeader';
 import StatCard from '../components/ui/StatCard';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -20,6 +21,7 @@ export default function AgendaView({ appointments, quotes = [], actionId, onOutc
   const [calendarOffset, setCalendarOffset] = useState(0);
   const [mode, setMode] = useState('day');
   const [status, setStatus] = useState('');
+  const [draftStatus, setDraftStatus] = useState('');
   const today = todayIsoDate();
   const calendarDays = useMemo(() => Array.from({ length: 7 }, (_, index) => {
     const date = startOfAsuncionDate(calendarOffset + index);
@@ -45,20 +47,20 @@ export default function AgendaView({ appointments, quotes = [], actionId, onOutc
   return (
     <section className="space-y-6">
       <PageHeader eyebrow="Calendario operativo" title="Agenda" subtitle="Sólo aparecen acciones válidas para el momento y estado de cada cita." action={<Button type="button" onClick={() => onNavigate('leads')}><CalendarPlus className="h-4 w-4" />Agendar desde Pacientes</Button>} />
-      <div className="hidden gap-4 sm:grid sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Citas en la vista" value={visibleAppointments.length} icon={CalendarDays} />
-        <StatCard label="Confirmadas" value={normalizedVisible.filter((value) => value === APPOINTMENT_STATUS.confirmed).length} tone="success" icon={CheckCircle2} />
-        <StatCard label="No asistieron" value={normalizedVisible.filter((value) => value === APPOINTMENT_STATUS.noShow).length} tone="danger" icon={Ban} />
-        <StatCard label="Reprogramadas" value={normalizedVisible.filter((value) => value === APPOINTMENT_STATUS.rescheduled).length} tone="purple" icon={RefreshCw} />
-      </div>
+      <details className="hidden rounded-lg border border-slate-200 bg-card sm:block">
+        <summary className="min-h-12 cursor-pointer px-5 py-4 text-sm font-bold text-textSoft">Resumen de la vista</summary>
+        <div className="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Citas en la vista" value={visibleAppointments.length} icon={CalendarDays} />
+          <StatCard label="Confirmadas" value={normalizedVisible.filter((value) => value === APPOINTMENT_STATUS.confirmed).length} tone="success" icon={CheckCircle2} />
+          <StatCard label="No asistieron" value={normalizedVisible.filter((value) => value === APPOINTMENT_STATUS.noShow).length} tone="danger" icon={Ban} />
+          <StatCard label="Reprogramadas" value={normalizedVisible.filter((value) => value === APPOINTMENT_STATUS.rescheduled).length} tone="purple" icon={RefreshCw} />
+        </div>
+      </details>
 
       <Card className="p-4">
         <div className="sm:hidden">
           <label className="block"><span className="mb-2 block text-sm font-semibold text-textMuted">Día</span><input className="input-premium" type="date" value={selectedDate} onChange={(event) => { setSelectedDate(event.target.value); setMode('day'); }} /></label>
-          <details className="mt-3 rounded-xl border border-slate-200 bg-soft p-3">
-            <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold text-textSoft">Filtrar por estado</summary>
-            <Select className="mt-3" label="Estado" value={status} onChange={setStatus} options={['Agendado', 'Confirmado', 'Asistió', 'No Asistió', 'Reprogramado', 'Cancelado']} placeholder="Todos" />
-          </details>
+          <div className="mt-3"><AgendaFilter status={status} draftStatus={draftStatus} setDraftStatus={setDraftStatus} setStatus={setStatus} /></div>
         </div>
         <div className="hidden flex-col gap-4 sm:flex xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0 flex-1">
@@ -84,12 +86,14 @@ export default function AgendaView({ appointments, quotes = [], actionId, onOutc
               })}
             </div>
           </div>
-          <div className="grid shrink-0 gap-3 sm:grid-cols-2 xl:w-[360px]">
+          <div className="grid shrink-0 gap-3 sm:grid-cols-2 xl:w-[360px] xl:grid-cols-1">
             <Select label="Período" value={mode} onChange={setMode} options={[{ value: 'day', label: 'Día seleccionado' }, { value: 'week', label: 'Semana visible' }, { value: 'upcoming', label: 'Próximas citas' }, { value: 'all', label: 'Historial completo' }]} />
-            <Select label="Estado" value={status} onChange={setStatus} options={['Agendado', 'Confirmado', 'Asistió', 'No Asistió', 'Reprogramado', 'Cancelado']} placeholder="Todos" />
+            <AgendaFilter status={status} draftStatus={draftStatus} setDraftStatus={setDraftStatus} setStatus={setStatus} />
           </div>
         </div>
       </Card>
+
+      <ActiveFilterChips items={status ? [{ key: 'status', label: status, onRemove: () => setStatus('') }] : []} />
 
       {grouped.length ? grouped.map(([date, dateAppointments]) => (
         <section key={date} className="space-y-3">
@@ -100,6 +104,19 @@ export default function AgendaView({ appointments, quotes = [], actionId, onOutc
         </section>
       )) : <EmptyState title="No hay citas en esta vista" text="Cambiá el día o los filtros. Para crear una cita, abrí Pacientes y elegí Agendar." />}
     </section>
+  );
+}
+
+function AgendaFilter({ status, draftStatus, setDraftStatus, setStatus }) {
+  return (
+    <FilterSheet
+      activeCount={status ? 1 : 0}
+      onOpen={() => setDraftStatus(status)}
+      onApply={() => setStatus(draftStatus)}
+      onClear={() => { setDraftStatus(''); setStatus(''); }}
+    >
+      <Select label="Estado" value={draftStatus} onChange={setDraftStatus} options={['Agendado', 'Confirmado', 'Asistió', 'No Asistió', 'Reprogramado', 'Cancelado']} placeholder="Todos" />
+    </FilterSheet>
   );
 }
 

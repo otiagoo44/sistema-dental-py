@@ -46,13 +46,6 @@ function sanitizeText(value: unknown, maxLength: number, fallback = "") {
   return clean || fallback;
 }
 
-function normalizeText(value: unknown) {
-  return sanitizeText(value, 500)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
 function normalizeClinicSlug(value: unknown) {
   return sanitizeText(value, 120)
     .toLowerCase()
@@ -110,79 +103,6 @@ function dbErrorMessage(error: unknown) {
     return String((error as { message?: unknown }).message || "unknown");
   }
   return "unknown";
-}
-
-function getTreatmentScore(treatment: string) {
-  const text = normalizeText(treatment);
-  if (text.includes("implante")) return 40;
-  if (text.includes("dolor") || text.includes("urgencia")) return 35;
-  if (text.includes("ortodoncia") || text.includes("bracket")) return 25;
-  if (text.includes("blanqueamiento")) return 15;
-  if (text.includes("limpieza")) return 10;
-  return 5;
-}
-
-function getUrgencyScore(urgency: string) {
-  const text = normalizeText(urgency);
-  if (text.includes("hoy")) return 35;
-  if (text.includes("semana")) return 25;
-  if (text.includes("mes")) return 10;
-  if (text.includes("solo") || text.includes("consultando")) return -10;
-  return 0;
-}
-
-function getEvaluationScore(evaluation: string) {
-  const text = normalizeText(evaluation);
-  if (text.includes("estudio") || text.includes("radiografia")) return 20;
-  if (text === "si" || text.startsWith("si ")) return 15;
-  if (text === "no" || text.startsWith("no ")) return 5;
-  return 0;
-}
-
-function getSituationScore(situation: string) {
-  const text = normalizeText(situation);
-  if (text.includes("agendar")) return 30;
-  if (text.includes("dolor") || text.includes("molestia")) return 25;
-  if (text.includes("precio")) return 5;
-  if (text.includes("comparando")) return -10;
-  return 0;
-}
-
-function getEstimatedValue(treatment: string) {
-  const text = normalizeText(treatment);
-  if (text.includes("implante")) return 5_000_000;
-  if (text.includes("ortodoncia") || text.includes("bracket")) return 4_000_000;
-  if (text.includes("blanqueamiento")) return 500_000;
-  if (text.includes("limpieza")) return 250_000;
-  if (text.includes("carilla")) return 2_000_000;
-  if (text.includes("dolor") || text.includes("urgencia")) return 350_000;
-  return 250_000;
-}
-
-function classify(score: number) {
-  if (score >= 80) return "Lead Caliente";
-  if (score >= 45) return "Lead Medio";
-  return "Lead Fr\u00edo";
-}
-
-function addTimeIso(amount: number, unit: "minutes" | "hours" | "days") {
-  const date = new Date();
-  if (unit === "minutes") date.setMinutes(date.getMinutes() + amount);
-  if (unit === "hours") date.setHours(date.getHours() + amount);
-  if (unit === "days") date.setDate(date.getDate() + amount);
-  return date.toISOString();
-}
-
-function nextActionFor(classification: string) {
-  if (classification === "Lead Caliente") return "Contactar inmediatamente";
-  if (classification === "Lead Medio") return "Contactar hoy";
-  return "Seguimiento autom\u00e1tico";
-}
-
-function nextFollowupFor(classification: string) {
-  if (classification === "Lead Caliente") return addTimeIso(5, "minutes");
-  if (classification === "Lead Medio") return addTimeIso(0, "minutes");
-  return addTimeIso(3, "days");
 }
 
 Deno.serve(async (req) => {
@@ -420,22 +340,14 @@ Deno.serve(async (req) => {
     const source = sanitizeText(body.origen || body.source, 120, "Landing odontologia");
     const page = sanitizeText(body.pagina || body.page, 120, "landing");
     const notes = sanitizeText(body.notes, 1000) || null;
+    const utmSource = sanitizeText(body.utm_source, 200) || null;
+    const utmMedium = sanitizeText(body.utm_medium, 200) || null;
+    const utmCampaign = sanitizeText(body.utm_campaign, 240) || null;
+    const utmContent = sanitizeText(body.utm_content, 240) || null;
+    const utmTerm = sanitizeText(body.utm_term, 240) || null;
+    const landingPage = sanitizeText(body.landing_page, 500) || null;
+    const referrer = sanitizeText(body.referrer, 500) || null;
     const consentAt = new Date().toISOString();
-
-    const score = Math.max(
-      0,
-      getTreatmentScore(treatment) +
-        getUrgencyScore(urgency) +
-        getEvaluationScore(evaluationPrevious) +
-        getSituationScore(situation) +
-        10 +
-        (name.trim().split(/\s+/).length >= 2 ? 5 : 0),
-    );
-
-    const classification = classify(score);
-    const estimatedValue = getEstimatedValue(treatment);
-    const nextAction = nextActionFor(classification);
-    const nextFollowupAt = nextFollowupFor(classification);
     const whatsappMessage = encodeURIComponent(
       `Hola ${name}, vimos que dejaste tus datos por ${treatment}. \u00bfQuer\u00e9s que te pasemos los horarios disponibles para una evaluaci\u00f3n?`,
     );
@@ -444,7 +356,7 @@ Deno.serve(async (req) => {
     // All domain writes happen in one Postgres transaction. The Edge Function
     // remains responsible for HTTP, origin, token, consent, anti-spam and rate limits.
     const { data: intakeResult, error: intakeError } = await supabase.rpc(
-      "create_public_lead_intake",
+      "create_public_lead_intake_v2",
       {
         p_form_id: formConfig.id,
         p_clinic_slug: clinicSlug,
@@ -454,14 +366,9 @@ Deno.serve(async (req) => {
         p_phone_plus: phoneResult.phonePlus,
         p_treatment: treatment,
         p_urgency: urgency,
-        p_score: score,
-        p_classification: classification,
         p_situation: situation,
         p_evaluation_previous: evaluationPrevious,
         p_consultation_reason: consultationReason,
-        p_estimated_value: estimatedValue,
-        p_next_action: nextAction,
-        p_next_followup_at: nextFollowupAt,
         p_whatsapp_link: whatsappLink,
         p_source: source,
         p_page: page,
@@ -469,6 +376,13 @@ Deno.serve(async (req) => {
         p_consent_at: consentAt,
         p_ip_hash: ipHash,
         p_phone_hash: phoneHash,
+        p_utm_source: utmSource,
+        p_utm_medium: utmMedium,
+        p_utm_campaign: utmCampaign,
+        p_utm_content: utmContent,
+        p_utm_term: utmTerm,
+        p_landing_page: landingPage,
+        p_referrer: referrer,
       },
     );
 
@@ -486,8 +400,8 @@ Deno.serve(async (req) => {
     return jsonResponse(responseOrigin, 200, {
       success: true,
       message: "Datos enviados correctamente",
-      classification: result.classification || classification,
-      score: result.score ?? score,
+      classification: result.classification || null,
+      score: result.score ?? null,
       lead_id: result.lead_id,
       assigned: Boolean(result.assigned_to),
       created: Boolean(result.created),

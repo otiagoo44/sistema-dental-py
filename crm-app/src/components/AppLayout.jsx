@@ -5,6 +5,7 @@ import { NAV_ITEMS } from '../lib/constants';
 const icons = {
   dashboard: Gauge,
   leads: Users,
+  pending: ListTodo,
   followups: ListTodo,
   agenda: CalendarDays,
   tasks: CheckSquare2,

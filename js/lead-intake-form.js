@@ -435,6 +435,8 @@ function buildPayload() {
     answers.tratamiento ||
     null;
 
+  const urlParams = new URLSearchParams(window.location.search);
+
   return {
     clinic_slug: LEAD_FORM_CONFIG.clinicSlug,
     landing_token: LEAD_FORM_CONFIG.landingToken,
@@ -452,6 +454,13 @@ function buildPayload() {
     consentimiento_contacto: answers.consentimiento_contacto === true,
     website: "",
     company: "",
+    utm_source: urlParams.get("utm_source") || null,
+    utm_medium: urlParams.get("utm_medium") || null,
+    utm_campaign: urlParams.get("utm_campaign") || null,
+    utm_content: urlParams.get("utm_content") || null,
+    utm_term: urlParams.get("utm_term") || null,
+    landing_page: `${window.location.origin}${window.location.pathname}`,
+    referrer: document.referrer || null,
   };
 }
 

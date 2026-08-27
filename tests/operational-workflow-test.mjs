@@ -123,7 +123,7 @@ const unassignedBeatsAppointment = getEffectiveNextAction({ ...baseLead, assigne
   now,
   appointments: [{ id: 'appointment-unassigned', lead_id: baseLead.id, status: 'Agendado', appointment_date: '2026-08-24', appointment_time: '13:00:00' }],
 });
-assert.equal(unassignedBeatsAppointment.actionType, 'assign_owner');
+assert.equal(unassignedBeatsAppointment.actionType, 'confirm_appointment');
 
 const earliestOpenTask = getEffectiveNextAction(baseLead, {
   now,
@@ -161,5 +161,64 @@ assert.equal(canTransitionAppointment('Agendado', 'Asistió', futureAppointment,
 assert.equal(canTransitionAppointment('Confirmado', 'Asistió', pastAppointment, now), true);
 assert.equal(canTransitionAppointment('Asistió', 'Confirmado', pastAppointment, now), false);
 assert.equal(canTransitionAppointment('No Asistió', 'Reprogramado', pastAppointment, now), true);
+
+const mediumAppointmentBeforeHotFuture = buildNextActionQueue({
+  now,
+  leads: [
+    { ...baseLead, id: 'hot-future', score: 92, classification: 'Lead Caliente', next_followup_at: '2026-08-27T15:00:00.000Z' },
+    { ...baseLead, id: 'medium-imminent', score: 65, classification: 'Lead Medio' },
+  ],
+  appointments: [{ id: 'imminent-appointment', lead_id: 'medium-imminent', status: 'Agendado', appointment_date: '2026-08-24', appointment_time: '11:20:00' }],
+});
+assert.equal(mediumAppointmentBeforeHotFuture[0].lead.id, 'medium-imminent');
+
+const coldOverdueBeforeHotTomorrow = buildNextActionQueue({
+  now,
+  leads: [
+    { ...baseLead, id: 'cold-overdue', score: 22, classification: 'Lead Frío' },
+    { ...baseLead, id: 'hot-tomorrow', score: 94, classification: 'Lead Caliente', next_followup_at: '2026-08-25T15:00:00.000Z' },
+  ],
+  tasks: [{ id: 'cold-overdue-task', lead_id: 'cold-overdue', type: 'followup', title: 'Seguimiento vencido', status: 'pendiente', due_at: '2026-08-24T14:00:00.000Z' }],
+});
+assert.equal(coldOverdueBeforeHotTomorrow[0].lead.id, 'cold-overdue');
+
+const tenPatientLeads = [
+  { ...baseLead, id: 'p1', name: 'Nueva', status: 'Nuevo', score: 82, first_contacted_at: null, last_contact_at: null },
+  { ...baseLead, id: 'p2', name: 'Vencida', score: 30, classification: 'Lead Frío' },
+  { ...baseLead, id: 'p3', name: 'Cita', score: 60, classification: 'Lead Medio' },
+  { ...baseLead, id: 'p4', name: 'No show', status: 'No Asistió', score: 55 },
+  { ...baseLead, id: 'p5', name: 'Presupuesto', status: 'Presupuesto Enviado', score: 70 },
+  { ...baseLead, id: 'p6', name: 'Recordatorio', score: 40 },
+  { ...baseLead, id: 'p7', name: 'Futuro', score: 90, next_followup_at: '2026-08-26T15:00:00.000Z' },
+  { ...baseLead, id: 'p8', name: 'Sin encargado', assigned_to: null, score: 50 },
+  { ...baseLead, id: 'p9', name: 'Terminal', status: 'Tratamiento Iniciado', score: 96 },
+  { ...baseLead, id: 'p10', name: 'Archivada', is_archived: true, score: 88 },
+];
+const tenPatientContext = {
+  now,
+  leads: tenPatientLeads,
+  tasks: [
+    { id: 'p2-task', lead_id: 'p2', type: 'followup', title: 'Seguimiento vencido', status: 'pendiente', due_at: '2026-08-24T14:00:00.000Z' },
+    { id: 'p6-task', lead_id: 'p6', type: 'manual_reminder', title: 'Pedir radiografía', status: 'pendiente', due_at: '2026-08-24T19:00:00.000Z' },
+  ],
+  appointments: [
+    { id: 'p3-appointment', lead_id: 'p3', status: 'Agendado', appointment_date: '2026-08-24', appointment_time: '11:20:00' },
+    { id: 'p4-appointment', lead_id: 'p4', status: 'No Asistió', appointment_date: '2026-08-23', appointment_time: '10:00:00' },
+  ],
+  quotes: [{ id: 'p5-quote', lead_id: 'p5', status: 'pending', next_action_at: '2026-08-24T14:00:00.000Z' }],
+};
+const tenPatientQueue = buildNextActionQueue(tenPatientContext);
+assert.equal(tenPatientQueue.length, 8);
+assert.equal(new Set(tenPatientQueue.map((item) => item.lead.id)).size, tenPatientQueue.length);
+assert.equal(tenPatientQueue[0].lead.id, 'p1');
+assert.equal(tenPatientQueue.some((item) => ['p9', 'p10'].includes(item.lead.id)), false);
+
+const respondedAction = getEffectiveNextAction({ ...tenPatientLeads[0], status: 'Respondió', first_contacted_at: now.toISOString() }, { now });
+assert.notEqual(respondedAction.actionType, 'initial_contact');
+assert.equal(getEffectiveNextAction({ ...tenPatientLeads[0], status: 'Tratamiento Iniciado' }, { now }), null);
+const futureBeforeDue = getEffectiveNextAction(tenPatientLeads[6], { now });
+const futureAfterDue = getEffectiveNextAction(tenPatientLeads[6], { now: new Date('2026-08-26T16:00:00.000Z') });
+assert.equal(futureBeforeDue.priorityGroup, PRIORITY_GROUP.later);
+assert.equal(futureAfterDue.priorityGroup, PRIORITY_GROUP.now);
 
 console.log('PASS canonical next actions, priorities and state transitions');

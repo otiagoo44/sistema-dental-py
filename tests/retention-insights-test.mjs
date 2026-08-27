@@ -6,13 +6,13 @@ const now = new Date('2026-08-22T15:00:00.000Z');
 const hotLead = { id: 'lead-1', name: 'Laura', classification: 'Lead Caliente', status: 'Nuevo', created_at: '2026-08-22T12:00:00.000Z', treatment: 'Implante dental', urgency: 'Hoy', source: 'WhatsApp directo' };
 const urgent = getLeadPriority(hotLead, { now });
 assert.equal(urgent.level, 'urgent');
-assert.match(urgent.reason, /caliente/i);
+assert.match(urgent.reason, /sin respuesta/i);
 
-const controlled = getLeadPriority({ ...hotLead, status: 'Confirmado', last_contact_at: '2026-08-22T13:00:00.000Z', assigned_to: 'u1' }, { appointments: [{ lead_id: 'lead-1', status: 'Confirmado', appointment_date: '2026-08-23' }], now });
+const controlled = getLeadPriority({ ...hotLead, status: 'Confirmado', last_contact_at: '2026-08-22T13:00:00.000Z', assigned_to: 'u1', next_action: 'Seguimiento', next_followup_at: '2026-08-25T13:00:00.000Z' }, { now });
 assert.equal(controlled.level, 'controlled');
 
 const alerts = getRiskAlerts([hotLead], [], [], now);
-assert.equal(alerts[0].id, 'hot');
+assert.equal(alerts[0].id, 'new');
 
 const rendered = buildMessageFromTemplate(
   'Hola {{nombre}}. {{tratamiento}} · {{fuente}} · {{fecha_cita}} {{hora_cita}} · {{dato_inexistente}}',

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../supabase/functions/lead-intake/index.ts', import.meta.url), 'utf8');
 const config = await readFile(new URL('../supabase/config.toml', import.meta.url), 'utf8');
-const rpcMarker = '"create_public_lead_intake"';
+const rpcMarker = '"create_public_lead_intake_v2"';
 const rpcPosition = source.indexOf(rpcMarker);
 
 assert.ok(rpcPosition > 0, 'lead-intake must call the transactional intake RPC');

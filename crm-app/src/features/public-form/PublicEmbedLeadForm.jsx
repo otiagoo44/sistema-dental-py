@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { PUBLIC_LEAD_WEBHOOK_URL, cleanOptionalText } from '../../lib/crmDomain';
 import { humanizeCrmError } from '../../lib/errors';
+import { captureUrlAttribution } from '../../lib/attribution';
 import { Field, TextArea } from '../../components/crm/CrmPrimitives';
 
 export default function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
@@ -64,6 +65,7 @@ export default function PublicEmbedLeadForm({ clinicSlug, landingToken }) {
       fecha_envio: new Date().toISOString(),
       consentimiento_contacto: true,
       website: '',
+      ...captureUrlAttribution(window.location, document.referrer),
     };
 
     setSending(true);

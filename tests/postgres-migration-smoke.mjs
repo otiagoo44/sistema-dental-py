@@ -78,7 +78,7 @@ for (const migrationName of migrationNames) {
   }
 }
 
-for (const testName of ['operational-integrity.sql', 'operational-workflows-e2e.sql']) {
+for (const testName of ['operational-integrity.sql', 'operational-workflows-e2e.sql', 'clarity-scoring.sql']) {
   const sql = await readFile(path.join(projectRoot, 'tests', testName), 'utf8');
   try {
     await database.exec(sql);

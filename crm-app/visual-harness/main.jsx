@@ -5,6 +5,8 @@ import AppLayout from '../src/components/AppLayout.jsx';
 import Dashboard from '../src/pages/DashboardPage.jsx';
 import LeadsView from '../src/pages/LeadsPage.jsx';
 import AgendaView from '../src/pages/AgendaPage.jsx';
+import PendingPage from '../src/pages/PendingPage.jsx';
+import MetricsView from '../src/pages/MetricsPage.jsx';
 import ContactOutcomeModal from '../src/components/modals/ContactOutcomeModal.jsx';
 import QuoteModal from '../src/components/modals/QuoteModal.jsx';
 import AppointmentModal from '../src/components/modals/AppointmentModal.jsx';
@@ -21,9 +23,9 @@ const profiles = [
   { id: 'user-owner', full_name: 'Dueño Dental', email: 'owner@example.test', role: 'owner', active: true },
 ];
 const leads = [
-  { id: 'lead-1', clinic_id: 'clinic-1', name: 'María González', phone_plus: '+595981111111', treatment: 'Implante dental', status: 'Nuevo', assigned_to: 'user-reception', created_at: new Date(now.getTime() - 18 * 60_000).toISOString(), next_action: 'Responder nueva consulta', next_followup_at: new Date(now.getTime() - 13 * 60_000).toISOString() },
-  { id: 'lead-2', clinic_id: 'clinic-1', name: 'Carlos Benítez', phone_plus: '+595982222222', treatment: 'Ortodoncia', status: 'Contactado', assigned_to: 'user-reception', created_at: now.toISOString(), next_action: 'Volver a contactar', next_followup_at: new Date(now.getTime() + 2 * 60 * 60_000).toISOString() },
-  { id: 'lead-3', clinic_id: 'clinic-1', name: 'Laura Gómez', phone_plus: '', treatment: 'Carillas', status: 'Confirmado', assigned_to: 'user-reception', created_at: now.toISOString(), next_action: 'Registrar asistencia', next_followup_at: now.toISOString() },
+  { id: 'lead-1', clinic_id: 'clinic-1', name: 'María González', phone_plus: '+595981111111', treatment: 'Implante dental', status: 'Nuevo', score: 88, classification: 'Lead Caliente', assigned_to: 'user-reception', created_at: new Date(now.getTime() - 18 * 60_000).toISOString(), next_action: 'Responder nueva consulta', next_followup_at: new Date(now.getTime() - 13 * 60_000).toISOString(), source_normalized: 'Instagram' },
+  { id: 'lead-2', clinic_id: 'clinic-1', name: 'Carlos Benítez', phone_plus: '+595982222222', treatment: 'Ortodoncia', status: 'Contactado', score: 64, classification: 'Lead Medio', assigned_to: 'user-reception', created_at: now.toISOString(), first_contacted_at: now.toISOString(), next_action: 'Volver a contactar', next_followup_at: new Date(now.getTime() + 2 * 60 * 60_000).toISOString(), source_normalized: 'Google' },
+  { id: 'lead-3', clinic_id: 'clinic-1', name: 'Laura Gómez', phone_plus: '', treatment: 'Carillas', status: 'Confirmado', score: 45, classification: 'Lead Frío', assigned_to: 'user-reception', created_at: now.toISOString(), first_contacted_at: now.toISOString(), next_action: 'Registrar asistencia', next_followup_at: now.toISOString(), source_normalized: 'Referido' },
 ];
 const tasks = [
   { id: 'task-1', clinic_id: 'clinic-1', lead_id: 'lead-1', type: 'contact', title: 'Responder nueva consulta', status: 'pendiente', priority: 'alta', due_at: leads[0].next_followup_at, assigned_to: 'user-reception' },
@@ -48,8 +50,8 @@ const workspaceEvents = [
 const noop = () => {};
 const params = new URLSearchParams(window.location.search);
 const page = params.get('page') || 'home';
-const isOwner = page === 'owner';
-const activeView = page === 'patients' ? 'leads' : page === 'agenda' ? 'agenda' : 'dashboard';
+const isOwner = ['owner', 'analysis'].includes(page);
+const activeView = page === 'patients' ? 'leads' : page === 'pending' ? 'pending' : page === 'agenda' ? 'agenda' : page === 'analysis' ? 'metrics' : 'dashboard';
 
 const common = { leads, tasks, appointments, quotes, profiles, workspaceEvents, messageTemplates: [], clinicContext: {}, onNavigate: noop };
 let content;
@@ -59,6 +61,10 @@ if (page === 'modal') {
   content = <LeadsView {...common} canAdmin={false} onCreateLead={noop} onOpenLead={noop} onRegisterOutcome={noop} onWhatsAppOpened={noop} />;
 } else if (page === 'agenda') {
   content = <AgendaView {...common} actionId="" onOutcome={noop} onReschedule={noop} onOpenLead={noop} onRegisterQuote={noop} onRegisterOutcome={noop} onWhatsAppOpened={noop} />;
+} else if (page === 'pending') {
+  content = <PendingPage {...common} onOpenLead={noop} onRegisterOutcome={noop} onConfirmAppointment={noop} onCompleteTask={noop} onWhatsAppOpened={noop} />;
+} else if (page === 'analysis') {
+  content = <MetricsView {...common} onNavigate={noop} />;
 } else {
   content = <Dashboard {...common} canAdmin={isOwner} onCreateLead={noop} onOpenLead={noop} onRegisterOutcome={noop} onConfirmAppointment={noop} onWhatsAppOpened={noop} onRefresh={noop} />;
 }
@@ -84,9 +90,9 @@ function ModalScenario({ kind, saving }) {
       <h1 className="text-2xl font-bold text-cream">Prueba de modal</h1>
       <button id="qa-modal-opener" className="button-primary min-h-11 rounded-xl px-4" type="button" onClick={() => setOpen(true)}>Abrir modal</button>
       {open && kind === 'contact' ? <ContactOutcomeModal context={context} saving={saving} quotes={quotes} onClose={() => setOpen(false)} onSubmit={async () => {}} /> : null}
-      {open && kind === 'quote' ? <QuoteModal context={{ lead: leads[1], appointment: appointments[1] }} saving={saving} onClose={() => setOpen(false)} onSubmit={async () => {}} /> : null}
-      {open && kind === 'appointment' ? <AppointmentModal clinic={{ doctor_name: 'Dra. López' }} lead={leads[1]} appointments={appointments} profiles={profiles} clinicSettings={{ opening_hours: 'Lunes a viernes 08:00-12:00; 14:00-18:00' }} mode="schedule" saving={saving} onClose={() => setOpen(false)} onSubmit={async () => {}} /> : null}
-      {open && kind === 'lead' ? <LeadFormModal mode="create" lead={null} canAdmin={false} profiles={profiles} currentUserId="user-reception" saving={saving} onClose={() => setOpen(false)} onSubmit={async () => {}} /> : null}
+      {open && kind === 'quote' ? <QuoteModal context={{ lead: leads[1], appointment: appointments[1] }} saving={saving} onClose={() => setOpen(false)} onSubmit={async () => { throw new Error('No se pudo guardar el presupuesto de prueba.'); }} /> : null}
+      {open && kind === 'appointment' ? <AppointmentModal clinic={{ doctor_name: 'Dra. López' }} lead={leads[1]} appointments={appointments} profiles={profiles} clinicSettings={{ opening_hours: 'Lunes a viernes 08:00-12:00; 14:00-18:00' }} mode="schedule" saving={saving} onClose={() => setOpen(false)} onSubmit={async () => { throw new Error('No se pudo guardar la cita de prueba.'); }} /> : null}
+      {open && kind === 'lead' ? <LeadFormModal mode="create" lead={null} canAdmin={false} profiles={profiles} currentUserId="user-reception" saving={saving} onClose={() => setOpen(false)} onSubmit={async () => { throw new Error('No se pudo guardar la consulta de prueba.'); }} /> : null}
     </section>
   );
 }

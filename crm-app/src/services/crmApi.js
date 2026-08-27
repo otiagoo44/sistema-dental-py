@@ -76,7 +76,7 @@ export async function getClinicWorkspace(clinicId) {
       .maybeSingle(),
     supabase
       .from('treatment_prices')
-      .select('treatment, estimated_price')
+      .select('id, treatment, estimated_price')
       .eq('clinic_id', clinicId)
       .order('treatment', { ascending: true }),
     supabase

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CalendarPlus, Save } from 'lucide-react';
-import { CLASSIFICATIONS, EVALUATION_OPTIONS, NEXT_ACTION_OPTIONS, SITUATION_OPTIONS, TREATMENT_OPTIONS, URGENCY_OPTIONS } from '../../lib/constants';
+import { EVALUATION_OPTIONS, NEXT_ACTION_OPTIONS, SITUATION_OPTIONS, TREATMENT_OPTIONS, URGENCY_OPTIONS } from '../../lib/constants';
 import { addDaysAsuncion, formatDateTime, fromDatetimeLocalAsuncion, toDatetimeLocalAsuncion } from '../../lib/formatters';
 import { humanizeCrmError } from '../../lib/errors';
 import { MANUAL_LEAD_SOURCES, addHoursIso } from '../../lib/crmDomain';
@@ -16,8 +16,6 @@ function getLeadFormDefaults(lead, currentUserId = '') {
     phone_plus: lead?.phone_plus || '',
     treatment: lead?.treatment || 'Consulta general',
     urgency: lead?.urgency || 'Esta semana',
-    classification: lead?.classification || 'Lead Medio',
-    score: lead?.score ?? 0,
     status: lead?.status || 'Nuevo',
     situation: lead?.situation || 'Quiere agendar una consulta',
     evaluation_previous: lead?.evaluation_previous || 'No sabe',
@@ -117,7 +115,6 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
                 <Select label="Urgencia" value={form.urgency} onChange={(value) => updateField('urgency', value)} options={URGENCY_OPTIONS} disabled={saving} />
                 <Select label="Evaluación previa" value={form.evaluation_previous} onChange={(value) => updateField('evaluation_previous', value)} options={EVALUATION_OPTIONS} disabled={saving} />
                 <Select label="Situación" value={form.situation} onChange={(value) => updateField('situation', value)} options={SITUATION_OPTIONS} disabled={saving} />
-                {canAdmin ? <Select label="Clasificación interna" value={form.classification} onChange={(value) => updateField('classification', value)} options={CLASSIFICATIONS} disabled={saving} /> : null}
                 {!isCreate ? <div className="rounded-xl border border-slate-200 bg-soft p-3"><p className="text-sm font-semibold text-textMuted">Estado actual</p><p className="mt-1 font-bold text-cream">{form.status}</p></div> : null}
                 <TextArea label="Motivo o nota breve (opcional)" value={form.consultation_reason} onChange={(value) => updateField('consultation_reason', value)} disabled={saving} className="md:col-span-2 xl:col-span-3" placeholder="Contexto comercial mínimo, sin información clínica sensible." />
               </div>
@@ -140,7 +137,7 @@ export default function LeadFormModal({ mode, lead, canAdmin, profiles, currentU
                 </label> : null}
                 {isCreate && canAdmin ? followupPreset === 'custom' ? <Field label="Fecha y hora personalizada" type="datetime-local" value={form.next_followup_at} onChange={(value) => updateField('next_followup_at', value)} disabled={saving} /> : <div className="rounded-xl border border-sky-400/20 bg-sky-400/10 p-3 text-sm text-sky-300 md:col-span-2 xl:col-span-3">Seguimiento programado para {formatDateTime(fromDatetimeLocalAsuncion(form.next_followup_at))}.</div> : null}
                 <TextArea label={isCreate ? 'Nota interna (opcional)' : 'Notas'} value={form.notes} onChange={(value) => updateField('notes', value)} disabled={saving} className="md:col-span-2 xl:col-span-3" />
-                {canAdmin && !isCreate ? <><Field label="Score" type="number" value={form.score} onChange={(value) => updateField('score', value)} disabled={saving} /><Field label="Valor potencial estimado" type="number" value={form.estimated_value} onChange={(value) => updateField('estimated_value', value)} disabled={saving} /></> : null}
+                {canAdmin && !isCreate ? <Field label="Valor potencial estimado" type="number" value={form.estimated_value} onChange={(value) => updateField('estimated_value', value)} disabled={saving} /> : null}
               </div>
               {isCreate ? <label className="mt-4 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600"><input className="mt-0.5 h-4 w-4 accent-mint" type="checkbox" checked={form.consent_contact} onChange={(event) => updateField('consent_contact', event.target.checked)} disabled={saving} /><span>La persona autorizó a la clínica a contactarla por estos datos.</span></label> : null}
             </FormSection>
