@@ -6,9 +6,9 @@
 
 // Configuracion multi-clinica editable.
 // Estos valores son publicos y reemplazan cualquier clinic_id hardcodeado en frontend.
-const CLINIC_SLUG = "dentalpro";
-const LANDING_TOKEN = "lf_FQtBqoPD7BCHLQkkDEdS4eK-pXwjj5WJCfLb8fvt6uI";
-const WEBHOOK_URL = "https://kfpdworxksqofipmjijz.supabase.co/functions/v1/lead-intake";
+const CLINIC_SLUG = "qa-first-clinic-a";
+const LANDING_TOKEN = "lf_qa_first_clinic_a_0123456789abcdef0123456789";
+const WEBHOOK_URL = "https://aqdufiycayedsfldljjq.supabase.co/functions/v1/lead-intake";
 
 // ─── Configuración editable ─────────────────────────────────
 const LEAD_FORM_CONFIG = {
@@ -88,6 +88,7 @@ const answers = {};
 let overlayEl = null;
 /** Evita doble avance si el usuario aprieta "Siguiente" y el auto-avance del mismo paso. */
 let autoAdvanceTimer = null;
+let formStartedAt = null;
 
 function clearAutoAdvanceTimer() {
   if (autoAdvanceTimer != null) {
@@ -323,6 +324,10 @@ function renderCurrentStep() {
         `
           )
           .join("")}
+        <label class="flex items-start gap-2 text-xs text-muted">
+          <input type="checkbox" data-lead-consent class="mt-0.5" />
+          <span>Acepto que me contacten por WhatsApp para responder mi consulta.</span>
+        </label>
       </div>
     `;
   }
@@ -363,6 +368,10 @@ function currentStepIsValid() {
       setInlineError(p.message);
       return false;
     }
+    if (!answers.consentimiento_contacto) {
+      setInlineError("Aceptá el consentimiento de contacto para continuar.");
+      return false;
+    }
     return true;
   }
   return false;
@@ -375,6 +384,8 @@ function syncFieldAnswersFromDOM() {
     const input = overlayEl.querySelector(`[data-lead-field="${f.key}"]`);
     if (input) answers[f.key] = input.value;
   });
+  const consent = overlayEl.querySelector("[data-lead-consent]");
+  if (consent) answers.consentimiento_contacto = consent.checked;
 }
 
 function goBack() {
@@ -406,7 +417,6 @@ function goNext() {
 
 /** Construye el cuerpo JSON para Supabase Edge Function. */
 function buildPayload() {
-  const fechaEnvio = new Date().toISOString();
   const phoneResult = validatePhone(answers.telefono || "");
   const consultationReason =
     answers.consultation_reason ||
@@ -425,10 +435,10 @@ function buildPayload() {
     evaluacion_previa: answers.evaluacion_previa || "",
     situacion: answers.situacion || "",
     consultation_reason: consultationReason,
-    horario_preferido: "",
     origen: "Landing odontología",
     pagina: "implantes",
-    fecha_envio: fechaEnvio,
+    consentimiento_contacto: answers.consentimiento_contacto === true,
+    form_started_at: formStartedAt,
     website: "",
     company: "",
   };
@@ -567,6 +577,7 @@ function openLeadFormModal() {
   if (old) old.remove();
 
   resetFormState();
+  formStartedAt = new Date().toISOString();
   overlayEl = buildOverlay();
   document.body.appendChild(overlayEl);
   document.body.style.overflow = "hidden";
